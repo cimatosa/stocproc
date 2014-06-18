@@ -5,4 +5,4 @@ generate time continuous stochastic process for a given correlation function usi
 
 sphinx html doc can be found at
 
-http://http://cimatosa.github.io/stocproc/
+http://cimatosa.github.io/stocproc/
