@@ -17,7 +17,44 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
-"""Stochastic Process Module
+"""
+Stochastic Process Module
+=========================
+
+This module contains various methods to generate stochastic processes for a 
+given correlation function. There are two different kinds of generators. The one kind
+allows to generate the process for a given time grid, where as the other one generates a
+time continuous process in such a way that it allows to "correctly" interpolate between the
+solutions of the time discrete version.
+
+    **time discrete methods:**
+        :py:func:`stochastic_process_kle` 
+        Simulate Stochastic Process using Karhunen-Loève expansion
+            This method still needs explicit integrations weights for the 
+            numeric integrations. For convenience you can use
+            
+                :py:func:`stochastic_process_mid_point_weight` simplest approach, for
+                test reasons only, uses :py:func:`get_mid_point_weights` 
+                to calculate the weights
+                
+                :py:func:`stochastic_process_trapezoidal_weight` little more sophisticated,
+                so far for general use, uses :py:func:`get_trapezoidal_weights_times` 
+                to calculate the weights
+                
+                .. todo:: implement Simpson etc.
+    
+        
+        :py:func:`stochastic_process_fft`
+        Simulate Stochastic Process using FFT method
+        
+    **time continuous methods:**
+        :py:class:`StocProc` 
+        Simulate Stochastic Process using Karhunen-Loève expansion and allows
+        for correct interpolation. This class still needs explicit integrations 
+        weights for the numeric integrations (use :py:func:`get_trapezoidal_weights_times`
+        for general purposes).
+        
+        .. todo:: implement convenient classes with fixed weights
 """
 
 from __future__ import division
