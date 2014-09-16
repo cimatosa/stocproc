@@ -58,10 +58,7 @@ solutions of the time discrete version.
 
 
 import numpy as np
-
 import time as tm
-
-
 
 class StocProc(object):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion 
@@ -712,6 +709,4 @@ def auto_correlation(x, s_0_idx = 0):
     x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
     return np.mean(x * np.conj(x_s_0), axis = 0)
 
-if __name__ == '__main__':
-    print('this is the stocproc module')
-    
+ 
