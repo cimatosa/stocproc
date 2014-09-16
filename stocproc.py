@@ -18,8 +18,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 """
-Stochastic Process Module
-=========================
+**Stochastic Process Module**
 
 This module contains various methods to generate stochastic processes for a 
 given correlation function. There are two different kinds of generators. The one kind
@@ -57,18 +56,12 @@ solutions of the time discrete version.
         .. todo:: implement convenient classes with fixed weights
 """
 
-from __future__ import division
+
 import numpy as np
 
 import time as tm
-# _pp_ import my_pypreprocessor as pp
-# _pp_ pypreprocessor = pp.Preprocessor(__file__, verbose = False, always_parse = False)
 
-# _pp_ # pypreprocessor.define('TIME_IT')
-# _pp_ pypreprocessor.define('VERBOSE')
-# _pp_ # pypreprocessor.define('TESTING')
 
-# _pp_ pypreprocessor.process()
 
 class StocProc(object):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion 
@@ -180,12 +173,6 @@ class StocProc(object):
         same weights :math:`w_i` and time grid points :math:`s_i`.
         """
         tmp = self._Y * self._sqrt_eig_val.reshape(self._num_ev,1)
-#exclude
-# _pp_         print "tmp = rand * sqrt(eig_val): shape", tmp.shape
-# _pp_         print tmp
-# _pp_         print "eig_vec: shape", self._eig_vec.shape
-# _pp_         print self._eig_vec
-#endexclude
         return np.tensordot(tmp, self._eig_vec, axes=([0],[1])).flatten()
         
     def x(self, t):
@@ -330,9 +317,7 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
     seed = None
     sig_min = 0
     t_large = np.linspace(0, t_max, ng_interpolation)
-#ifdef VERBOSE
-    print "start auto_grid_points, determine ng ..."
-#endif
+    print("start auto_grid_points, determine ng ...")
 
     #exponential increase to get below error threshold
     while err > tol:
@@ -345,19 +330,17 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
         
         err = np.max(err_method(r_t_s, r_t_s_exact))
 
-#ifdef VERBOSE
-        print "    ng {} -> err {:.2e}".format(ng, err)
-#endif        
+        print("    ng {} -> err {:.2e}".format(ng, err))
         
     ng_low = ng // 2
     ng_high = ng
     
     while (ng_high - ng_low) > 1:
-        print "#"*40
-        print "    ng_l", ng_low
-        print "    ng_h", ng_high
+        print("#"*40)
+        print("    ng_l", ng_low)
+        print("    ng_h", ng_high)
         ng = (ng_low + ng_high) // 2
-        print "    ng", ng
+        print("    ng", ng)
         t, w = get_trapezoidal_weights_times(t_max, ng)
         stoc_proc = StocProc(r_tau, t, w, seed, sig_min)
 
@@ -366,16 +349,14 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
         
         err = np.max(err_method(r_t_s, r_t_s_exact))
 
-#ifdef VERBOSE
-        print "    ng {} -> err {:.2e}".format(ng, err)
-#endif
+        print("    ng {} -> err {:.2e}".format(ng, err))
         if err > tol:
-            print "        err > tol!"
-            print "        ng_l -> ", ng
+            print("        err > tol!")
+            print("        ng_l -> ", ng)
             ng_low = ng
         else:
-            print "        err <= tol!"
-            print "        ng_h -> ", ng
+            print("        err <= tol!")
+            print("        ng_h -> ", ng)
             ng_high = ng
     
 
@@ -416,17 +397,13 @@ def solve_hom_fredholm(r, w, eig_val_min):
     d = np.diag(np.sqrt(w))
     d_inverse = np.diag(1/np.sqrt(w))
     r = np.dot(d, np.dot(r, d))
-#ifdef VERBOSE
-    print "solve eigenvalue equation ..."
-#endif
+    print("solve eigenvalue equation ...")
     eig_val, eig_vec = np.linalg.eigh(r)
 
     # use only eigenvalues larger than sig_min**2
     large_eig_val_idx = np.where(eig_val >= eig_val_min)[0]
     num_of_functions = len(large_eig_val_idx)
-#ifdef VERBOSE
-    print "use {} / {} eigenfunctions".format(num_of_functions, len(w))
-#endif
+    print("use {} / {} eigenfunctions".format(num_of_functions, len(w)))
     eig_val = eig_val[large_eig_val_idx]
     eig_vec = eig_vec[:, large_eig_val_idx]
     
@@ -489,10 +466,8 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
         stochastic process.
     """
 
-#ifdef VERBOSE
-    print "__ stochastic_process __"
-    print "pre calculations ..."
-#endif
+    print("__ stochastic_process __")
+    print("pre calculations ...")
     if seed != None:
         np.random.seed(seed)
     
@@ -503,9 +478,6 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
     # r_tau(t-s) -> integral/sum over s -> s must be row in EV equation
     r = r_tau(t_col-t_row)
     
-#ifdef TIME_IT
-# _pp_     t_0 = tm.clock()
-#endif 
 
     # solve discrete Fredholm equation
     # eig_val = lambda
@@ -515,61 +487,14 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
     # generate samples
     sig = np.sqrt(eig_val).reshape(1, num_of_functions)               # variance of the random quantities of the  Karhunen-Loève expansion
 
-#ifdef TIME_IT
-# _pp_     t_1 = tm.clock()
-#endif
     
-#ifdef VERBOSE
-    print "generate samples ..."
-#endif
+    print("generate samples ...")
     x = np.random.normal(size=(num_samples, num_of_functions)) * sig  # random quantities all aligned for num_samples samples
-#exclude
-# _pp_     print "x = rand * sqrt(eigval): shape", x.shape
-# _pp_     print x
-# _pp_     print "eig_vec: shape", eig_vec.shape
-# _pp_     print eig_vec
-#endexclude
     x_t_array = np.tensordot(x, eig_vec, axes=([1],[1]))              # multiplication with the eigenfunctions == base of Karhunen-Loève expansion
-#ifdef TESTING    
-# _pp_     print "use np.dot ..."
-# _pp_     x_t_array_2 = np.dot(x, eig_vec.T)                                  
-# _pp_     assert np.all(x_t_array == x_t_array_2)
-# _pp_     print "passed test: np.all(x_t_array == x_t_array_2)"
-#endif
-#ifdef TIME_IT
-# _pp_     t_2 = tm.clock()
-#endif
     
-#ifdef TESTING
-#ifdef VERBOSE
-# _pp_     print "generate samples (alternative) ..."
-#endif
-# _pp_     assert seed != None
-# _pp_     x_t_array_alt = _stochastic_process_alternative_samples(num_samples, num_of_functions, t, sig.flatten(), eig_vec, seed)
-#ifdef TIME_IT
-# _pp_     t_3 = tm.clock()
-#endif
-# _pp_     assert np.all(x_t_array == x_t_array_alt)
-# _pp_     print "passed test: assert np.all(x_t_array == x_t_array_alt)"
-#ifdef TIME_IT
-# _pp_     print "generate samples alternative        : {:.2e}s".format(t_3-t_2)
-# _pp_     print "-"*50
-#endif
-#endif
     
-#ifdef TIME_IT
-# _pp_     print "-"*50
-# _pp_     print "solve eigenvalue equation           : {:.2e}s".format(t_1-t_0)
-# _pp_     print "generate samples                    : {:.2e}s".format(t_2-t_1)
-# _pp_     print "-"*50
-# _pp_     print "time per sample                     : {:.2e}s".format((t_2-t_1) / num_samples )
-# _pp_     print "overall time                        : {:.2e}s".format(t_2-t_0)
-# _pp_     print "-"*50
-#endif
 
-#ifdef VERBOSE
-    print "ALL DONE!\n"
-#endif
+    print("ALL DONE!\n")
     
     return x_t_array
 
@@ -582,7 +507,7 @@ def _stochastic_process_alternative_samples(num_samples, num_of_functions, t, si
     """
     np.random.seed(seed)
     x_t_array = np.empty(shape=(num_samples, len(t)), dtype = complex)
-    for i in xrange(num_samples):
+    for i in range(num_samples):
         x = np.random.normal(size=num_of_functions) * sig
         x_t_array[i,:] = np.dot(eig_vec, x.T)
     return x_t_array
@@ -737,13 +662,8 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
         1D array of time grid points). Each row of the stochastic process 
         array contains one sample of the stochastic process.
     """
-#ifdef VERBOSE
-    print "__ stochastic_process_fft __"
-    print "pre calculations ..."
-#endif
-#ifdef TIME_IT
-# _pp_     t_0 = tm.clock()
-#endif
+    print("__ stochastic_process_fft __")
+    print("pre calculations ...")
     n_dft = num_grid_points * 2 - 1
     delta_t = t_max / (num_grid_points-1)
     delta_omega = 2 * np.pi / delta_t / n_dft
@@ -752,47 +672,20 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     omega = delta_omega*np.arange(n_dft)
     #reshape for multiplication with matrix xi
     sqrt_spectral_density = np.sqrt(spectral_density(omega)).reshape((1, n_dft))
-#ifdef TIME_IT
-# _pp_     t_1 = tm.clock()
-#endif
     if seed != None:
         np.random.seed(seed)
-#ifdef VERBOSE
-    print "  omega_max  : {:.2}".format(delta_omega * n_dft)
-    print "  delta_omega: {:.2}".format(delta_omega)
-    print "generate samples ..."
-#endif
-#ifdef TIME_IT
-# _pp_     t_2 = tm.clock()
-#endif
+    print("  omega_max  : {:.2}".format(delta_omega * n_dft))
+    print("  delta_omega: {:.2}".format(delta_omega))
+    print("generate samples ...")
     #random normal samples
     xi = np.random.normal(size = (num_samples,n_dft))
     #each row contain a different integrand
     weighted_integrand = sqrt_spectral_density * xi * np.sqrt(delta_omega)
     #compute integral using fft routine
     z_ast = np.fft.rfft(weighted_integrand, axis = 1)
-#ifdef TIME_IT
-# _pp_     t_3 = tm.clock()
-#endif
-#ifdef TIME_IT
-# _pp_     print "-"*50
-# _pp_     print "inital array setup                  : {:.2e}s".format(t_1-t_0)
-# _pp_     print "generate samples using fft          : {:.2e}s".format(t_3-t_2)
-# _pp_     print "-"*50
-# _pp_     print "time per sample                     : {:.2e}s".format( (t_3-t_2) / num_samples )
-# _pp_     print "overall time                        : {:.2e}s".format(t_3-t_0)
-# _pp_     print "-"*50
-#endif
     #corresponding time axis
     t = np.linspace(0, t_max, num_grid_points)
-#ifdef TESTING
-# _pp_     t_ = np.fft.rfftfreq(n_dft, delta_omega/2/np.pi)
-# _pp_     assert (np.max(np.abs(t-t_)) < 1e-14)
-# _pp_     print "passed test: assert np.all(t == t_)"
-#endif
-#ifdef VERBOSE
-    print "ALL DONE!\n"
-#endif
+    print("ALL DONE!\n")
     return z_ast, t
     
     
@@ -820,5 +713,5 @@ def auto_correlation(x, s_0_idx = 0):
     return np.mean(x * np.conj(x_s_0), axis = 0)
 
 if __name__ == '__main__':
-    print 'this is the stocproc module'
+    print('this is the stocproc module')
     
