@@ -56,7 +56,6 @@ solutions of the time discrete version.
         .. todo:: implement convenient classes with fixed weights
 """
 
-
 import numpy as np
 import time as tm
 
