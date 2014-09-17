@@ -20,16 +20,21 @@
 """Test Suite for Stochastic Process Module stocproc.py
 """
 
-from __future__ import division
 import numpy as np
-import stocproc as sp
 from scipy.special import gamma
 from scipy.interpolate import interp1d
 import time as tm
 import pickle as pc
 import matplotlib.pyplot as plt
+import functools
 
-import matplotlib.pyplot as plt
+import sys
+import os
+
+path = os.path.dirname(__file__)
+sys.path.append(path)
+
+import stocproc as sp
 
 def corr(tau, s, gamma_s_plus_1):
     """ohmic bath correlation function"""
@@ -186,9 +191,9 @@ def test_orthonomality():
     idx1, idx2 = np.where(diff > diff_assert)
     
     if len(idx1) > 0:
-        print "orthonomality test FAILED at:"
+        print("orthonomality test FAILED at:")
         for i in range(len(idx1)):
-            print "    ({}, {}) diff to unity matrix: {}".format(idx1[i],idx2[i], diff[idx1[i],idx2[i]])
+            print("    ({}, {}) diff to unity matrix: {}".format(idx1[i],idx2[i], diff[idx1[i],idx2[i]]))
         raise Exception("test_orthonomality FAILED!")
     
 def test_auto_grid_points():
@@ -202,7 +207,63 @@ def test_auto_grid_points():
     tol = 1e-16
     
     ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol)
-    print ng
+    print(ng)
+    
+def test_chache():
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    
+    t_max = 10
+    ng = 50
+    seed = 0
+    sig_min = 1e-8
+     
+    stocproc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+    
+    t = {}
+    t[1] = 3
+    t[2] = 4
+    t[3] = 5
+    
+    total = 0
+    misses = len(t.keys())
+    for t_i in t.keys():
+        for i in range(t[t_i]):
+            total += 1
+            stocproc.x(t_i)
+        
+    ci = stocproc.get_cache_info()
+    assert ci.hits == total - misses
+    assert ci.misses == misses
+    
+def test_dump_load():
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    r_tau = functools.partial(corr, s=s_param, gamma_s_plus_1=gamma_s_plus_1) 
+    
+    t_max = 10
+    ng = 50
+    seed = 0
+    sig_min = 1e-8
+     
+    stocproc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+    
+    t = np.linspace(0,4,30)
+    
+    x_t = stocproc.x_t_array(t)
+    
+    fname = 'test_stocproc.dump'
+    
+    stocproc.save_to_file(fname)
+    
+    stocproc_2 = sp.StocProc(seed = seed, fname = fname)
+    x_t_2 = stocproc_2.x_t_array(t)
+    
+    assert np.all(x_t == x_t_2)
+    
+    
+    
     
 def show_auto_grid_points_result():
     s_param = 1
@@ -242,5 +303,7 @@ if __name__ == "__main__":
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
-    show_auto_grid_points_result()
+#     show_auto_grid_points_result()
+#     test_chache()
+    test_dump_load()
     pass
