@@ -61,6 +61,7 @@ import numpy as np
 import time as tm
 import functools
 import pickle
+import gquad
 
 class StocProc(object):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion 
@@ -167,14 +168,34 @@ class StocProc(object):
         self.new_process(seed)
         
     @classmethod
-    def new_instance_with_trapezoidal_weights(_StocProc, r_tau, t_max, ng, seed, sig_min):
+    def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min):
+        known_names = ['trapezoidal', 'mid_point', 'gauss_legendre']
+        
+        if name == 'trapezoidal':
+            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+        elif name == 'mid_point':
+            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+        elif name == 'gauss_legendre':
+            ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min)
+        else:
+            raise RuntimeError("unknown name '{}' to create StocProc instance\nknown names are {}".format(name, known_names))
+        
+        ob.name = name
+        return ob
+    @classmethod
+    def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed, sig_min):
         t, w = get_trapezoidal_weights_times(t_max, ng)
-        return _StocProc(r_tau, t, w, seed, sig_min)
+        return cls(r_tau, t, w, seed, sig_min)
 
     @classmethod
-    def new_instance_with_mid_point_weights(_StocProc, r_tau, t_max, ng, seed, sig_min):
+    def new_instance_with_mid_point_weights(cls, r_tau, t_max, ng, seed, sig_min):
         t, w = get_mid_point_weights(t_max, ng)
-        return _StocProc(r_tau, t, w, seed, sig_min)
+        return cls(r_tau, t, w, seed, sig_min)
+
+    @classmethod    
+    def new_instance_with_gauss_legendre_weights(cls, r_tau, t_max, ng, seed, sig_min):
+        t, w = gquad.gauss_nodes_weights_legendre(n=ng, low=0, high=t_max)
+        return cls(r_tau, t, w, seed, sig_min)        
     
     def __load(self, fname):
         with open(fname, 'rb') as f:
@@ -195,6 +216,12 @@ class StocProc(object):
 
     def save_to_file(self, fname):
         self.__dump(fname)
+        
+    def get_name(self):
+        if hasattr(self, 'name'):
+            return self.name
+        else:
+            return 'unknown'
 
     def new_process(self, seed = None):
         r"""setup new process
@@ -363,7 +390,7 @@ def _max_error(r_t_s, r_t_s_exact):
     return err
     
     
-def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error):
+def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error, name = 'gauss_legendre'):
     err = 1
     ng = 1
     seed = None
@@ -374,9 +401,8 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
     #exponential increase to get below error threshold
     while err > tol:
         ng *= 2
-        t, w = get_trapezoidal_weights_times(t_max, ng)
-        stoc_proc = StocProc(r_tau, t, w, seed, sig_min)
-
+        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
+        print("    new process with {} weights".format(stoc_proc.get_name()))
         r_t_s = stoc_proc.recons_corr(t_large)
         r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
         
@@ -393,8 +419,8 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
         print("    ng_h", ng_high)
         ng = (ng_low + ng_high) // 2
         print("    ng", ng)
-        t, w = get_trapezoidal_weights_times(t_max, ng)
-        stoc_proc = StocProc(r_tau, t, w, seed, sig_min)
+        
+        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
 
         r_t_s = stoc_proc.recons_corr(t_large)
         r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))

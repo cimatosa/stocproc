@@ -271,15 +271,19 @@ def show_auto_grid_points_result():
     # two parameter correlation function -> correlation matrix
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
     # time interval [0,T]
-    t_max = 15
+    t_max = 3
     ng_interpolation = 1000
-    tol = 1e-16
+    tol = 1e-8
     seed = None
     sig_min = 0
     
     t_large = np.linspace(0, t_max, ng_interpolation)
     
-    ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol)
+    name = 'mid_point'
+    name = 'trapezoidal'
+    name = 'gauss_legendre'
+    
+    ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol, name=name)
 
     t, w = sp.get_trapezoidal_weights_times(t_max, ng)
     stoc_proc = sp.StocProc(r_tau, t, w, seed, sig_min)
@@ -303,7 +307,7 @@ if __name__ == "__main__":
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
-#     show_auto_grid_points_result()
+    show_auto_grid_points_result()
 #     test_chache()
-    test_dump_load()
+#     test_dump_load()
     pass
