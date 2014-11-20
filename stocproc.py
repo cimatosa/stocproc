@@ -17,7 +17,6 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
-from copyreg import pickle
 """
 **Stochastic Process Module**
 
@@ -61,6 +60,12 @@ import numpy as np
 import time as tm
 import functools
 import pickle
+
+import sys
+import os
+path = os.path.dirname(__file__)
+sys.path.append(path)
+
 import gquad
 
 class StocProc(object):
@@ -129,22 +134,29 @@ class StocProc(object):
         
     """
     
-    def __init__(self, r_tau=None, t=None, w=None, seed = None, sig_min = 1e-4, fname=None):
+    def __init__(self, 
+                  r_tau=None, 
+                  t=None, 
+                  w=None, 
+                  seed=None, 
+                  sig_min=1e-4, 
+                  fname=None,
+                  cache_size=1024):
         self.__dump_members = ['_r_tau', 
                                '_s',
                                '_w',
                                '_eig_val',
                                '_eig_vec']
-        if fname == None:
+        if fname is None:
             
-            assert r_tau != None
+            assert r_tau is not None
             self._r_tau = r_tau
             
-            assert t != None
+            assert t is not None
             self._s = t
             self._num_gp = len(self._s)
             
-            assert w != None
+            assert w is not None
             self._w = w
             
             t_row = self._s.reshape(1, self._num_gp)
@@ -165,6 +177,8 @@ class StocProc(object):
             self.__load(fname)
             self.__calc_missing()
             
+        self.my_cache_decorator = functools.lru_cache(maxsize=cache_size, typed=False)
+        self.x = self.my_cache_decorator(self._x)
         self.new_process(seed)
         
     @classmethod
@@ -174,7 +188,7 @@ class StocProc(object):
         if name == 'trapezoidal':
             ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
         elif name == 'mid_point':
-            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+            ob = cls.new_instance_with_mid_point_weights(r_tau, t_max, ng, seed, sig_min)
         elif name == 'gauss_legendre':
             ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min)
         else:
@@ -236,7 +250,9 @@ class StocProc(object):
         """
         if seed != None:
             np.random.seed(seed)
-        self._Y = np.random.normal(size = (self._num_ev,1))
+        self.clear_cache()
+#         self._Y = np.random.normal(size = (self._num_ev,1))
+        self._Y = 1/np.sqrt(2)*(np.random.normal(size = (self._num_ev,1)) + 1j*np.random.normal(size = (self._num_ev,1)))
         
     def x_for_initial_time_grid(self):
         r"""Get process on initial time grid
@@ -248,9 +264,12 @@ class StocProc(object):
         """
         tmp = self._Y * self._sqrt_eig_val.reshape(self._num_ev,1)
         return np.tensordot(tmp, self._eig_vec, axes=([0],[1])).flatten()
+    
+    def time_grid(self):
+        return self._s
 
-    @functools.lru_cache(maxsize=1024, typed=False)   
-    def x(self, t):
+#    @functools.lru_cache(maxsize=1024, typed=False)   
+    def _x(self, t):
         # _Y                                      # (N_ev, 1   )
         tmp = self._Y*self._r_tau(t-self._s.reshape(1, self._num_gp))
                                                   # (N_ev, N_gp)
@@ -259,6 +278,9 @@ class StocProc(object):
     
     def get_cache_info(self):
         return self.x.cache_info()
+    
+    def clear_cache(self):
+        self.x.cache_clear()
         
         
     def x_t_array(self, t_array):
@@ -367,6 +389,9 @@ class StocProc(object):
         
         return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))
     
+#    def reconst_corr_zero(self, t_array):
+        
+    
 def _mean_error(r_t_s, r_t_s_exact):
     r"""mean error of the correlation function as function of s
     
@@ -384,13 +409,9 @@ def _mean_error(r_t_s, r_t_s_exact):
     return err
     
 def _max_error(r_t_s, r_t_s_exact):
-    abs_sqare = np.abs(r_t_s - r_t_s_exact)**2
+    return np.max(np.abs(r_t_s - r_t_s_exact))
     
-    err = np.max(abs_sqare, axis = 0)
-    return err
-    
-    
-def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error, name = 'gauss_legendre'):
+def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error, name = 'mid_point'):
     err = 1
     ng = 1
     seed = None
@@ -406,7 +427,7 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
         r_t_s = stoc_proc.recons_corr(t_large)
         r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
         
-        err = np.max(err_method(r_t_s, r_t_s_exact))
+        err = err_method(r_t_s, r_t_s_exact)
 
         print("    ng {} -> err {:.2e}".format(ng, err))
         
@@ -425,7 +446,7 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
         r_t_s = stoc_proc.recons_corr(t_large)
         r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
         
-        err = np.max(err_method(r_t_s, r_t_s_exact))
+        err = err_method(r_t_s, r_t_s_exact)
 
         print("    ng {} -> err {:.2e}".format(ng, err))
         if err > tol:
@@ -670,7 +691,7 @@ def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_sam
         
     See :py:func:`stochastic_process` for other parameters
     """ 
-    t,w = get_trapezoidal_weights_times(t_max, num_grid_points)    
+    t, w = get_trapezoidal_weights_times(t_max, num_grid_points)    
     return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
    
 
@@ -690,8 +711,8 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     
     .. math:: X(t) = \sum_{k=0}^{N-1} \sqrt{J(\omega_k)} X_k \exp^{-\mathrm{i}\omega_k t}
     
-    with random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0` 
-    and :math:`\langle X_k X_{k'}\rangle = \Delta \omega \delta_{k,k'}` it is easy to see
+    with random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0`, 
+    :math:`\langle X_k X_{k'}\rangle = 0` and :math:`\langle X_k X^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}` it is easy to see
     that it fullfills the Riemann approximated correlation function.
 
     .. math:: 
@@ -755,8 +776,8 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     print("  omega_max  : {:.2}".format(delta_omega * n_dft))
     print("  delta_omega: {:.2}".format(delta_omega))
     print("generate samples ...")
-    #random normal samples
-    xi = np.random.normal(size = (num_samples,n_dft))
+    #random complex normal samples
+    xi = 1/np.sqrt(2)*(np.random.normal(size = (num_samples,n_dft)) + 1j*np.random.normal(size = (num_samples,n_dft)))
     #each row contain a different integrand
     weighted_integrand = sqrt_spectral_density * xi * np.sqrt(delta_omega)
     #compute integral using fft routine
@@ -790,4 +811,12 @@ def auto_correlation(x, s_0_idx = 0):
     x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
     return np.mean(x * np.conj(x_s_0), axis = 0)
 
- 
+def auto_correlation_zero(x, s_0_idx = 0):
+    # handle type error
+    if x.ndim != 2:
+        raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
+    
+    num_samples = x.shape[0]
+    x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
+    return np.mean(x * x_s_0, axis = 0)
+    
