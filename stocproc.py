@@ -17,6 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
+
 """
 **Stochastic Process Module**
 
@@ -63,8 +64,8 @@ import pickle
 
 import sys
 import os
-path = os.path.dirname(__file__)
-sys.path.append(path)
+
+sys.path.append(os.path.dirname(__file__))
 
 import gquad
 
@@ -250,9 +251,10 @@ class StocProc(object):
         """
         if seed != None:
             np.random.seed(seed)
+
         self.clear_cache()
-#         self._Y = np.random.normal(size = (self._num_ev,1))
         self._Y = 1/np.sqrt(2)*(np.random.normal(size = (self._num_ev,1)) + 1j*np.random.normal(size = (self._num_ev,1)))
+
         
     def x_for_initial_time_grid(self):
         r"""Get process on initial time grid
