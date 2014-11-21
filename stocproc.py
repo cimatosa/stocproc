@@ -253,7 +253,7 @@ class StocProc(object):
             np.random.seed(seed)
 
         self.clear_cache()
-        self._Y = 1/np.sqrt(2)*(np.random.normal(size = (self._num_ev,1)) + 1j*np.random.normal(size = (self._num_ev,1)))
+        self._Y = 1/np.sqrt(2)*np.random.normal(size=2*self._num_ev).view(np.complex).reshape(self._num_ev,1)
 
         
     def x_for_initial_time_grid(self):
