@@ -391,6 +391,14 @@ class StocProc(object):
         
         return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))
     
+    def recons_corr_single_s(self, t_array, s):
+        u_i_all_t = self.u_i_all(t_array)                        #(N_gp, N_ev)
+        u_i_all_ast_s = np.conj(self.u_i_all(np.asarray([s])))   #(1, N_ev)
+        lambda_i_all = self.lambda_i_all()                       #(N_ev)
+        tmp = lambda_i_all.reshape(1, self._num_ev) * u_i_all_t  #(N_gp, N_ev)
+        return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))[:,0]
+
+    
 #    def reconst_corr_zero(self, t_array):
         
     
