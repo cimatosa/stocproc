@@ -434,7 +434,7 @@ def _max_error(r_t_s, r_t_s_exact):
 def _max_rel_error(r_t_s, r_t_s_exact):
     return np.max(np.abs(r_t_s - r_t_s_exact) / np.abs(r_t_s_exact))
     
-def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error, name = 'mid_point', sig_min=1e-4):
+def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error, name = 'mid_point', sig_min = 1e-4):
     err = 1
     ng = 1
     seed = None
