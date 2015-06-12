@@ -52,7 +52,7 @@ def test_stochastic_process_KLE_correlation_function():
     t_max = 30
     # number of subintervals
     # leads to N+1 grid points
-    num_grid_points = 100
+    num_grid_points = 300
     # number of samples for the stochastic process
     num_samples = 100000
     
@@ -64,6 +64,14 @@ def test_stochastic_process_KLE_correlation_function():
     autoCorr_KLE = sp.auto_correlation(x_t_array_KLE, s_0_idx)
     tau = t - t[s_0_idx]
     c = r_tau(tau)
+    
+    plt.plot(tau, np.real(autoCorr_KLE), color='b')
+    plt.plot(tau, np.imag(autoCorr_KLE), color='r')
+    plt.plot(tau, np.real(c), color='b', ls='--')
+    plt.plot(tau, np.imag(c), color='r', ls='--')
+    
+    plt.grid()
+    plt.show()    
 
     max_diff = np.max(np.abs(c - autoCorr_KLE)) 
     assert max_diff < 1e-2, "KLE max diff: {}".format(max_diff)
@@ -75,24 +83,33 @@ def test_stochastic_process_FFT_correlation_function():
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)    
     spectral_density_omega = lambda omega : spectral_density(omega, s_param)
     # time interval [0,T]
-    t_max = 30
+    t_max = 20
     # number of subintervals
     # leads to N+1 grid points
-    num_grid_points = 100
+    num_grid_points = 300
     # number of samples for the stochastic process
-    num_samples = 100000
+    num_samples = 10000
     
     seed = 0
     sig_min = 1e-3
-    s_0_idx = 0
+    s_0_idx = num_grid_points/3
     
     x_t_array_FFT, t = sp.stochastic_process_fft(spectral_density_omega, t_max, num_grid_points, num_samples, seed)
     autoCorr_FFT = sp.auto_correlation(x_t_array_FFT, s_0_idx)
     tau = t - t[s_0_idx]
     c = r_tau(tau)
+    
+    plt.plot(tau, np.real(autoCorr_FFT), color='b')
+    plt.plot(tau, np.imag(autoCorr_FFT), color='r')
+    plt.plot(tau, np.real(c), color='b', ls='--')
+    plt.plot(tau, np.imag(c), color='r', ls='--')
+    
+    plt.grid()
+    plt.show()
+    
   
-    max_diff = np.max(np.abs(c - autoCorr_FFT))
-    assert max_diff < 1e-2, "FFT max diff: {}".format(max_diff)
+    #max_diff = np.max(np.abs(c - autoCorr_FFT))
+    #assert max_diff < 1e-2, "FFT max diff: {}".format(max_diff)
     
 def test_stochastic_process_KLE_interpolation():
     s_param = 1
@@ -302,12 +319,12 @@ def show_auto_grid_points_result():
     
 if __name__ == "__main__":
 #     test_stochastic_process_KLE_correlation_function()
-#     test_stochastic_process_FFT_correlation_function()
+    test_stochastic_process_FFT_correlation_function()
 #     test_stochastic_process_KLE_interpolation()
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
-    show_auto_grid_points_result()
+#     show_auto_grid_points_result()
 #     test_chache()
 #     test_dump_load()
     pass

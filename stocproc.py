@@ -17,6 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
+from Cython.Compiler.Main import verbose
 
 """
 **Stochastic Process Module**
@@ -410,7 +411,52 @@ class StocProc(object):
 
     
 #    def reconst_corr_zero(self, t_array):
+class StocProc_FFT(object):
+    r"""
+        Simulate Stochastic Process using FFT method 
+    """
+    def __init__(self, spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1):
+        self.verbose     = verbose
+        self.num_samples = num_samples
+        self.t_max = t_max
+        self.num_grid_points = num_grid_points
         
+        self.n_dft = self.num_grid_points * 2 - 1
+        delta_t = self.t_max / (self.num_grid_points-1)
+        self.delta_omega = 2 * np.pi / delta_t / self.n_dft
+          
+        #omega axis
+        omega = self.delta_omega*np.arange(self.n_dft)
+        #reshape for multiplication with matrix xi
+        self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 = np.sqrt(spectral_density(omega)).reshape((1, self.n_dft)) * np.sqrt(self.delta_omega) / np.sqrt(2) 
+        if seed != None:
+            print("init with seed", seed)
+            np.random.seed(seed)
+        
+        if self.verbose > 0:
+            print("  omega_max  : {:.2}".format(self.delta_omega * self.n_dft))
+            print("  delta_omega: {:.2}".format(self.delta_omega))
+            
+    def new_process(self, seed = None):
+        if self.verbose > 0:
+            print("generate samples ...")
+        if seed != None:
+            print("use seed", seed)
+            np.random.seed(seed)
+        #random complex normal samples
+        yi = np.random.normal(size = (self.num_samples, self.n_dft)) + 1j*np.random.normal(size = (self.num_samples, self.n_dft))
+        #each row contain a different integrand
+        weighted_integrand = self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 * yi 
+        #compute integral using fft routine
+        z_ast = np.fft.rfft(weighted_integrand, axis = 1)
+        if self.verbose > 0:
+            print("done!")
+        return z_ast
+    
+    def get_time_axis(self):
+        #corresponding time axis
+        return np.linspace(0, self.t_max, self.num_grid_points)
+    
     
 def _mean_error(r_t_s, r_t_s_exact):
     r"""mean error of the correlation function as function of s
@@ -730,9 +776,9 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     
     For a process defined by
     
-    .. math:: X(t) = \sum_{k=0}^{N-1} \sqrt{J(\omega_k)} X_k \exp^{-\mathrm{i}\omega_k t}
+    .. math:: X(t) = \sum_{k=0}^{N-1} \Delta \omega \sqrt{J(\omega_k)} X_k \exp^{-\mathrm{i}\omega_k t}
     
-    with random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0`, 
+    with compelx random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0`, 
     :math:`\langle X_k X_{k'}\rangle = 0` and :math:`\langle X_k X^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}` it is easy to see
     that it fullfills the Riemann approximated correlation function.
 
@@ -798,7 +844,7 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     print("  delta_omega: {:.2}".format(delta_omega))
     print("generate samples ...")
     #random complex normal samples
-    xi = 1/np.sqrt(2)*(np.random.normal(size = (num_samples,n_dft)) + 1j*np.random.normal(size = (num_samples,n_dft)))
+    xi = np.random.normal(size = (num_samples,n_dft)) + 1j*np.random.normal(size = (num_samples,n_dft))
     #each row contain a different integrand
     weighted_integrand = sqrt_spectral_density * xi * np.sqrt(delta_omega)
     #compute integral using fft routine
