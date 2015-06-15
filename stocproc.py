@@ -17,8 +17,6 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
-from Cython.Compiler.Main import verbose
-
 """
 **Stochastic Process Module**
 
@@ -59,7 +57,6 @@ solutions of the time discrete version.
 """
 
 import numpy as np
-import time as tm
 import functools
 import pickle
 
@@ -69,6 +66,17 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 import gquad
+
+from scipy.interpolate import InterpolatedUnivariateSpline
+
+class ComplexInterpolatedUnivariateSpline(object):
+    def __init__(self, x, y, k=2):
+        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
+        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
+        
+    def __call__(self, t):
+        return self.re_spline(t) + 1j*self.im_spline(t)
+
 
 class StocProc(object):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion 
@@ -143,14 +151,16 @@ class StocProc(object):
                      '_eig_vec']
     
     def __init__(self, 
-                  r_tau=None, 
-                  t=None, 
-                  w=None, 
-                  seed=None, 
-                  sig_min=1e-4, 
-                  fname=None,
-                  cache_size=1024):
+                 r_tau      = None, 
+                 t          = None, 
+                 w          = None, 
+                 seed       = None, 
+                 sig_min    = 1e-4, 
+                 fname      = None,
+                 cache_size = 1024,
+                 verbose    = 1):
         
+        self.verbose = verbose
         if fname is None:
             
             assert r_tau is not None
@@ -280,8 +290,14 @@ class StocProc(object):
     
     def time_grid(self):
         return self._s
+    
+    def __call__(self, t):
+        if isinstance(t, np.ndarray):
+            return self.x_t_array(t)
+        else:
+            return self._x(t)
 
-#    @functools.lru_cache(maxsize=1024, typed=False)   
+    @functools.lru_cache(maxsize=1024, typed=False)   
     def _x(self, t):
         # _Y                                      # (N_ev, 1   )
         tmp = self._Y*self._r_tau(t-self._s.reshape(1, self._num_gp))
@@ -415,43 +431,46 @@ class StocProc_FFT(object):
     r"""
         Simulate Stochastic Process using FFT method 
     """
-    def __init__(self, spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1):
+    def __init__(self, spectral_density, t_max, num_grid_points, seed = None, verbose=1):
         self.verbose     = verbose
-        self.num_samples = num_samples
         self.t_max = t_max
         self.num_grid_points = num_grid_points
-        
         self.n_dft = self.num_grid_points * 2 - 1
         delta_t = self.t_max / (self.num_grid_points-1)
-        self.delta_omega = 2 * np.pi / delta_t / self.n_dft
+        self.delta_omega = 2 * np.pi / (delta_t * self.n_dft)
           
-        #omega axis
+       #omega axis
         omega = self.delta_omega*np.arange(self.n_dft)
         #reshape for multiplication with matrix xi
-        self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 = np.sqrt(spectral_density(omega)).reshape((1, self.n_dft)) * np.sqrt(self.delta_omega) / np.sqrt(2) 
-        if seed != None:
-            print("init with seed", seed)
-            np.random.seed(seed)
+        self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega) / np.sqrt(2) 
         
         if self.verbose > 0:
             print("  omega_max  : {:.2}".format(self.delta_omega * self.n_dft))
             print("  delta_omega: {:.2}".format(self.delta_omega))
             
+        self.new_process(seed = seed)
+            
     def new_process(self, seed = None):
-        if self.verbose > 0:
-            print("generate samples ...")
+        self.interpolator = None
         if seed != None:
-            print("use seed", seed)
+            if self.verbose > 0:
+                print("use seed", seed)
             np.random.seed(seed)
         #random complex normal samples
-        yi = np.random.normal(size = (self.num_samples, self.n_dft)) + 1j*np.random.normal(size = (self.num_samples, self.n_dft))
+        yi = np.random.normal(size = 2*self.n_dft).view(np.complex)
         #each row contain a different integrand
         weighted_integrand = self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 * yi 
         #compute integral using fft routine
-        z_ast = np.fft.rfft(weighted_integrand, axis = 1)
-        if self.verbose > 0:
-            print("done!")
-        return z_ast
+        self.z_ast = np.fft.fft(weighted_integrand)[0:self.num_grid_points]
+            
+    def x_for_initial_time_grid(self):
+        return self.z_ast 
+            
+    def __call__(self, t):
+        if self.interpolator is None:
+            self.interpolator = ComplexInterpolatedUnivariateSpline(self.get_time_axis(), self.z_ast, k=3)
+
+        return self.interpolator(t)
     
     def get_time_axis(self):
         #corresponding time axis
@@ -528,7 +547,7 @@ def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _m
 
     return ng_high
         
-def solve_hom_fredholm(r, w, eig_val_min):
+def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
     
     .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)
@@ -563,22 +582,27 @@ def solve_hom_fredholm(r, w, eig_val_min):
     d = np.diag(np.sqrt(w))
     d_inverse = np.diag(1/np.sqrt(w))
     r = np.dot(d, np.dot(r, d))
-    print("solve eigenvalue equation ...")
+    if verbose > 0:
+        print("solve eigenvalue equation ...")
     eig_val, eig_vec = np.linalg.eigh(r)
 
     # use only eigenvalues larger than sig_min**2
     large_eig_val_idx = np.where(eig_val >= eig_val_min)[0]
     num_of_functions = len(large_eig_val_idx)
-    print("use {} / {} eigenfunctions".format(num_of_functions, len(w)))
+    if verbose > 0:
+        print("use {} / {} eigenfunctions (sig_min = {})".format(num_of_functions, len(w), np.sqrt(eig_val_min)))
     eig_val = eig_val[large_eig_val_idx]
     eig_vec = eig_vec[:, large_eig_val_idx]
     
     # inverse scale of the eigenvectors
     eig_vec = np.dot(d_inverse, eig_vec)
+    if verbose > 0:
+        print("done!")
+    
     
     return eig_val, eig_vec
 
-def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4):
+def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4, verbose=1):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion
     
     Simulate :math:`N_\mathrm{S}` wide-sense stationary stochastic processes 
@@ -631,9 +655,10 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
     :return: returns a 2D array of the shape (num_samples, len(t)). Each row of the returned array contains one sample of the
         stochastic process.
     """
+    
+    if verbose > 0:
+        print("__ stochastic_process __")
 
-    print("__ stochastic_process __")
-    print("pre calculations ...")
     if seed != None:
         np.random.seed(seed)
     
@@ -653,14 +678,14 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
     # generate samples
     sig = np.sqrt(eig_val).reshape(1, num_of_functions)               # variance of the random quantities of the  Karhunen-Loève expansion
 
-    
-    print("generate samples ...")
-    x = np.random.normal(size=(num_samples, num_of_functions)) * sig  # random quantities all aligned for num_samples samples
+    if verbose > 0:
+        print("generate samples ...")
+    x = np.random.normal(size=(2*num_samples*num_of_functions)).view(np.complex).reshape(num_of_functions, num_samples).T \
+         / np.sqrt(2) * sig                                           # random quantities all aligned for num_samples samples
     x_t_array = np.tensordot(x, eig_vec, axes=([1],[1]))              # multiplication with the eigenfunctions == base of Karhunen-Loève expansion
     
-    
-
-    print("ALL DONE!\n")
+    if verbose > 0:
+        print("done!")
     
     return x_t_array
 
@@ -762,7 +787,7 @@ def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_sam
     return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
    
 
-def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None):
+def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1):
     r"""Simulate Stochastic Process using FFT method
     
     This method works only for correlations functions of the form
@@ -828,11 +853,13 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
         1D array of time grid points). Each row of the stochastic process 
         array contains one sample of the stochastic process.
     """
-    print("__ stochastic_process_fft __")
-    print("pre calculations ...")
+    
+    if verbose > 0:
+        print("__ stochastic_process_fft __")
+    
     n_dft = num_grid_points * 2 - 1
     delta_t = t_max / (num_grid_points-1)
-    delta_omega = 2 * np.pi / delta_t / n_dft
+    delta_omega = 2 * np.pi / (delta_t * n_dft)  
       
     #omega axis
     omega = delta_omega*np.arange(n_dft)
@@ -840,43 +867,53 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     sqrt_spectral_density = np.sqrt(spectral_density(omega)).reshape((1, n_dft))
     if seed != None:
         np.random.seed(seed)
-    print("  omega_max  : {:.2}".format(delta_omega * n_dft))
-    print("  delta_omega: {:.2}".format(delta_omega))
-    print("generate samples ...")
+    if verbose > 0:
+        print("  omega_max  : {:.2}".format(delta_omega * n_dft))
+        print("  delta_omega: {:.2}".format(delta_omega))
+        print("generate samples ...")
     #random complex normal samples
-    xi = np.random.normal(size = (num_samples,n_dft)) + 1j*np.random.normal(size = (num_samples,n_dft))
+    xi = (np.random.normal(size = (2*num_samples*n_dft)).view(np.complex)).reshape(num_samples, n_dft)
     #each row contain a different integrand
-    weighted_integrand = sqrt_spectral_density * xi * np.sqrt(delta_omega)
+    weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega) / np.sqrt(2) * xi 
     #compute integral using fft routine
-    z_ast = np.fft.rfft(weighted_integrand, axis = 1)
+    z_ast = np.fft.fft(weighted_integrand, axis = 1)[:, 0:num_grid_points]
     #corresponding time axis
     t = np.linspace(0, t_max, num_grid_points)
-    print("ALL DONE!\n")
+    if verbose > 0:
+        print("done!")
     return z_ast, t
     
     
-def auto_correlation(x, s_0_idx = 0):
+def auto_correlation(x, verbose=1):
     r"""Computes the auto correlation function for a set of wide-sense stationary stochastic processes
     
     Computes the auto correlation function for the given set :math:`{X_i(t)}` of stochastic processes:
     
-    .. math:: \alpha(s, \tau) = \langle X(s+\tau)X^\ast(s) \rangle \qquad \tau = t-s
+    .. math:: \alpha(s, t) = \langle X(t)X^\ast(s) \rangle
     
-    For wide-sense stationary processes :math:`\alpha` is independent of :math:`s` so by default :math:`s` is set to :math:`s_0`.
+    For wide-sense stationary processes :math:`\alpha` is independent of :math:`s`.
     
     :param x: 2D array of the shape (num_samples, num_time_points) containing the set of stochastic processes where each row represents one process
-    :param s_0_idx: time index of the reference time :math:`s`
     
-    :return: 1D array containing the correlation function 
+    :return: 2D array containing the correlation function as function of :math:`s, t` 
     """
     
     # handle type error
     if x.ndim != 2:
         raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
     
-    num_samples = x.shape[0]
-    x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
-    return np.mean(x * np.conj(x_s_0), axis = 0)
+    num_samples, num_time_points = x.shape
+    
+    x_prime = x.reshape(num_samples, 1, num_time_points)
+    x       = x.reshape(num_samples, num_time_points, 1)
+    
+    if verbose > 0:
+        print("calculate auto correlation function ...")
+    res = np.mean(x * np.conj(x_prime), axis = 0), np.mean(x * x_prime, axis = 0)
+    if verbose > 0:
+        print("done!")
+        
+    return res  
 
 def auto_correlation_zero(x, s_0_idx = 0):
     # handle type error
