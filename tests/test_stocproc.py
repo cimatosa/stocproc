@@ -29,8 +29,9 @@ import functools
 import sys
 import os
 
-path = os.path.dirname(__file__)
-sys.path.append(path)
+import pathlib
+p = pathlib.PosixPath(os.path.abspath(__file__))
+sys.path.insert(0, str(p.parent.parent / 'stocproc'))
 
 import stocproc as sp
 
@@ -663,9 +664,9 @@ if __name__ == "__main__":
 #     test_stocproc_KLE_splineinterpolation(plot=False)
 #     test_stochastic_process_FFT_interpolation(plot=False)
 #     test_stocProc_eigenfunction_extraction()
-#     test_orthonomality()
-#     test_auto_grid_points()
+    test_orthonomality()
+    test_auto_grid_points()
     show_auto_grid_points_result()
-#     test_chache()
-#     test_dump_load()
+    test_chache()
+    test_dump_load()
     pass
