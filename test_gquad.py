@@ -1,8 +1,13 @@
-import gquad
 from scipy.integrate import quad
 import numpy as np
 import numpy.polynomial as pln
 import pytest
+
+import os
+import sys
+path = os.path.dirname(__file__)
+sys.path.append(path)
+import gquad
 
 
 def scp_laguerre(p1,p2):

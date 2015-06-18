@@ -182,18 +182,15 @@ class StocProc(object):
             # solve discrete Fredholm equation
             # eig_val = lambda
             # eig_vec = u(t)
-            self._eig_val, self._eig_vec = solve_hom_fredholm(r, w, sig_min**2)
-            self._sqrt_eig_val = np.sqrt(self._eig_val)
-            self._num_ev = len(self._eig_val)
-            self._A = self._w.reshape(self._num_gp,1) * self._eig_vec / self._sqrt_eig_val.reshape(1, self._num_ev)
-
+            self._eig_val, self._eig_vec = solve_hom_fredholm(r, w, sig_min**2, verbose=self.verbose)
         else:
             self.__load(fname)
-            self.__calc_missing()
+
+        self.__calc_missing()
             
         self.my_cache_decorator = functools.lru_cache(maxsize=cache_size, typed=False)
         self.x = self.my_cache_decorator(self._x)
-        self.new_process(seed)
+        self.new_process(seed = seed)
         
     @classmethod
     def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min):
@@ -211,19 +208,19 @@ class StocProc(object):
         ob.name = name
         return ob
     @classmethod
-    def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed, sig_min):
+    def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed, sig_min, verbose=1):
         t, w = get_trapezoidal_weights_times(t_max, ng)
-        return cls(r_tau, t, w, seed, sig_min)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
 
     @classmethod
-    def new_instance_with_mid_point_weights(cls, r_tau, t_max, ng, seed, sig_min):
+    def new_instance_with_mid_point_weights(cls, r_tau, t_max, ng, seed, sig_min, verbose=1):
         t, w = get_mid_point_weights(t_max, ng)
-        return cls(r_tau, t, w, seed, sig_min)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
 
     @classmethod    
-    def new_instance_with_gauss_legendre_weights(cls, r_tau, t_max, ng, seed, sig_min):
+    def new_instance_with_gauss_legendre_weights(cls, r_tau, t_max, ng, seed, sig_min, verbose=1):
         t, w = gquad.gauss_nodes_weights_legendre(n=ng, low=0, high=t_max)
-        return cls(r_tau, t, w, seed, sig_min)        
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
     
     def __load(self, fname):
         with open(fname, 'rb') as f:
@@ -234,7 +231,8 @@ class StocProc(object):
         self._num_gp = len(self._s)
         self._sqrt_eig_val = np.sqrt(self._eig_val)
         self._num_ev = len(self._eig_val)
-        self._A = self._w.reshape(self._num_gp,1) * self._eig_vec / self._sqrt_eig_val.reshape(1, self._num_ev)
+        self._w /= np.sqrt(2)
+        self._A = self._w.reshape(self._num_gp,1) * self._eig_vec / self._sqrt_eig_val.reshape(1, self._num_ev) 
 
     
     def __dump(self, fname):
@@ -259,7 +257,7 @@ class StocProc(object):
         else:
             return 'unknown'
 
-    def new_process(self, seed = None):
+    def new_process(self, yi=None, seed=None):
         r"""setup new process
         
         Generates a new set of independent normal random variables :math:`Y_i`
@@ -274,7 +272,14 @@ class StocProc(object):
             np.random.seed(seed)
 
         self.clear_cache()
-        self._Y = 1/np.sqrt(2)*np.random.normal(size=2*self._num_ev).view(np.complex).reshape(self._num_ev,1)
+        if yi is None:
+            if self.verbose > 1:
+                print("generate samples ...")
+            self._Y = np.random.normal(size=2*self._num_ev).view(np.complex).reshape(self._num_ev,1)
+            if self.verbose > 1:
+                print("done!")
+        else:
+            self._Y = yi.reshape(self._num_ev,1)
 
         
     def x_for_initial_time_grid(self):
@@ -285,8 +290,14 @@ class StocProc(object):
         equation. This is equivalent to calling :py:func:`stochastic_process_kle` with the
         same weights :math:`w_i` and time grid points :math:`s_i`.
         """
-        tmp = self._Y * self._sqrt_eig_val.reshape(self._num_ev,1)
-        return np.tensordot(tmp, self._eig_vec, axes=([0],[1])).flatten()
+        tmp = self._Y / np.sqrt(2) * self._sqrt_eig_val.reshape(self._num_ev,1) 
+        if self.verbose > 1:
+            print("calc process via matrix prod ...")
+        res = np.tensordot(tmp, self._eig_vec, axes=([0],[1])).flatten()
+        if self.verbose > 1:
+            print("done!")
+        
+        return res
     
     def time_grid(self):
         return self._s
@@ -295,9 +306,8 @@ class StocProc(object):
         if isinstance(t, np.ndarray):
             return self.x_t_array(t)
         else:
-            return self._x(t)
+            return self.x(t)
 
-    @functools.lru_cache(maxsize=1024, typed=False)   
     def _x(self, t):
         # _Y                                      # (N_ev, 1   )
         tmp = self._Y*self._r_tau(t-self._s.reshape(1, self._num_gp))
@@ -319,7 +329,12 @@ class StocProc(object):
                                                        # (N_ev, N_gp, N_t)
         # A                                            # (N_gp, N_ev)
         # A_j,i = w_j / sqrt(lambda_i) u_i(s_j)
-        return np.tensordot(tmp, self._A, axes=([1,0],[0,1]))
+        if self.verbose > 1:
+            print("calc process via matrix prod ...")
+        res = np.tensordot(tmp, self._A, axes=([1,0],[0,1]))
+        if self.verbose > 1:
+            print("done!")
+        return res
 
     
     def u_i(self, t_array, i):
@@ -340,7 +355,7 @@ class StocProc(object):
                                                        # (N_gp, N_t)
         # A                                            # (N_gp, N_ev)
         # A_j,i = w_j / sqrt(lambda_i) u_i(s_j)                                                     
-        return 1/self._sqrt_eig_val[i]*np.tensordot(tmp, self._A[:,i], axes=([0],[0]))
+        return np.sqrt(2)/self._sqrt_eig_val[i]*np.tensordot(tmp, self._A[:,i], axes=([0],[0]))
 
     def u_i_all(self, t_array):
         r"""get all eigenfunctions
@@ -362,7 +377,7 @@ class StocProc(object):
                                                        # (N_gp, N_t)
         # A                                            # (N_gp, N_ev)
         # A_j,i = w_j / sqrt(lambda_i) u_i(s_j)
-        return np.tensordot(tmp, 1/self._sqrt_eig_val.reshape(1,self._num_ev) * self._A, axes=([0],[0]))
+        return np.tensordot(tmp, np.sqrt(2)/self._sqrt_eig_val.reshape(1,self._num_ev) * self._A, axes=([0],[0]))
 
     def eigen_vector_i(self, i):
         r"""Returns the i-th eigenvector (solution of the discrete Fredhom equation)"""
@@ -425,19 +440,83 @@ class StocProc(object):
         tmp = lambda_i_all.reshape(1, self._num_ev) * u_i_all_t  #(N_gp, N_ev)
         return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))[:,0]
 
+class StocProc_KLE(StocProc):
+    def __init__(self, r_tau, t_max, num_grid_points, ng_fredholm=None, seed=None, sig_min=1e-5, verbose=1):
+        """
+            class to simulate stocastic processes using KLE method
+                - solve fredholm equation on grid with ng_fregholm nodes (trapezoidal_weights)
+                - calculate process (using interpolation solution of fredholm equation) with num_grid_points nodes
+                - ivoke cubic spline interpolator when calling 
+        """
+        
+        if ng_fredholm is None:
+            ng_fredholm = num_grid_points
+            
+        if num_grid_points < ng_fredholm:
+            print("WARNING: found 'num_grid_points < ng_fredholm' -> set 'num_grid_points == ng_fredholm'")
+
+        if ng_fredholm == num_grid_points:
+            self.kle_interp = False
+        else:
+            self.kle_interp = True
+
+        self.stocproc = StocProc.new_instance_with_trapezoidal_weights(r_tau   = r_tau,
+                                                                       t_max   = t_max,
+                                                                       ng      = ng_fredholm, 
+                                                                       sig_min = sig_min,
+                                                                       seed    = seed,
+                                                                       verbose = verbose)
+        self._r_tau = self.stocproc._r_tau
+        self._s = self.stocproc._s
+        self._A = self.stocproc._A        
+        self.stocproc.verbose = verbose
+        self.verbose = verbose
+        self.t = np.linspace(0, t_max, num_grid_points)
+        self._z = self.__cal_z()
+        if self.verbose > 1:
+            print("setup interpolator ...")
+        self.interpolator = ComplexInterpolatedUnivariateSpline(self.t, self._z, k=3)
+        if self.verbose > 1:
+            print("done!")
+            
+    def __cal_z(self):
+        if self.kle_interp:
+            return self.stocproc.x_t_array(self.t)
+        else:
+            return self.stocproc.x_for_initial_time_grid()
+        
+    def __call__(self, t):
+        return self.interpolator(t)
+
+    def get_time(self):
+        return self.t
+
+    def get_z(self):
+        return self._z
+
+    def new_process(self, yi = None, seed = None):
+        self.stocproc.new_process(yi=yi, seed=seed)
+        self._z = self.__cal_z()
+        if self.verbose > 1:
+            print("setup interpolator ...")
+        self.interpolator = ComplexInterpolatedUnivariateSpline(self.t, self._z, k=3)
+        if self.verbose > 1:
+            print("done!")        
+        
+
     
 #    def reconst_corr_zero(self, t_array):
 class StocProc_FFT(object):
     r"""
         Simulate Stochastic Process using FFT method 
     """
-    def __init__(self, spectral_density, t_max, num_grid_points, seed = None, verbose=1):
-        self.verbose     = verbose
-        self.t_max = t_max
+    def __init__(self, spectral_density, t_max, num_grid_points, seed=None, verbose=1):
+        self.verbose         = verbose
+        self.t_max           = t_max
         self.num_grid_points = num_grid_points
-        self.n_dft = self.num_grid_points * 2 - 1
-        delta_t = self.t_max / (self.num_grid_points-1)
-        self.delta_omega = 2 * np.pi / (delta_t * self.n_dft)
+        self.n_dft           = self.num_grid_points * 2 - 1
+        delta_t              = self.t_max / (self.num_grid_points-1)
+        self.delta_omega     = 2 * np.pi / (delta_t * self.n_dft)
           
        #omega axis
         omega = self.delta_omega*np.arange(self.n_dft)
@@ -445,36 +524,56 @@ class StocProc_FFT(object):
         self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega) / np.sqrt(2) 
         
         if self.verbose > 0:
-            print("  omega_max  : {:.2}".format(self.delta_omega * self.n_dft))
-            print("  delta_omega: {:.2}".format(self.delta_omega))
+            print("stoc proc fft, spectral density sampling information:")
+            print("  t_max      :", (t_max))
+            print("  ng         :", (num_grid_points))
             
+            print("  omega_max  :", (self.delta_omega * self.n_dft))
+            print("  delta_omega:", (self.delta_omega))
+            
+        self.interpolator = None
+        self.t = np.linspace(0, self.t_max, self.num_grid_points)
         self.new_process(seed = seed)
+
+    def __call__(self, t):
+        if self.interpolator is None:
+            if self.verbose > 1:
+                print("setup interpolator ...")
+            self.interpolator = ComplexInterpolatedUnivariateSpline(self.t, self._z, k=3)
+            if self.verbose > 1:
+                print("done!")
+        return self.interpolator(t)
+
+    def get_time(self):
+        return self.t
+
+    def get_z(self):
+        return self._z 
             
-    def new_process(self, seed = None):
+    def new_process(self, yi = None, seed = None):
         self.interpolator = None
         if seed != None:
             if self.verbose > 0:
                 print("use seed", seed)
             np.random.seed(seed)
-        #random complex normal samples
-        yi = np.random.normal(size = 2*self.n_dft).view(np.complex)
+        if yi is None:
+            #random complex normal samples
+            if self.verbose > 1:
+                print("generate samples ...")
+            yi = np.random.normal(size = 2*self.n_dft).view(np.complex)
+            if self.verbose > 1:
+                print("done")
         #each row contain a different integrand
         weighted_integrand = self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 * yi 
         #compute integral using fft routine
-        self.z_ast = np.fft.fft(weighted_integrand)[0:self.num_grid_points]
+        if self.verbose > 1:
+            print("calc process via fft ...")
+        self._z = np.fft.fft(weighted_integrand)[0:self.num_grid_points]
+        if self.verbose > 1:
+            print("done")        
+ 
             
-    def x_for_initial_time_grid(self):
-        return self.z_ast 
-            
-    def __call__(self, t):
-        if self.interpolator is None:
-            self.interpolator = ComplexInterpolatedUnivariateSpline(self.get_time_axis(), self.z_ast, k=3)
 
-        return self.interpolator(t)
-    
-    def get_time_axis(self):
-        #corresponding time axis
-        return np.linspace(0, self.t_max, self.num_grid_points)
     
     
 def _mean_error(r_t_s, r_t_s_exact):
@@ -484,64 +583,65 @@ def _mean_error(r_t_s, r_t_s_exact):
     
     :return: the mean error ``err`` 
     """
-    len_t, len_s = r_t_s.shape
-    abs_sqare = np.abs(r_t_s - r_t_s_exact)**2
     
-    abs_sqare[0,:] /= 2
-    abs_sqare[-1,:] /= 2
-    
-    err = np.sum(abs_sqare, axis = 0) / len_t
+    err = np.mean(np.abs(r_t_s - r_t_s_exact), axis = 0)
     return err
     
 def _max_error(r_t_s, r_t_s_exact):
-    return np.max(np.abs(r_t_s - r_t_s_exact))
+    return np.max(np.abs(r_t_s - r_t_s_exact), axis = 0)
 
 def _max_rel_error(r_t_s, r_t_s_exact):
     return np.max(np.abs(r_t_s - r_t_s_exact) / np.abs(r_t_s_exact))
     
-def auto_grid_points(r_tau, t_max, ng_interpolation, tol = 1e-8, err_method = _max_error, name = 'mid_point', sig_min = 1e-4):
+def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = _max_error, name = 'mid_point', sig_min = 1e-4):
     err = 1
-    ng = 1
+    ng = 64
     seed = None
-    t_large = np.linspace(0, t_max, ng_interpolation)
+    err_method_name = err_method.__name__
     print("start auto_grid_points, determine ng ...")
     #exponential increase to get below error threshold
     while err > tol:
         ng *= 2
+        ng_fine = ng*10
+        t_fine = np.linspace(0, t_max, ng_fine)
+        print("#"*40)
+        print("new process with {} weights ...".format(name))
         stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
-        print("    new process with {} weights".format(stoc_proc.get_name()))
-        r_t_s = stoc_proc.recons_corr(t_large)
-        r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
-        
-        err = err_method(r_t_s, r_t_s_exact)
-
-        print("    ng {} -> err {:.2e}".format(ng, err))
+        print("reconstruct correlation function ({} points)...".format(ng_fine))
+        r_t_s = stoc_proc.recons_corr(t_fine)
+        print("calculate exact correlation function ...")
+        r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
+        print("calculate error using {} ...".format(err_method_name))
+        err = np.max(err_method(r_t_s, r_t_s_exact))
+        print("ng {} -> err {:.3e}".format(ng, err))
         
     ng_low = ng // 2
     ng_high = ng
     
     while (ng_high - ng_low) > 1:
         print("#"*40)
-        print("    ng_l", ng_low)
-        print("    ng_h", ng_high)
+        print("ng_l", ng_low)
+        print("ng_h", ng_high)
         ng = (ng_low + ng_high) // 2
-        print("    ng", ng)
-        
+        print("ng", ng)
+        ng_fine = ng*10
+        t_fine = np.linspace(0, t_max, ng_fine)
+        print("new process with {} weights ...".format(name))
         stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
-
-        r_t_s = stoc_proc.recons_corr(t_large)
-        r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
-        
-        err = err_method(r_t_s, r_t_s_exact)
-
-        print("    ng {} -> err {:.2e}".format(ng, err))
+        print("reconstruct correlation function ({} points)...".format(ng_fine))
+        r_t_s = stoc_proc.recons_corr(t_fine)
+        print("calculate exact correlation function ...")
+        r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
+        print("calculate error using {} ...".format(err_method_name))
+        err = np.max(err_method(r_t_s, r_t_s_exact))
+        print("ng {} -> err {:.3e}".format(ng, err))
         if err > tol:
-            print("        err > tol!")
-            print("        ng_l -> ", ng)
+            print("    err > tol!")
+            print("    ng_l -> ", ng)
             ng_low = ng
         else:
-            print("        err <= tol!")
-            print("        ng_h -> ", ng)
+            print("    err <= tol!")
+            print("    ng_h -> ", ng)
             ng_high = ng
     
 

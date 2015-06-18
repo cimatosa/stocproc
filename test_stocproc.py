@@ -182,6 +182,7 @@ def test_func_vs_class_KLE_FFT():
                                                  sig_min = sig_min)
     x_t_array_class = stoc_proc.x_for_initial_time_grid()
 
+    print(np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_kle vs. StocProc Class not identical"
 
     x_t_array_func, t = sp.stochastic_process_fft(spectral_density  = J,
@@ -195,7 +196,7 @@ def test_func_vs_class_KLE_FFT():
                                 num_grid_points  = ng,
                                 seed             = seed)
     
-    x_t_array_class = stoc_proc.x_for_initial_time_grid()    
+    x_t_array_class = stoc_proc.get_z()    
     
     print(np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
@@ -214,7 +215,7 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     ng_fine = ng*3
     
     seed = 0
-    sig_min = 1e-2
+    sig_min = 1e-5
     
     stoc_proc = sp.StocProc.new_instance_by_name(name    = 'trapezoidal', 
                                                  r_tau   = r_tau, 
@@ -229,13 +230,12 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     ns = 6000
     
     x_t_samples = np.empty(shape=(ns, ng_fine), dtype=np.complex)
-    
+
+    print("generate samples ...")
     for n in range(ns):
-        if n % 100 == 0:
-            print(n, ns)
         stoc_proc.new_process()
         x_t_samples[n] = stoc_proc(finer_t)
-        
+    print("done!")
     ac_kle_int_conj, ac_kle_int_not_conj = sp.auto_correlation(x_t_samples)
     
     t_grid = np.linspace(0, t_max, ng_fine)
@@ -293,6 +293,93 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     assert max_diff_not_conj < 4e-2
     assert max_diff_conj < 4e-2    
     
+def test_stocproc_KLE_splineinterpolation(plot=False):
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    # two parameter correlation function -> correlation matrix
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    # time interval [0,T]
+    t_max = 15
+    # number of subintervals
+    # leads to N+1 grid points
+    ng_fredholm   = 60
+    ng_kle_interp = ng_fredholm*3 
+    ng_fine       = ng_fredholm*30  
+    
+    seed = 0
+    sig_min = 1e-5
+    stoc_proc = sp.StocProc_KLE(r_tau, t_max, ng_kle_interp, ng_fredholm, seed, sig_min)
+  
+    finer_t = np.linspace(0, t_max, ng_fine)
+    
+    ns = 6000
+    
+    ac_conj     = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
+    ac_not_conj = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
+    print("generate samples ...")    
+    for n in range(ns):
+        stoc_proc.new_process()
+        x_t = stoc_proc(finer_t)
+        ac_conj     += x_t.reshape(ng_fine, 1) * np.conj(x_t.reshape(1, ng_fine))
+        ac_not_conj += x_t.reshape(ng_fine, 1) * x_t.reshape(1, ng_fine)
+    print("done!")
+    ac_conj /= ns
+    ac_not_conj /= ns
+    
+    t_grid = np.linspace(0, t_max, ng_fine)
+    ac_true = r_tau(t_grid.reshape(ng_fine, 1) - t_grid.reshape(1, ng_fine))
+    
+    max_diff_conj = np.max(np.abs(ac_true - ac_conj))
+    print("max diff <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj))
+    
+    max_diff_not_conj = np.max(np.abs(ac_not_conj))
+    print("max diff <x(t) x(s)>: {:.2e}".format(max_diff_not_conj))
+    
+    if plot:
+        v_min_real = np.floor(np.min(np.real(ac_true)))
+        v_max_real = np.ceil(np.max(np.real(ac_true)))
+        
+        v_min_imag = np.floor(np.min(np.imag(ac_true)))
+        v_max_imag = np.ceil(np.max(np.imag(ac_true)))
+        
+        fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(10,12))
+        ax[0,0].set_title(r"exact $\mathrm{re}\left(\langle x(t) x^\ast(s) \rangle\right)$")        
+        ax[0,0].imshow(np.real(ac_true), interpolation='none', vmin=v_min_real, vmax=v_max_real)
+        ax[0,1].set_title(r"exact $\mathrm{im}\left(\langle x(t) x^\ast(s) \rangle\right)$")
+        ax[0,1].imshow(np.imag(ac_true), interpolation='none', vmin=v_min_imag, vmax=v_max_imag)
+                
+        ax[1,0].set_title(r"KLE $\mathrm{re}\left(\langle x(t) x^\ast(s) \rangle\right)$")
+        ax[1,0].imshow(np.real(ac_conj), interpolation='none', vmin=v_min_real, vmax=v_max_real)
+        ax[1,1].set_title(r"KLE $\mathrm{im}\left(\langle x(t) x^\ast(s) \rangle\right)$")
+        ax[1,1].imshow(np.imag(ac_conj), interpolation='none', vmin=v_min_imag, vmax=v_max_imag)
+        
+        ax[2,0].set_title(r"KLE $\mathrm{re}\left(\langle x(t) x(s) \rangle\right)$")
+        ax[2,0].imshow(np.real(ac_not_conj), interpolation='none', vmin=v_min_real, vmax=v_max_real)
+        ax[2,1].set_title(r"KLE $\mathrm{im}\left(\langle x(t) x(s) \rangle\right)$")
+        ax[2,1].imshow(np.imag(ac_not_conj), interpolation='none', vmin=v_min_imag, vmax=v_max_imag)
+        
+        ax[0,2].set_title(r"FFT log rel diff")
+        im02 = ax[0,2].imshow(np.log10(np.abs(ac_conj - ac_true) / np.abs(ac_true)), interpolation='none')
+        divider02 = make_axes_locatable(ax[0,2])
+        cax02 = divider02.append_axes("right", size="10%", pad=0.05)
+        cbar02 = plt.colorbar(im02, cax=cax02)
+        
+        ax[1,2].set_title(r"FFT rel diff")
+        im12 = ax[1,2].imshow(np.abs(ac_conj - ac_true) / np.abs(ac_true), interpolation='none')
+        divider12 = make_axes_locatable(ax[1,2])
+        cax12 = divider12.append_axes("right", size="10%", pad=0.05)
+        cbar12 = plt.colorbar(im12, cax=cax12)        
+        
+        ax[2,2].set_title(r"FFT abs diff")
+        im22 = ax[2,2].imshow(np.abs(ac_conj - ac_true), interpolation='none')
+        divider22 = make_axes_locatable(ax[2,2])
+        cax22 = divider22.append_axes("right", size="10%", pad=0.05)
+        cbar22 = plt.colorbar(im22, cax=cax22)          
+        
+        plt.show()    
+    
+    assert max_diff_not_conj < 4e-2
+    assert max_diff_conj < 4e-2        
     
 def test_stochastic_process_FFT_interpolation(plot=False):
     s_param = 1
@@ -320,18 +407,13 @@ def test_stochastic_process_FFT_interpolation(plot=False):
     
     ac_conj     = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
     ac_not_conj = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
-    
-    
+    print("generate samples ...")    
     for n in range(ns):
-        if (n % 1000) == 0:
-            print(n, ns)
         stoc_proc.new_process()
         x_t = stoc_proc(finer_t)
         ac_conj     += x_t.reshape(ng_fine, 1) * np.conj(x_t.reshape(1, ng_fine))
         ac_not_conj += x_t.reshape(ng_fine, 1) * x_t.reshape(1, ng_fine)
-        
-        
-        
+    print("done!")
     ac_conj /= ns
     ac_not_conj /= ns
     
@@ -479,7 +561,7 @@ def test_auto_grid_points():
     # time interval [0,T]
     t_max = 15
     ng_interpolation = 1000
-    tol = 1e-16
+    tol = 1e-8
     
     ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol, sig_min=0)
     print(ng)
@@ -506,7 +588,7 @@ def test_chache():
     for t_i in t.keys():
         for i in range(t[t_i]):
             total += 1
-            stocproc.x(t_i)
+            stocproc(t_i)
         
     ci = stocproc.get_cache_info()
     assert ci.hits == total - misses
@@ -538,25 +620,23 @@ def test_dump_load():
     assert np.all(x_t == x_t_2)
     
     
-    
-    
 def show_auto_grid_points_result():
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
     # time interval [0,T]
-    t_max = 3
+    t_max = 15
     ng_interpolation = 1000
-    tol = 1e-10
+    tol = 1e-8
     seed = None
     sig_min = 0
     
     t_large = np.linspace(0, t_max, ng_interpolation)
     
     name = 'mid_point'
-    name = 'trapezoidal'
-    name = 'gauss_legendre'
+#     name = 'trapezoidal'
+#     name = 'gauss_legendre'
     
     ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol, name=name, sig_min=sig_min)
 
@@ -570,25 +650,22 @@ def show_auto_grid_points_result():
     diff_max = sp._max_error(r_t_s, r_t_s_exact)
     
     plt.plot(t_large, diff)
-    plt.axhline(y=diff_max)
+    plt.plot(t_large, diff_max)
     plt.yscale('log')
     plt.grid()
     plt.show()
-    
-def test_fft_func_vs_class():
-    pass
-    
-    
+        
 if __name__ == "__main__":
 #     test_stochastic_process_KLE_correlation_function(plot=False)
 #     test_stochastic_process_FFT_correlation_function(plot=False)
 #     test_func_vs_class_KLE_FFT()
-    test_stochastic_process_KLE_interpolation(plot=True)
-    test_stochastic_process_FFT_interpolation(plot=True)
+#     test_stochastic_process_KLE_interpolation(plot=False)
+#     test_stocproc_KLE_splineinterpolation(plot=False)
+#     test_stochastic_process_FFT_interpolation(plot=False)
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
-#     show_auto_grid_points_result()
+    show_auto_grid_points_result()
 #     test_chache()
 #     test_dump_load()
     pass
