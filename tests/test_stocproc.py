@@ -31,7 +31,7 @@ import os
 
 import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
-sys.path.insert(0, str(p.parent.parent / 'stocproc'))
+sys.path.insert(0, str(p.parent.parent))
 
 import stocproc as sp
 
@@ -561,10 +561,12 @@ def test_auto_grid_points():
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
     # time interval [0,T]
     t_max = 15
-    ng_interpolation = 1000
     tol = 1e-8
     
-    ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol, sig_min=0)
+    ng = sp.auto_grid_points(r_tau   = r_tau, 
+                             t_max   = t_max,
+                             tol     = tol,
+                             sig_min = 0)
     print(ng)
     
 def test_chache():
@@ -639,7 +641,7 @@ def show_auto_grid_points_result():
 #     name = 'trapezoidal'
 #     name = 'gauss_legendre'
     
-    ng = sp.auto_grid_points(r_tau, t_max, ng_interpolation, tol, name=name, sig_min=sig_min)
+    ng = sp.auto_grid_points(r_tau, t_max, tol, name=name, sig_min=sig_min)
 
     t, w = sp.get_trapezoidal_weights_times(t_max, ng)
     stoc_proc = sp.StocProc(r_tau, t, w, seed, sig_min)
@@ -647,14 +649,52 @@ def show_auto_grid_points_result():
     
     r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
     
-    diff = sp._mean_error(r_t_s, r_t_s_exact)
-    diff_max = sp._max_error(r_t_s, r_t_s_exact)
+    diff = sp.mean_error(r_t_s, r_t_s_exact)
+    diff_max = sp.max_error(r_t_s, r_t_s_exact)
     
     plt.plot(t_large, diff)
     plt.plot(t_large, diff_max)
     plt.yscale('log')
     plt.grid()
     plt.show()
+    
+def test_ui_mem_save():
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    t_max = 1
+    
+    N1 = 100
+    a  = 5
+    N2 = a*(N1 - 1) + 1 
+    
+    t_fine = np.linspace(0, t_max, N2)
+    
+    assert abs( (t_max/(N1-1)) - a*(t_fine[1]-t_fine[0]) ) < 1e-14, "{}".format(abs( (t_max/(N1-1)) - (t_fine[1]-t_fine[0]) ))
+
+    stoc_proc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min = 1e-4)
+    
+    for i in range(stoc_proc.num_ev()):
+
+        ui_ms = stoc_proc.u_i_mem_save(delta_t_fac=a, i=i)
+        ui = stoc_proc.u_i(t_fine, i)
+#         plt.plot(t_fine, np.real(ui_ms), color='k')
+#         plt.plot(t_fine, np.imag(ui_ms), color='k')
+#         
+#         plt.plot(t_fine, np.real(ui), color='r')
+#         plt.plot(t_fine, np.imag(ui), color='r')
+#         
+#         plt.plot(stoc_proc._s, np.real(stoc_proc._eig_vec[:,i]), marker = 'o', ls='', color='b')
+#         plt.plot(stoc_proc._s, np.imag(stoc_proc._eig_vec[:,i]), marker = 'o', ls='', color='b')
+#         
+#         plt.grid()
+#         
+#         plt.show()
+        
+        assert np.allclose(ui_ms, ui), "{}".format(max(np.abs(ui_ms - ui)))
+        
+            
+    
         
 if __name__ == "__main__":
 #     test_stochastic_process_KLE_correlation_function(plot=False)
@@ -664,9 +704,10 @@ if __name__ == "__main__":
 #     test_stocproc_KLE_splineinterpolation(plot=False)
 #     test_stochastic_process_FFT_interpolation(plot=False)
 #     test_stocProc_eigenfunction_extraction()
-    test_orthonomality()
-    test_auto_grid_points()
-    show_auto_grid_points_result()
-    test_chache()
-    test_dump_load()
+#     test_orthonomality()
+#     test_auto_grid_points()
+#     show_auto_grid_points_result()
+#     test_chache()
+#     test_dump_load()
+    test_ui_mem_save()
     pass
