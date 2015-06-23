@@ -2,10 +2,12 @@ import functools
 import numpy as np
 import pickle
 
-from . import solve_hom_fredholm
-from . import get_mid_point_weights
-from . import get_trapezoidal_weights_times
-from . import gquad
+from .stocproc import solve_hom_fredholm
+from .stocproc import get_mid_point_weights
+from .stocproc import get_trapezoidal_weights_times
+import gquad
+
+from . import stocproc_c
 
 
 class StocProc(object):
@@ -91,6 +93,7 @@ class StocProc(object):
                  verbose    = 1):
         
         self.verbose = verbose
+        self._one_over_sqrt_2 = 1/np.sqrt(2)
         if fname is None:
             
             assert r_tau is not None
@@ -205,7 +208,7 @@ class StocProc(object):
         if yi is None:
             if self.verbose > 1:
                 print("generate samples ...")
-            self._Y = np.random.normal(size=2*self._num_ev).view(np.complex).reshape(self._num_ev,1)
+            self._Y = np.random.normal(scale = self._one_over_sqrt_2, size=2*self._num_ev).view(np.complex).reshape(self._num_ev,1)
             if self.verbose > 1:
                 print("done!")
         else:
@@ -220,7 +223,7 @@ class StocProc(object):
         equation. This is equivalent to calling :py:func:`stochastic_process_kle` with the
         same weights :math:`w_i` and time grid points :math:`s_i`.
         """
-        tmp = self._Y / np.sqrt(2) * self._sqrt_eig_val.reshape(self._num_ev,1) 
+        tmp = self._Y * self._sqrt_eig_val.reshape(self._num_ev,1) 
         if self.verbose > 1:
             print("calc process via matrix prod ...")
         res = np.tensordot(tmp, self._eig_vec, axes=([0],[1])).flatten()
@@ -265,27 +268,40 @@ class StocProc(object):
         if self.verbose > 1:
             print("done!")
         return res
+    
+    def x_t_mem_save(self, delta_t_fac):
+        a = delta_t_fac        
+        N1 = len(self._s)
+        N2 = a * (N1 - 1) + 1        
+        T = self._s[-1]
+        alpha_k = self._r_tau(np.linspace(-T, T, 2*N2 - 1))        
+        return stocproc_c.z_t(delta_t_fac = delta_t_fac,
+                              time_axis   = self._s,
+                              alpha_k     = alpha_k,
+                              Y           = self._Y[:,0],
+                              A           = self._A)
 
     def u_i_mem_save(self, delta_t_fac, i):
-        r"""
-        """
-        a = delta_t_fac
-        assert isinstance(a, int)
-        T = self._s[-1]
+        a = delta_t_fac        
         N1 = len(self._s)
-        N2 = a * (N1 - 1) + 1
+        N2 = a * (N1 - 1) + 1        
+        T = self._s[-1]
         alpha_k = self._r_tau(np.linspace(-T, T, 2*N2 - 1))
-        
-        print(alpha_k[N2-1])
-        
-        print("WARNING! this needs to be cythonized")
-        u_res = np.zeros(shape=N2, dtype=np.complex)
-        for j in range(N2):
-            for l in range(N1):
-                k = j - a*l + N2-1
-                u_res[j] += self._w[l] * alpha_k[k] * self._eig_vec[l, i]      
-
-        return u_res / self._eig_val[i]
+        return stocproc_c.eig_func_interp(delta_t_fac,
+                                          self._s,
+                                          alpha_k,
+                                          self._w,
+                                          self._eig_val[i],
+                                          self._eig_vec[:, i])
+         
+#         print("WARNING! this needs to be cythonized")
+#         u_res = np.zeros(shape=N2, dtype=np.complex)
+#         for j in range(N2):
+#             for l in range(N1):
+#                 k = j - a*l + N2-1
+#                 u_res[j] += self._w[l] * alpha_k[k] * self._eig_vec[l, i]      
+# 
+#         return u_res / self._eig_val[i]
         
     
     def u_i(self, t_array, i):
@@ -329,6 +345,32 @@ class StocProc(object):
         # A                                            # (N_gp, N_ev)
         # A_j,i = w_j / sqrt(lambda_i) u_i(s_j)
         return np.tensordot(tmp, 1/self._sqrt_eig_val.reshape(1,self._num_ev) * self._A, axes=([0],[0]))
+
+    def u_i_all_mem_save(self, delta_t_fac):
+        a = delta_t_fac        
+        N1 = len(self._s)
+        N2 = a * (N1 - 1) + 1        
+        T = self._s[-1]
+        alpha_k = self._r_tau(np.linspace(-T, T, 2*N2 - 1))
+        
+        return stocproc_c.eig_func_all_interp(delta_t_fac = delta_t_fac,
+                                              time_axis   = self._s,
+                                              alpha_k     = alpha_k, 
+                                              weights     = self._w,
+                                              eigen_val   = self._eig_val,
+                                              eigen_vec   = self._eig_vec)
+        
+#         print("WARNING! this needs to be cythonized")
+#         u_res = np.zeros(shape=(N2, self.num_ev()), dtype=np.complex)
+#         for i in range(self.num_ev()):
+#             for j in range(N2):
+#                 for l in range(N1):
+#                     k = j - a*l + N2-1
+#                     u_res[j, i] += self._w[l] * alpha_k[k] * self._eig_vec[l, i]      
+#  
+#             u_res[:, i] /= self._eig_val[i]
+#             
+#         return u_res
 
     def eigen_vector_i(self, i):
         r"""Returns the i-th eigenvector (solution of the discrete Fredhom equation)"""

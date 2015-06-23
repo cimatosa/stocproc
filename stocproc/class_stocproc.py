@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
-from . import StocProc
+from .class_stocproc_kle import StocProc
 
 class ComplexInterpolatedUnivariateSpline(object):
     r"""
@@ -37,12 +37,15 @@ class _absStocProc(object):
             :param k: polynomial degree used for spline interpolation  
         """
         self._verbose = verbose
+        self.t_max = t_max
+        self.num_grid_points = num_grid_points
         self.t = np.linspace(0, t_max, num_grid_points)
         self._z = None
         self._interpolator = None
         self._k = k
         if seed is not None:
             np.random.seed(seed)
+        self._one_over_sqrt_2 = 1/np.sqrt(2)
 
     def __call__(self, t):
         r"""
@@ -104,7 +107,7 @@ class _absStocProc(object):
             #random complex normal samples
             if self._verbose > 1:
                 print("generate samples ...")
-            y = np.random.normal(size = 2*self.get_num_y()).view(np.complex)
+            y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
             if self._verbose > 1:
                 print("done")        
 
@@ -119,26 +122,18 @@ class StocProc_KLE(_absStocProc):
         - Calculate discrete stochastic process (using interpolation solution of fredholm equation) with num_grid_points nodes
         - invoke spline interpolator when calling 
     """
-    def __init__(self, r_tau, t_max, num_grid_points, ng_fredholm=None, seed=None, sig_min=1e-5, verbose=1, k=3):
+    def __init__(self, r_tau, t_max, ng_fredholm, ng_fac=4, seed=None, sig_min=1e-5, verbose=1, k=3):
         r"""
             :param r_tau: auto correlation function of the stochastic process
             :param t_max: specify time axis as [0, t_max]
-            :param num_grid_points: number of equidistant times on that axis
-            :param ng_fredholm: number of discrete time used to solve the underlying fredholm equation, ``None`` set ``ng_fredholm = num_grid_points``
             :param seed: if not ``None`` set seed to ``seed``
             :param sig_min: eigenvalue threshold (see KLE method to generate stochastic processes)
             :param verbose: 0: no output, 1: informational output, 2: (eventually some) debug info
             :param k: polynomial degree used for spline interpolation  
              
         """
-        if ng_fredholm is None:
-            ng_fredholm = num_grid_points
-            
-        if num_grid_points < ng_fredholm:
-            print("WARNING: found 'num_grid_points < ng_fredholm' -> set 'num_grid_points == ng_fredholm'")
-
-        # if ng_fredholm == num_grid_points -> no kle_fredholm interpolation is needed
-        if ng_fredholm == num_grid_points:
+        self.ng_fac = ng_fac
+        if ng_fac == 1:
             self.kle_interp = False
         else:
             self.kle_interp = True
@@ -150,7 +145,9 @@ class StocProc_KLE(_absStocProc):
                                                                        seed    = seed,
                                                                        verbose = verbose)
         
-        super().__init__(t_max=t_max, num_grid_points=num_grid_points, seed=seed, verbose=verbose, k=k)
+        ng = ng_fac * (ng_fredholm - 1) + 1  
+        
+        super().__init__(t_max=t_max, num_grid_points=ng, seed=seed, verbose=verbose, k=k)
                 
         # this is only needed access the underlaying stocproc KLE class
         # in a convenient fashion 
@@ -161,14 +158,15 @@ class StocProc_KLE(_absStocProc):
         
         self.verbose = verbose
 
-    def _cal_z(self, y):
+    def _calc_z(self, y):
         r"""
         uses the underlaying stocproc class to generate the process (see :py:class:`StocProc` for details) 
         """
         self.stocproc.new_process(y)
         
         if self.kle_interp:
-            return self.stocproc.x_t_array(self.t)
+            #return self.stocproc.x_t_array(np.linspace(0, self.t_max, self.num_grid_points))
+            return self.stocproc.x_t_mem_save(delta_t_fac = self.ng_fac)
         else:
             return self.stocproc.x_for_initial_time_grid()
         
@@ -176,7 +174,7 @@ class StocProc_KLE(_absStocProc):
         return self.num_y
         
 
-class StocProc_FFT(object):
+class StocProc_FFT(_absStocProc):
     r"""
         Simulate Stochastic Process using FFT method 
     """
@@ -187,16 +185,16 @@ class StocProc_FFT(object):
                          verbose         = verbose,
                          k               = k)
         
-        self.n_dft           = self.num_grid_points * 2 - 1
-        delta_t              = self.t_max / (self.num_grid_points-1)
+        self.n_dft           = num_grid_points * 2 - 1
+        delta_t              = t_max / (num_grid_points-1)
         self.delta_omega     = 2 * np.pi / (delta_t * self.n_dft)
           
         #omega axis
         omega = self.delta_omega*np.arange(self.n_dft)
         #reshape for multiplication with matrix xi
-        self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega) / np.sqrt(2) 
+        self.sqrt_spectral_density_times_sqrt_delta_omega = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega) 
         
-        if self.verbose > 0:
+        if self._verbose > 0:
             print("stoc proc fft, spectral density sampling information:")
             print("  t_max      :", (t_max))
             print("  ng         :", (num_grid_points))
@@ -204,13 +202,13 @@ class StocProc_FFT(object):
             print("  omega_max  :", (self.delta_omega * self.n_dft))
             print("  delta_omega:", (self.delta_omega))
             
-    def _cal_z(self, y):
-        weighted_integrand = self.sqrt_spectral_density_times_sqrt_delta_omega_over_sqrt_2 * y 
+    def _calc_z(self, y):
+        weighted_integrand = self.sqrt_spectral_density_times_sqrt_delta_omega * y 
         #compute integral using fft routine
-        if self.verbose > 1:
+        if self._verbose > 1:
             print("calc process via fft ...")
         z = np.fft.fft(weighted_integrand)[0:self.num_grid_points]
-        if self.verbose > 1:
+        if self._verbose > 1:
             print("done")
         return z
 

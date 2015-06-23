@@ -197,7 +197,8 @@ def test_func_vs_class_KLE_FFT():
                                 num_grid_points  = ng,
                                 seed             = seed)
     
-    x_t_array_class = stoc_proc.get_z()    
+    stoc_proc.new_process()
+    x_t_array_class = stoc_proc.get_z()
     
     print(np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
@@ -305,11 +306,16 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
     # leads to N+1 grid points
     ng_fredholm   = 60
     ng_kle_interp = ng_fredholm*3 
-    ng_fine       = ng_fredholm*30  
+    ng_fine       = ng_fredholm*15
     
     seed = 0
     sig_min = 1e-5
-    stoc_proc = sp.StocProc_KLE(r_tau, t_max, ng_kle_interp, ng_fredholm, seed, sig_min)
+    stoc_proc = sp.StocProc_KLE(r_tau       = r_tau,
+                                t_max       = t_max, 
+                                ng_fredholm = ng_fredholm,
+                                ng_fac      = 3,
+                                seed        = seed, 
+                                sig_min     = sig_min)
   
     finer_t = np.linspace(0, t_max, ng_fine)
     
@@ -317,10 +323,12 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
     
     ac_conj     = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
     ac_not_conj = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
+
     print("generate samples ...")    
     for n in range(ns):
         stoc_proc.new_process()
         x_t = stoc_proc(finer_t)
+
         ac_conj     += x_t.reshape(ng_fine, 1) * np.conj(x_t.reshape(1, ng_fine))
         ac_not_conj += x_t.reshape(ng_fine, 1) * x_t.reshape(1, ng_fine)
     print("done!")
@@ -652,17 +660,17 @@ def show_auto_grid_points_result():
     diff = sp.mean_error(r_t_s, r_t_s_exact)
     diff_max = sp.max_error(r_t_s, r_t_s_exact)
     
-    plt.plot(t_large, diff)
-    plt.plot(t_large, diff_max)
-    plt.yscale('log')
-    plt.grid()
-    plt.show()
+#     plt.plot(t_large, diff)
+#     plt.plot(t_large, diff_max)
+#     plt.yscale('log')
+#     plt.grid()
+#     plt.show()
     
 def test_ui_mem_save():
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
-    t_max = 1
+    t_max = 5
     
     N1 = 100
     a  = 5
@@ -673,6 +681,8 @@ def test_ui_mem_save():
     assert abs( (t_max/(N1-1)) - a*(t_fine[1]-t_fine[0]) ) < 1e-14, "{}".format(abs( (t_max/(N1-1)) - (t_fine[1]-t_fine[0]) ))
 
     stoc_proc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min = 1e-4)
+    
+    ui_all_ms = stoc_proc.u_i_all_mem_save(delta_t_fac=a)
     
     for i in range(stoc_proc.num_ev()):
 
@@ -692,16 +702,56 @@ def test_ui_mem_save():
 #         plt.show()
         
         assert np.allclose(ui_ms, ui), "{}".format(max(np.abs(ui_ms - ui)))
+        assert np.allclose(ui_all_ms[:, i], ui), "{}".format(max(np.abs(ui_all_ms[:, i] - ui)))
         
-            
+
+def test_z_t_mem_save():            
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    t_max = 5
     
+    N1 = 100
+    a  = 5
+    N2 = a*(N1 - 1) + 1
+    sig_min = 0
+    
+    t_fine = np.linspace(0, t_max, N2)
+    
+    assert abs( (t_max/(N1-1)) - a*(t_fine[1]-t_fine[0]) ) < 1e-14, "{}".format(abs( (t_max/(N1-1)) - (t_fine[1]-t_fine[0]) ))
+
+    stoc_proc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min=sig_min)
+    
+    z_t_mem_save = stoc_proc.x_t_mem_save(delta_t_fac = a)
+    z_t = stoc_proc.x_t_array(t_fine)
+    
+    z_t_rough = stoc_proc.x_for_initial_time_grid()
+        
+#     plt.plot(t_fine, np.real(z_t_mem_save), color='k')
+#     plt.plot(t_fine, np.imag(z_t_mem_save), color='k')
+#      
+#     plt.plot(t_fine, np.real(z_t), color='r')
+#     plt.plot(t_fine, np.imag(z_t), color='r')
+#      
+#     plt.plot(stoc_proc._s, np.real(z_t_rough), marker = 'o', ls='', color='b')
+#     plt.plot(stoc_proc._s, np.imag(z_t_rough), marker = 'o', ls='', color='b')
+#      
+#     plt.grid()
+#      
+#     plt.show()    
+    
+    assert np.allclose(z_t_mem_save, z_t), "{}".format(max(np.abs(z_t_mem_save - z_t)))
+    
+    
+    
+ 
         
 if __name__ == "__main__":
 #     test_stochastic_process_KLE_correlation_function(plot=False)
 #     test_stochastic_process_FFT_correlation_function(plot=False)
 #     test_func_vs_class_KLE_FFT()
 #     test_stochastic_process_KLE_interpolation(plot=False)
-#     test_stocproc_KLE_splineinterpolation(plot=False)
+    test_stocproc_KLE_splineinterpolation(plot=False)
 #     test_stochastic_process_FFT_interpolation(plot=False)
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
@@ -709,5 +759,7 @@ if __name__ == "__main__":
 #     show_auto_grid_points_result()
 #     test_chache()
 #     test_dump_load()
-    test_ui_mem_save()
+#     test_ui_mem_save()
+#     test_z_t_mem_save()
+
     pass

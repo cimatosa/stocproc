@@ -194,9 +194,9 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
 
     if verbose > 0:
         print("generate samples ...")
-    x = np.random.normal(size=(2*num_samples*num_of_functions)).view(np.complex).reshape(num_of_functions, num_samples).T \
-         / np.sqrt(2) * sig                                           # random quantities all aligned for num_samples samples
-    x_t_array = np.tensordot(x, eig_vec, axes=([1],[1]))              # multiplication with the eigenfunctions == base of Karhunen-Loève expansion
+    x = np.random.normal(scale=1/np.sqrt(2), size=(2*num_samples*num_of_functions)).view(np.complex).reshape(num_of_functions, num_samples).T
+                                                                      # random quantities all aligned for num_samples samples
+    x_t_array = np.tensordot(x*sig, eig_vec, axes=([1],[1]))              # multiplication with the eigenfunctions == base of Karhunen-Loève expansion
     
     if verbose > 0:
         print("done!")
@@ -386,9 +386,9 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
         print("  delta_omega: {:.2}".format(delta_omega))
         print("generate samples ...")
     #random complex normal samples
-    xi = (np.random.normal(size = (2*num_samples*n_dft)).view(np.complex)).reshape(num_samples, n_dft)
+    xi = (np.random.normal(scale=1/np.sqrt(2), size = (2*num_samples*n_dft)).view(np.complex)).reshape(num_samples, n_dft)
     #each row contain a different integrand
-    weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega) / np.sqrt(2) * xi 
+    weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega) * xi 
     #compute integral using fft routine
     z_ast = np.fft.fft(weighted_integrand, axis = 1)[:, 0:num_grid_points]
     #corresponding time axis
