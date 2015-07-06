@@ -178,7 +178,7 @@ class StocProc_FFT(_absStocProc):
     r"""
         Simulate Stochastic Process using FFT method 
     """
-    def __init__(self, spectral_density, t_max, num_grid_points, seed=None, verbose=1, k=3):
+    def __init__(self, spectral_density, t_max, num_grid_points, seed=None, verbose=0, k=3):
         super().__init__(t_max           = t_max, 
                          num_grid_points = num_grid_points, 
                          seed            = seed, 
@@ -192,7 +192,7 @@ class StocProc_FFT(_absStocProc):
         #omega axis
         omega = self.delta_omega*np.arange(self.n_dft)
         #reshape for multiplication with matrix xi
-        self.sqrt_spectral_density_times_sqrt_delta_omega = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega) 
+        self.sqrt_spectral_density_over_pi_times_sqrt_delta_omega = np.sqrt(spectral_density(omega) / np.pi) * np.sqrt(self.delta_omega) 
         
         if self._verbose > 0:
             print("stoc proc fft, spectral density sampling information:")
@@ -203,7 +203,7 @@ class StocProc_FFT(_absStocProc):
             print("  delta_omega:", (self.delta_omega))
             
     def _calc_z(self, y):
-        weighted_integrand = self.sqrt_spectral_density_times_sqrt_delta_omega * y 
+        weighted_integrand = self.sqrt_spectral_density_over_pi_times_sqrt_delta_omega * y 
         #compute integral using fft routine
         if self._verbose > 1:
             print("calc process via fft ...")
