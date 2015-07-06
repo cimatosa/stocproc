@@ -390,12 +390,26 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
     assert max_diff_not_conj < 4e-2
     assert max_diff_conj < 4e-2        
     
+    
+    
 def test_stochastic_process_FFT_interpolation(plot=False):
-    s_param = 1
+    s_param = 0.7
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
     J = lambda w : spectral_density(w, s_param)
+    
+    eta = 0.1
+    s = 0.7
+    gamma_param = 2.
+    
+    from scipy.special import gamma as gamma_func
+
+    _c1 = eta * gamma_param**(s+1) / np.pi
+    _c3 = gamma_func(s + 1)    
+    r_tau = lambda tau: _c1 * (1 + 1j*gamma_param * tau)**(-(s+1)) * _c3
+    J = lambda w: eta * w**s * np.exp(-w/gamma_param)
+    
     # time interval [0,T]
     t_max = 30
     # number of subintervals
@@ -408,7 +422,8 @@ def test_stochastic_process_FFT_interpolation(plot=False):
     stoc_proc = sp.StocProc_FFT(spectral_density    = J,
                                 t_max               = t_max, 
                                 num_grid_points     = ng,
-                                seed                = seed)
+                                seed                = seed,
+                                verbose             = 1)
     
     finer_t = np.linspace(0, t_max, ng_fine)
     
@@ -751,8 +766,8 @@ if __name__ == "__main__":
 #     test_stochastic_process_FFT_correlation_function(plot=False)
 #     test_func_vs_class_KLE_FFT()
 #     test_stochastic_process_KLE_interpolation(plot=False)
-    test_stocproc_KLE_splineinterpolation(plot=False)
-#     test_stochastic_process_FFT_interpolation(plot=False)
+#     test_stocproc_KLE_splineinterpolation(plot=False)
+    test_stochastic_process_FFT_interpolation(plot=True)
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
