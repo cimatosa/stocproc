@@ -758,6 +758,44 @@ def test_z_t_mem_save():
     assert np.allclose(z_t_mem_save, z_t), "{}".format(max(np.abs(z_t_mem_save - z_t)))
     
     
+def show_ef():
+    G = 1
+    Gamma = 1 + 1j
+    r_tau = lambda tau : G * np.exp(- Gamma * tau)
+    # time interval [0,T]
+    t_max = 8
+    # number of subintervals
+    # leads to N+1 grid points
+    ng = 250
+    ng_fine = ng*3
+    
+    seed = 0
+    sig_min = 1e-5
+    
+    stoc_proc = sp.StocProc.new_instance_by_name(name    = 'trapezoidal', 
+                                                 r_tau   = r_tau, 
+                                                 t_max   = t_max, 
+                                                 ng      = ng, 
+                                                 seed    = seed, 
+                                                 sig_min = sig_min)
+    
+    t = stoc_proc._s
+    
+    plt.figure()
+    plt.plot(stoc_proc._sqrt_eig_val[::-1], ls='', marker='o')
+    plt.grid()
+    plt.yscale('log')
+    
+    plt.figure()
+    for i in range(1, 20):
+        g = stoc_proc._sqrt_eig_val[-i]
+        p, = plt.plot(t, g*np.real(stoc_proc._eig_vec[:,-i]), label="n:{}g:{:.1e}".format(i, g))
+        plt.plot(t, g*np.imag(stoc_proc._eig_vec[:,-i]), color=p.get_color(), ls='--')
+    
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
     
  
         
@@ -767,7 +805,7 @@ if __name__ == "__main__":
 #     test_func_vs_class_KLE_FFT()
 #     test_stochastic_process_KLE_interpolation(plot=False)
 #     test_stocproc_KLE_splineinterpolation(plot=False)
-    test_stochastic_process_FFT_interpolation(plot=True)
+#     test_stochastic_process_FFT_interpolation(plot=True)
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
@@ -776,5 +814,6 @@ if __name__ == "__main__":
 #     test_dump_load()
 #     test_ui_mem_save()
 #     test_z_t_mem_save()
+    show_ef()
 
     pass

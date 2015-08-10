@@ -287,6 +287,7 @@ class StocProc(object):
         N2 = a * (N1 - 1) + 1        
         T = self._s[-1]
         alpha_k = self._r_tau(np.linspace(-T, T, 2*N2 - 1))
+
         return stocproc_c.eig_func_interp(delta_t_fac,
                                           self._s,
                                           alpha_k,
@@ -371,6 +372,11 @@ class StocProc(object):
 #             u_res[:, i] /= self._eig_val[i]
 #             
 #         return u_res
+
+    def t_mem_save(self, delta_t_fac):
+        T = self._s[-1]
+        N = len(self._s)
+        return np.linspace(0, T, delta_t_fac*(N-1) + 1)
 
     def eigen_vector_i(self, i):
         r"""Returns the i-th eigenvector (solution of the discrete Fredhom equation)"""
