@@ -22,6 +22,8 @@
 
 import numpy as np
 from scipy.special import gamma
+from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import functools
@@ -32,6 +34,22 @@ import os
 import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
+
+class ComplexInterpolatedUnivariateSpline(object):
+    def __init__(self, x, y, k=2):
+        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
+        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
+        
+    def __call__(self, t):
+        return self.re_spline(t) + 1j*self.im_spline(t)
+    
+def complex_quad(func, a, b, **kw_args):
+    func_re = lambda t: np.real(func(t))
+    func_im = lambda t: np.imag(func(t))
+    I_re = quad(func_re, a, b, **kw_args)[0]
+    I_im = quad(func_im, a, b, **kw_args)[0]
+    
+    return I_re + 1j*I_im
 
 import stocproc as sp
 
@@ -796,8 +814,65 @@ def show_ef():
     plt.grid()
     plt.show()
     
+def test_matrix_build():
+    N = 10
+    w = np.random.rand(N)
+    r = np.random.rand(N**2).reshape(N,N)
+    
+    r_mat_mult = np.dot( np.diag(w), np.dot(r, np.diag(w)) )
+    
+    t_vec_mult = w.reshape(N,1) * r * w.reshape(1,N)
+    
+    diff = np.max(np.abs(r_mat_mult - t_vec_mult))
+    assert diff < 1e-15 
     
  
+def test_integral_equation():
+    tmax = 1
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    
+    delta_t_fac = 10
+    
+    # two parameter correlation function -> correlation matrix
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)    
+    
+    stocproc_simp = sp.StocProc.new_instance_with_simpson_weights(r_tau   = r_tau, 
+                                                                  t_max   = tmax, 
+                                                                  ng      = 1001,
+                                                                  sig_min = 0, 
+                                                                  verbose = 1)
+
+
+    eig_val = stocproc_simp.lambda_i_all()
+    idx_selection = np.where(eig_val/max(eig_val) > 0.01)[0][::-1]
+    eig_val = eig_val[idx_selection]
+    
+    U_intp = []
+    for i in idx_selection:
+        U_intp.append(stocproc_simp.u_i_mem_save(delta_t_fac, i))
+    
+    t_intp = stocproc_simp.t_mem_save(delta_t_fac)
+    
+    for i in range(len(eig_val)):
+        u_t_intp = ComplexInterpolatedUnivariateSpline(t_intp, U_intp[i], k=3)
+        I_intp = []
+        rhs_intp = []
+        tau = np.linspace(0, tmax, 50)
+        for tau_ in tau:
+            I_intp.append(complex_quad(lambda s: r_tau(tau_-s) * u_t_intp(s), 0, tmax, limit=5000))
+            rhs_intp.append(eig_val[i] * u_t_intp(tau_))
+        
+        
+        rel_diff = np.abs(np.asarray(I_intp) - np.asarray(rhs_intp)) / np.abs(np.asarray(rhs_intp))
+        print(max(rel_diff))
+        assert max(rel_diff) < 1e-8
+
+
+
+
+
+
         
 if __name__ == "__main__":
 #     test_stochastic_process_KLE_correlation_function(plot=False)
@@ -805,7 +880,7 @@ if __name__ == "__main__":
 #     test_func_vs_class_KLE_FFT()
 #     test_stochastic_process_KLE_interpolation(plot=False)
 #     test_stocproc_KLE_splineinterpolation(plot=False)
-#     test_stochastic_process_FFT_interpolation(plot=True)
+#     test_stochastic_process_FFT_interpolation(plot=False)
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
@@ -814,6 +889,8 @@ if __name__ == "__main__":
 #     test_dump_load()
 #     test_ui_mem_save()
 #     test_z_t_mem_save()
-    show_ef()
+#     show_ef()
+#     test_matrix_build()
+    test_integral_equation()
 
     pass

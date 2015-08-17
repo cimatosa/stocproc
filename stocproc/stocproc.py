@@ -60,6 +60,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(__file__))
 import numpy as np
+import scipy.linalg
     
 def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
@@ -93,9 +94,14 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     """
     
     # weighted matrix r due to quadrature weights
-    d = np.diag(np.sqrt(w))
-    d_inverse = np.diag(1/np.sqrt(w))
-    r = np.dot(d, np.dot(r, d))
+    if verbose > 0:
+        print("build matrix ...")
+#     d = np.diag(np.sqrt(w))
+#     r = np.dot(d, np.dot(r, d))
+    n = len(w)
+    w_sqrt = np.sqrt(w)
+    r = w_sqrt.reshape(n,1) * r * w_sqrt.reshape(1,n)
+    
     if verbose > 0:
         print("solve eigenvalue equation ...")
     eig_val, eig_vec = np.linalg.eigh(r)
@@ -109,7 +115,10 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     eig_vec = eig_vec[:, large_eig_val_idx]
     
     # inverse scale of the eigenvectors
-    eig_vec = np.dot(d_inverse, eig_vec)
+#     d_inverse = np.diag(1/np.sqrt(w))
+#     eig_vec = np.dot(d_inverse, eig_vec)
+    eig_vec = np.reshape(1/w_sqrt, (n,1)) * eig_vec
+
     if verbose > 0:
         print("done!")
     
@@ -276,6 +285,18 @@ def get_trapezoidal_weights_times(t_max, num_grid_points):
     w = np.ones(num_grid_points)*delta_t
     w[0] /= 2
     w[-1] /= 2
+    return t, w
+
+def get_simpson_weights_times(t_max, num_grid_points):
+    assert num_grid_points % 2 == 1
+    # generate mid points
+    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
+    # equal weights for grid points
+    w = np.empty(num_grid_points, dtype=np.float64)
+    w[0::2] = 2/3*delta_t
+    w[1::2] = 4/3*delta_t
+    w[0]    = 1/3*delta_t
+    w[-1]   = 1/3*delta_t
     return t, w
 
 def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed = None, sig_min = 1e-4):

@@ -5,6 +5,7 @@ import pickle
 from .stocproc import solve_hom_fredholm
 from .stocproc import get_mid_point_weights
 from .stocproc import get_trapezoidal_weights_times
+from .stocproc import get_simpson_weights_times
 import gquad
 
 from . import stocproc_c
@@ -144,6 +145,11 @@ class StocProc(object):
     @classmethod
     def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
         t, w = get_trapezoidal_weights_times(t_max, ng)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
+    
+    @classmethod
+    def new_instance_with_simpson_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
+        t, w = get_simpson_weights_times(t_max, ng)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
 
     @classmethod
