@@ -10,6 +10,24 @@ import gquad
 
 from . import stocproc_c
 
+from scipy.integrate import quad
+from scipy.interpolate import InterpolatedUnivariateSpline
+
+class ComplexInterpolatedUnivariateSpline(object):
+    def __init__(self, x, y, k=2):
+        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
+        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
+        
+    def __call__(self, t):
+        return self.re_spline(t) + 1j*self.im_spline(t)
+    
+def complex_quad(func, a, b, **kw_args):
+    func_re = lambda t: np.real(func(t))
+    func_im = lambda t: np.imag(func(t))
+    I_re = quad(func_re, a, b, **kw_args)[0]
+    I_im = quad(func_im, a, b, **kw_args)[0]
+    
+    return I_re + 1j*I_im
 
 class StocProc(object):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion 
@@ -445,6 +463,35 @@ class StocProc(object):
         lambda_i_all = self.lambda_i_all()                       #(N_ev)
         tmp = lambda_i_all.reshape(1, self._num_ev) * u_i_all_t  #(N_gp, N_ev)
         return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))[:,0]
+    
+    def get_largest_indices(self, rel_threshold):
+        G = self._sqrt_eig_val
+        return get_largest_indices(G, rel_threshold)
+    
+    def check_integral_eq(self, index, delta_t_fac = 4, num_t = 50):
+        t = self.t_mem_save(delta_t_fac)
+        u_t_discrete = self.u_i_mem_save(delta_t_fac, index)
+        tmax = self._s[-1]
+        G =self._sqrt_eig_val
+        bcf = self._r_tau
+        return check_integral_eq(G, u_t_discrete, t, tmax, bcf, num_t)
+
+
+def get_largest_indices(G, rel_threshold):
+    idx_selection = np.where(G/max(G) > rel_threshold)[0][::-1]
+    return idx_selection        
+    
+def check_integral_eq(G, U, t_U, tmax, bcf, num_t = 50):
+    u_t = ComplexInterpolatedUnivariateSpline(t_U, U, k=3)
+    data = np.empty(shape=(num_t, 2), dtype = np.complex128)
+    tau = np.linspace(0, tmax, num_t)
+    for i, tau_ in enumerate(tau):
+        data[i, 0] = complex_quad(lambda s: bcf(tau_-s) * u_t(s), 0, tmax, limit=500)
+        data[i, 1] = G**2*u_t(tau_)
+        
+    norm = quad(lambda s: np.abs(u_t(s))**2, 0, tmax, limit=500)[0]
+
+    return data, norm 
 
 def mean_error(r_t_s, r_t_s_exact):
     r"""mean error of the correlation function as function of s

@@ -88,7 +88,7 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     :param w: integrations weights :math:`w_i` 
         (they have to correspond to the discrete time :math:`t_i`)
     :param eig_val_min: discards all eigenvalues and eigenvectos with
-         :math:`\lambda_i < \mathtt{eig\_val\_min}`
+         :math:`\lambda_i < \mathtt{eig\_val\_min} / \mathrm{max}(\lambda)`
          
     :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, )
     """
@@ -107,7 +107,8 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     eig_val, eig_vec = np.linalg.eigh(r)
 
     # use only eigenvalues larger than sig_min**2
-    large_eig_val_idx = np.where(eig_val >= eig_val_min)[0]
+    
+    large_eig_val_idx = np.where(eig_val/max(eig_val) >= eig_val_min)[0]
     num_of_functions = len(large_eig_val_idx)
     if verbose > 0:
         print("use {} / {} eigenfunctions (sig_min = {})".format(num_of_functions, len(w), np.sqrt(eig_val_min)))
@@ -458,4 +459,3 @@ def auto_correlation_zero(x, s_0_idx = 0):
     num_samples = x.shape[0]
     x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
     return np.mean(x * x_s_0, axis = 0)
-    
