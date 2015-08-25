@@ -152,6 +152,8 @@ class StocProc(object):
             ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
         elif name == 'mid_point':
             ob = cls.new_instance_with_mid_point_weights(r_tau, t_max, ng, seed, sig_min)
+        elif name == 'simpson':
+            ob = cls.new_instance_with_simpson_weights(r_tau, t_max, ng, seed, sig_min)
         elif name == 'gauss_legendre':
             ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min)
         else:
@@ -167,6 +169,8 @@ class StocProc(object):
     
     @classmethod
     def new_instance_with_simpson_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
+        if ng % 2 == 0:
+            ng += 1
         t, w = get_simpson_weights_times(t_max, ng)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
 
@@ -512,16 +516,18 @@ def max_rel_error(r_t_s, r_t_s_exact):
 
 def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'mid_point', sig_min = 1e-4):
     err = 1
-    ng = 64
+    c = 2
     seed = None
     err_method_name = err_method.__name__
     print("start auto_grid_points, determine ng ...")
     #exponential increase to get below error threshold
     while err > tol:
-        ng *= 2
+        c *= 2
+        ng = 2*c + 1
         ng_fine = ng*10
         t_fine = np.linspace(0, t_max, ng_fine)
         print("#"*40)
+        print("c", c, "ng", ng)
         print("new process with {} weights ...".format(name))
         stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
         print("reconstruct correlation function ({} points)...".format(ng_fine))
@@ -532,14 +538,15 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
         err = np.max(err_method(r_t_s, r_t_s_exact))
         print("ng {} -> err {:.3e}".format(ng, err))
         
-    ng_low = ng // 2
-    ng_high = ng
+    c_low = c // 2
+    c_high = c
     
-    while (ng_high - ng_low) > 1:
+    while (c_high - c_low) > 1:
         print("#"*40)
-        print("ng_l", ng_low)
-        print("ng_h", ng_high)
-        ng = (ng_low + ng_high) // 2
+        print("c_low", c_low)
+        print("c_high", c_high)
+        c = (c_low + c_high) // 2
+        ng = 2*c + 1
         print("ng", ng)
         ng_fine = ng*10
         t_fine = np.linspace(0, t_max, ng_fine)
@@ -554,12 +561,12 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
         print("ng {} -> err {:.3e}".format(ng, err))
         if err > tol:
             print("    err > tol!")
-            print("    ng_l -> ", ng)
-            ng_low = ng
+            print("    c_low -> ", c)
+            c_low = c
         else:
             print("    err <= tol!")
-            print("    ng_h -> ", ng)
-            ng_high = ng
+            print("    c_high -> ", c)
+            c_high = c
     
 
-    return ng_high      
+    return ng      

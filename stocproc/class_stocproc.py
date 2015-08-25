@@ -138,12 +138,12 @@ class StocProc_KLE(_absStocProc):
         else:
             self.kle_interp = True
 
-        self.stocproc = StocProc.new_instance_with_trapezoidal_weights(r_tau   = r_tau,
-                                                                       t_max   = t_max,
-                                                                       ng      = ng_fredholm, 
-                                                                       sig_min = sig_min,
-                                                                       seed    = seed,
-                                                                       verbose = verbose)
+        self.stocproc = StocProc.new_instance_with_simpson_weights(r_tau   = r_tau,
+                                                                   t_max   = t_max,
+                                                                   ng      = ng_fredholm, 
+                                                                   sig_min = sig_min,
+                                                                   seed    = seed,
+                                                                   verbose = verbose)
         
         ng = ng_fac * (ng_fredholm - 1) + 1  
         
