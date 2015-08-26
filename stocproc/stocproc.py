@@ -58,9 +58,11 @@ solutions of the time discrete version.
 
 import sys
 import os
+from warnings import warn
 sys.path.append(os.path.dirname(__file__))
 import numpy as np
-import scipy.linalg
+from scipy.linalg import eigh as scipy_eigh
+from .stocproc_c import auto_correlation as auto_correlation_c 
     
 def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
@@ -90,7 +92,7 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     :param eig_val_min: discards all eigenvalues and eigenvectos with
          :math:`\lambda_i < \mathtt{eig\_val\_min} / \mathrm{max}(\lambda)`
          
-    :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, )
+    :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, ordered in decreasing order)
     """
     
     # weighted matrix r due to quadrature weights
@@ -104,16 +106,19 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     
     if verbose > 0:
         print("solve eigenvalue equation ...")
-    eig_val, eig_vec = np.linalg.eigh(r)
+    eig_val, eig_vec = scipy_eigh(r, overwrite_a=True)   # eig_vals in ascending
 
     # use only eigenvalues larger than sig_min**2
     
-    large_eig_val_idx = np.where(eig_val/max(eig_val) >= eig_val_min)[0]
-    num_of_functions = len(large_eig_val_idx)
+    min_idx = sum(eig_val < eig_val_min)
+     
+    eig_val = eig_val[min_idx:][::-1]
+    eig_vec = eig_vec[:, min_idx:][:, ::-1]
+    
+    num_of_functions = len(eig_val)
     if verbose > 0:
         print("use {} / {} eigenfunctions (sig_min = {})".format(num_of_functions, len(w), np.sqrt(eig_val_min)))
-    eig_val = eig_val[large_eig_val_idx]
-    eig_vec = eig_vec[:, large_eig_val_idx]
+    
     
     # inverse scale of the eigenvectors
 #     d_inverse = np.diag(1/np.sqrt(w))
@@ -288,18 +293,6 @@ def get_trapezoidal_weights_times(t_max, num_grid_points):
     w[-1] /= 2
     return t, w
 
-def get_simpson_weights_times(t_max, num_grid_points):
-    assert num_grid_points % 2 == 1
-    # generate mid points
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
-    # equal weights for grid points
-    w = np.empty(num_grid_points, dtype=np.float64)
-    w[0::2] = 2/3*delta_t
-    w[1::2] = 4/3*delta_t
-    w[0]    = 1/3*delta_t
-    w[-1]   = 1/3*delta_t
-    return t, w
-
 def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed = None, sig_min = 1e-4):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion with **trapezoidal rule** for integration
        
@@ -321,6 +314,34 @@ def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_sam
     """ 
     t, w = get_trapezoidal_weights_times(t_max, num_grid_points)    
     return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
+
+def get_simpson_weights_times(t_max, num_grid_points):
+    assert num_grid_points % 2 == 1
+    # generate mid points
+    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
+    # equal weights for grid points
+    w = np.empty(num_grid_points, dtype=np.float64)
+    w[0::2] = 2/3*delta_t
+    w[1::2] = 4/3*delta_t
+    w[0]    = 1/3*delta_t
+    w[-1]   = 1/3*delta_t
+    return t, w
+
+def stochastic_process_simpson_weight(r_tau, t_max, num_grid_points, num_samples, seed = None, sig_min = 1e-4):
+    r"""Simulate Stochastic Process using Karhunen-Loève expansion with **simpson rule** for integration
+    
+    Calling :py:func:`stochastic_process` with these calculated :math:`t_i, w_i` gives the corresponding processes.        
+    
+    :param t_max: right end of the considered time interval :math:`[0,t_\mathrm{max}]`
+    :param num_grid_points: :math:`N_\mathrm{GP}` number of time grid points (need to be odd) used for the discretization of the
+        integral of the Fredholm integral (see :py:func:`stochastic_process`)
+    
+    :return: returns the tuple (set of stochastic processes, time grid points) 
+        
+    See :py:func:`stochastic_process` for other parameters
+    """ 
+    t, w = get_simpson_weights_times(t_max, num_grid_points)    
+    return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
    
 
 def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1):
@@ -337,7 +358,7 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     
     For a process defined by
     
-    .. math:: X(t) = \sum_{k=0}^{N-1} \Delta \omega \sqrt{J(\omega_k)} X_k \exp^{-\mathrm{i}\omega_k t}
+    .. math:: X(t) = \sum_{k=0}^{N-1} \sqrt{\Delta \omega J(\omega_k)} X_k \exp^{-\mathrm{i}\omega_k t}
     
     with compelx random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0`, 
     :math:`\langle X_k X_{k'}\rangle = 0` and :math:`\langle X_k X^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}` it is easy to see
@@ -345,15 +366,15 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
 
     .. math:: 
         \begin{align}
-            \langle X(t) X^\ast(s) \rangle = & \sum_{k,k'} \sqrt{J(\omega_k)J(\omega_{k'})} \langle X_k X_{k'}\rangle \exp{-\mathrm{i}\omega_k (t-s)} \\
-                                           = & \sum_{k} \Delta \omega J(\omega_k) \exp{-\mathrm{i}\omega_k (t-s)} \\
+            \langle X(t) X^\ast(s) \rangle = & \sum_{k,k'} \sqrt{J(\omega_k)J(\omega_{k'})} \langle X_k X_{k'}\rangle \exp^{-\mathrm{i}\omega_k (t-s)} \\
+                                           = & \sum_{k} \Delta \omega J(\omega_k) \exp^{-\mathrm{i}\omega_k (t-s)} \\
                                            = & \alpha(t-s)
         \end{align}
     
     In order to use the sheme of the Discrete Fourier Transfrom (DFT) to calculate :math:`X(t)`
     :math:`t` has to be disrcetized as well. Some trivial rewriting leads
     
-    .. math:: X(t_l) = \sum_{k=0}^{N-1} \sqrt{J(\omega_k)} X_k e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
+    .. math:: X(t_l) = \sum_{k=0}^{N-1} \sqrt{\Delta \omega J(\omega_k)} X_k e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
     
     For the DFT sheme to be applicable :math:`\Delta t` has to be chosen such that
     
@@ -374,7 +395,7 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
 
     Implementing the above noted considerations it follows
 
-    .. math:: X(l \Delta t) = DFT\left(\sqrt{J(k \Delta \omega)} X_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
+    .. math:: X(l \Delta t) = DFT\left(\sqrt{\Delta \omega J(k \Delta \omega)} X_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
 
     Note: since :math:`\omega_\mathrm{max} = N \Delta \omega = 2 \pi / \Delta t = 2 \pi (n-1) / t_\mathrm{max}`
     
@@ -420,6 +441,26 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     return z_ast, t
     
     
+def auto_correlation_numpy(x, verbose=1):
+    warn("use 'auto_correlation' instead", DeprecationWarning)
+    
+    # handle type error
+    if x.ndim != 2:
+        raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
+    
+    num_samples, num_time_points = x.shape
+    
+    x_prime = x.reshape(num_samples, 1, num_time_points)
+    x       = x.reshape(num_samples, num_time_points, 1)
+    
+    if verbose > 0:
+        print("calculate auto correlation function ...")
+    res = np.mean(x * np.conj(x_prime), axis = 0), np.mean(x * x_prime, axis = 0)
+    if verbose > 0:
+        print("done!")
+        
+    return res
+
 def auto_correlation(x, verbose=1):
     r"""Computes the auto correlation function for a set of wide-sense stationary stochastic processes
     
@@ -437,19 +478,14 @@ def auto_correlation(x, verbose=1):
     # handle type error
     if x.ndim != 2:
         raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
-    
-    num_samples, num_time_points = x.shape
-    
-    x_prime = x.reshape(num_samples, 1, num_time_points)
-    x       = x.reshape(num_samples, num_time_points, 1)
-    
+        
     if verbose > 0:
         print("calculate auto correlation function ...")
-    res = np.mean(x * np.conj(x_prime), axis = 0), np.mean(x * x_prime, axis = 0)
+    res = auto_correlation_c(x)
     if verbose > 0:
         print("done!")
         
-    return res  
+    return res   
 
 def auto_correlation_zero(x, s_0_idx = 0):
     # handle type error

@@ -27,6 +27,7 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import functools
+import time
 
 import sys
 import os
@@ -34,6 +35,12 @@ import os
 import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
+
+import stocproc as sp
+
+import warnings
+warnings.simplefilter('default')
+
 
 class ComplexInterpolatedUnivariateSpline(object):
     def __init__(self, x, y, k=2):
@@ -51,7 +58,6 @@ def complex_quad(func, a, b, **kw_args):
     
     return I_re + 1j*I_im
 
-import stocproc as sp
 
 def corr(tau, s, gamma_s_plus_1):
     """ohmic bath correlation function"""
@@ -60,7 +66,22 @@ def corr(tau, s, gamma_s_plus_1):
 def spectral_density(omega, s):
     return omega**s * np.exp(-omega)
 
-def test_stochastic_process_KLE_correlation_function(plot=False):
+def test_stochastic_process_KLE_correlation_function_midpoint():
+    name = 'mid_point'
+    err_tol = [3.2e-2, 3.2e-2]
+    stochastic_process_KLE_correlation_function(name, err_tol, False)
+    
+def test_stochastic_process_KLE_correlation_function_trapezoidal():
+    name = 'trapezoidal'
+    err_tol = [3.2e-2, 3.2e-2]
+    stochastic_process_KLE_correlation_function(name, err_tol, False)
+    
+def test_stochastic_process_KLE_correlation_function_simpson():
+    name = 'simpson'
+    err_tol = [3.2e-2, 3.2e-2]
+    stochastic_process_KLE_correlation_function(name, err_tol, False)
+
+def stochastic_process_KLE_correlation_function(name, err_tol, plot=False):
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
@@ -69,14 +90,22 @@ def test_stochastic_process_KLE_correlation_function(plot=False):
     t_max = 15
     # number of subintervals
     # leads to N+1 grid points
-    num_grid_points = 200
+    num_grid_points = 101
     # number of samples for the stochastic process
     num_samples = 10000
     
     seed = 0
-    sig_min = 0
+    sig_min = 1e-4
     
-    x_t_array_KLE, t = sp.stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed, sig_min)
+    if name == 'mid_point':
+        method = sp.stochastic_process_mid_point_weight
+    elif name == 'trapezoidal':
+        method = sp.stochastic_process_trapezoidal_weight
+    elif name == 'simpson':
+        method = sp.stochastic_process_simpson_weight
+    
+    print("use {} method".format(name))
+    x_t_array_KLE, t = method(r_tau, t_max, num_grid_points, num_samples, seed, sig_min)
     autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.auto_correlation(x_t_array_KLE)
     
     t_grid = np.linspace(0, t_max, num_grid_points)
@@ -113,8 +142,9 @@ def test_stochastic_process_KLE_correlation_function(plot=False):
         
         plt.show()    
     
-    assert max_diff_not_conj < 3e-2
-    assert max_diff_conj < 3e-2
+    assert max_diff_not_conj < err_tol[0]
+    assert max_diff_conj < err_tol[1]
+    print()
 
         
             
@@ -201,7 +231,7 @@ def test_func_vs_class_KLE_FFT():
                                                  sig_min = sig_min)
     x_t_array_class = stoc_proc.x_for_initial_time_grid()
 
-    print(np.max(np.abs(x_t_array_func - x_t_array_class)))
+    print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_kle vs. StocProc Class not identical"
 
     x_t_array_func, t = sp.stochastic_process_fft(spectral_density  = J,
@@ -218,7 +248,16 @@ def test_func_vs_class_KLE_FFT():
     stoc_proc.new_process()
     x_t_array_class = stoc_proc.get_z()
     
-    print(np.max(np.abs(x_t_array_func - x_t_array_class)))
+    plt.plot(t, np.real(x_t_array_func[0,:]), color='k')
+    plt.plot(t, np.imag(x_t_array_func[0,:]), color='k')
+
+    plt.plot(t, np.real(x_t_array_class), color='r')
+    plt.plot(t, np.imag(x_t_array_class), color='r')
+    
+    plt.grid()
+    plt.show()
+    
+    print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
 
     
@@ -867,30 +906,95 @@ def test_integral_equation():
         rel_diff = np.abs(np.asarray(I_intp) - np.asarray(rhs_intp)) / np.abs(np.asarray(rhs_intp))
         print(max(rel_diff))
         assert max(rel_diff) < 1e-8
+        
+def test_solve_fredholm_ordered_eigen_values():
+    tmax = 1
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    # two parameter correlation function -> correlation matrix
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    num_gp = 100
+    
+    t, delta_t = np.linspace(0, tmax, num_gp, retstep=True)
+    t_row = t.reshape(1, num_gp)
+    t_col = t.reshape(num_gp, 1)
+    
+    r = r_tau(t_col-t_row)
+    
+    w = np.ones(num_gp)*delta_t
+    
+    eig_val_min = 1e-6
+    verbose=2
+    
+    eval, evec = sp.solve_hom_fredholm(r, w, eig_val_min, verbose)
+    
+    eval_old = np.Inf
+    
+    for e in eval:
+        assert eval_old >= e
+        assert e >= eig_val_min
+        eval_old = e
 
+def test_ac_vs_ac_from_c():
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    # two parameter correlation function -> correlation matrix
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    # time interval [0,T]
+    t_max = 15
+    # number of subintervals
+    # leads to N+1 grid points
+    num_grid_points = 100
+    # number of samples for the stochastic process
+    num_samples = 1000
+    
+    seed = 0
+    sig_min = 0
+    
+    x_t_array_KLE, t = sp.stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed, sig_min)
+    t1 = time.clock()
+    ac, ac_prime = sp.auto_correlation_numpy(x_t_array_KLE)
+    t2 = time.clock()
+    print("ac (numpy): {:.3g}s".format(t2-t1))
+#     import stocproc_c as spc
 
-
-
-
-
+    t1 = time.clock()
+    ac_c, ac_prime_c = sp.auto_correlation(x_t_array_KLE)
+    t2 = time.clock()
+    
+    print("ac (cython): {:.3g}s".format(t2-t1))
+    
+    assert np.max(np.abs(ac - ac_c)) < 1e-15
+    assert np.max(np.abs(ac_prime - ac_prime_c)) < 1e-15
+    
+    
         
 if __name__ == "__main__":
-#     test_stochastic_process_KLE_correlation_function(plot=False)
+#     test_solve_fredholm_ordered_eigen_values()
+#     test_ac_vs_ac_from_c()
+    
+#     test_stochastic_process_KLE_correlation_function_midpoint()
+#     test_stochastic_process_KLE_correlation_function_trapezoidal()
+#     test_stochastic_process_KLE_correlation_function_simpson()
+    
 #     test_stochastic_process_FFT_correlation_function(plot=False)
-#     test_func_vs_class_KLE_FFT()
-#     test_stochastic_process_KLE_interpolation(plot=False)
-#     test_stocproc_KLE_splineinterpolation(plot=False)
-#     test_stochastic_process_FFT_interpolation(plot=False)
-#     test_stocProc_eigenfunction_extraction()
-#     test_orthonomality()
-#     test_auto_grid_points()
-#     show_auto_grid_points_result()
-#     test_chache()
-#     test_dump_load()
-#     test_ui_mem_save()
-#     test_z_t_mem_save()
-#     show_ef()
-#     test_matrix_build()
+    test_func_vs_class_KLE_FFT()
+    test_stochastic_process_KLE_interpolation(plot=False)
+    test_stocproc_KLE_splineinterpolation(plot=False)
+    test_stochastic_process_FFT_interpolation(plot=False)
+    test_stocProc_eigenfunction_extraction()
+    test_orthonomality()
+    test_auto_grid_points()
+  
+    test_chache()
+    test_dump_load()
+    test_ui_mem_save()
+    test_z_t_mem_save()
+      
+    test_matrix_build()
     test_integral_equation()
+#     
+#     show_auto_grid_points_result()
+#     show_ef()        
 
     pass

@@ -145,17 +145,17 @@ class StocProc(object):
         self.new_process(seed = seed)
         
     @classmethod
-    def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min):
+    def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min, verbose=1):
         known_names = ['trapezoidal', 'mid_point', 'gauss_legendre']
         
         if name == 'trapezoidal':
-            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min, verbose)
         elif name == 'mid_point':
-            ob = cls.new_instance_with_mid_point_weights(r_tau, t_max, ng, seed, sig_min)
+            ob = cls.new_instance_with_mid_point_weights(r_tau, t_max, ng, seed, sig_min, verbose)
         elif name == 'simpson':
-            ob = cls.new_instance_with_simpson_weights(r_tau, t_max, ng, seed, sig_min)
+            ob = cls.new_instance_with_simpson_weights(r_tau, t_max, ng, seed, sig_min, verbose)
         elif name == 'gauss_legendre':
-            ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min)
+            ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min, verbose)
         else:
             raise RuntimeError("unknown name '{}' to create StocProc instance\nknown names are {}".format(name, known_names))
         
@@ -468,6 +468,10 @@ class StocProc(object):
         tmp = lambda_i_all.reshape(1, self._num_ev) * u_i_all_t  #(N_gp, N_ev)
         return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))[:,0]
     
+    def get_num_ef(self, rel_threshold):
+        G = self._sqrt_eig_val
+        return get_num_ef(G, rel_threshold)    
+    
     def get_largest_indices(self, rel_threshold):
         G = self._sqrt_eig_val
         return get_largest_indices(G, rel_threshold)
@@ -476,14 +480,33 @@ class StocProc(object):
         t = self.t_mem_save(delta_t_fac)
         u_t_discrete = self.u_i_mem_save(delta_t_fac, index)
         tmax = self._s[-1]
-        G =self._sqrt_eig_val
+        G = self._sqrt_eig_val[index]
         bcf = self._r_tau
-        return check_integral_eq(G, u_t_discrete, t, tmax, bcf, num_t)
+        data, norm = check_integral_eq(G, u_t_discrete, t, tmax, bcf, num_t)
+        return u_t_discrete, data, norm
 
+def get_num_ef(G, rel_threshold):
+    print("WARNING: debugging check for sorted G still active!")
+    g_old = np.Inf
+    for g in G:
+        assert g_old >= g
+        g_old = g
+    
+    # G must be in decreasing order
+    return sum(G/max(G) >= rel_threshold)
 
 def get_largest_indices(G, rel_threshold):
-    idx_selection = np.where(G/max(G) > rel_threshold)[0][::-1]
-    return idx_selection        
+    
+    print("WARNING: debugging check for sorted G still active!")
+    g_old = np.Inf
+    for g in G:
+        assert g_old >= g
+        g_old = g
+    
+    # G must be in decreasing order
+    idx = sum(G/max(G) >= rel_threshold)
+    idx_selection = np.arange(0, idx)
+    return idx_selection      
     
 def check_integral_eq(G, U, t_U, tmax, bcf, num_t = 50):
     u_t = ComplexInterpolatedUnivariateSpline(t_U, U, k=3)
