@@ -13,4 +13,4 @@ install:
 - pip install numpy scipy matplotlib pytest
 - pip freeze
 script:
-- py.test tests/
+- py.test -v tests/
