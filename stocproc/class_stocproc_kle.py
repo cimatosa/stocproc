@@ -1,3 +1,8 @@
+"""
+    advanced class to do all sort of things with KLE generated stochastic processes
+"""
+
+
 import functools
 import numpy as np
 import pickle
