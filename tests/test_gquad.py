@@ -5,9 +5,12 @@ import pytest
 
 import os
 import sys
-path = os.path.dirname(__file__)
-sys.path.append(path)
-import gquad
+
+import pathlib
+p = pathlib.PosixPath(os.path.abspath(__file__))
+sys.path.insert(0, str(p.parent.parent))
+
+from stocproc import gquad
 
 
 def scp_laguerre(p1,p2):
