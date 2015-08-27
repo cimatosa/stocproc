@@ -19,40 +19,42 @@
 #  MA 02110-1301, USA.
 """
 **Stochastic Process Module**
-
+ 
 This module contains various methods to generate stochastic processes for a 
 given correlation function. There are two different kinds of generators. The one kind
 allows to generate the process for a given time grid, where as the other one generates a
 time continuous process in such a way that it allows to "correctly" interpolate between the
 solutions of the time discrete version.
-
+ 
     **time discrete methods:**
         :py:func:`stochastic_process_kle` 
         Simulate Stochastic Process using Karhunen-Loève expansion
+        
             This method still needs explicit integrations weights for the 
             numeric integrations. For convenience you can use
-            
+             
                 :py:func:`stochastic_process_mid_point_weight` simplest approach, for
                 test reasons only, uses :py:func:`get_mid_point_weights` 
                 to calculate the weights
-                
+                 
                 :py:func:`stochastic_process_trapezoidal_weight` little more sophisticated,
-                so far for general use, uses :py:func:`get_trapezoidal_weights_times` 
+                uses :py:func:`get_trapezoidal_weights_times` to calculate the weights
+                 
+                :py:func:`stochastic_process_simpson_weight`,
+                **so far for general use**, uses :py:func:`get_simpson_weights_times` 
                 to calculate the weights
-                
-                .. todo:: implement Simpson etc.
-    
-        
+     
+         
         :py:func:`stochastic_process_fft`
         Simulate Stochastic Process using FFT method
-        
+         
     **time continuous methods:**
         :py:class:`StocProc` 
         Simulate Stochastic Process using Karhunen-Loève expansion and allows
         for correct interpolation. This class still needs explicit integrations 
         weights for the numeric integrations (use :py:func:`get_trapezoidal_weights_times`
         for general purposes).
-        
+         
         .. todo:: implement convenient classes with fixed weights
 """
 
@@ -316,7 +318,8 @@ def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_sam
     return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
 
 def get_simpson_weights_times(t_max, num_grid_points):
-    assert num_grid_points % 2 == 1
+    if num_grid_points % 2 == 0:
+        raise RuntimeError("simpson weight need odd number of grid points, but git ng={}".format(num_grid_points))
     # generate mid points
     t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
     # equal weights for grid points
@@ -349,16 +352,16 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     
     This method works only for correlations functions of the form
     
-    .. math:: \alpha(\tau) = \int_0^{\omega_\mathrm{max}} \mathrm{d}\omega \, J(\omega) e^{-\mathrm{i}\omega \tau}
+    .. math:: \alpha(\tau) = \int_0^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
     
     where :math:`J(\omega)` is a real non negative spectral density. 
     Then the intrgal can be approximated by the Riemann sum
     
-    .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} \Delta \omega J(\omega_k) e^{-\mathrm{i} k \Delta \omega \tau}
+    .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} \Delta \omega \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \Delta \omega \tau}
     
     For a process defined by
     
-    .. math:: X(t) = \sum_{k=0}^{N-1} \sqrt{\Delta \omega J(\omega_k)} X_k \exp^{-\mathrm{i}\omega_k t}
+    .. math:: X(t) = \sum_{k=0}^{N-1} \sqrt{\frac{\Delta \omega J(\omega_k)}{\pi}} X_k \exp^{-\mathrm{i}\omega_k t}
     
     with compelx random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0`, 
     :math:`\langle X_k X_{k'}\rangle = 0` and :math:`\langle X_k X^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}` it is easy to see
@@ -366,23 +369,23 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
 
     .. math:: 
         \begin{align}
-            \langle X(t) X^\ast(s) \rangle = & \sum_{k,k'} \sqrt{J(\omega_k)J(\omega_{k'})} \langle X_k X_{k'}\rangle \exp^{-\mathrm{i}\omega_k (t-s)} \\
-                                           = & \sum_{k} \Delta \omega J(\omega_k) \exp^{-\mathrm{i}\omega_k (t-s)} \\
+            \langle X(t) X^\ast(s) \rangle = & \sum_{k,k'} \frac{\Delta \omega}{\pi} \sqrt{J(\omega_k)J(\omega_{k'})} \langle X_k X_{k'}\rangle \exp^{-\mathrm{i}\omega_k (t-s)} \\
+                                           = & \sum_{k}    \frac{\Delta \omega}{\pi} J(\omega_k) \exp^{-\mathrm{i}\omega_k (t-s)} \\
                                            = & \alpha(t-s)
         \end{align}
     
     In order to use the sheme of the Discrete Fourier Transfrom (DFT) to calculate :math:`X(t)`
     :math:`t` has to be disrcetized as well. Some trivial rewriting leads
     
-    .. math:: X(t_l) = \sum_{k=0}^{N-1} \sqrt{\Delta \omega J(\omega_k)} X_k e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
+    .. math:: X(t_l) = \sum_{k=0}^{N-1} \sqrt{\frac{\Delta \omega J(\omega_k)}{\pi}} X_k e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
     
     For the DFT sheme to be applicable :math:`\Delta t` has to be chosen such that
     
     .. math:: 1 = \frac{\Delta \omega \Delta t}{2 \pi} N
     
     holds. Since :math:`J(\omega)` is real it follows that :math:`X(t_l) = X^\ast(t_{N-l})`.
-    For that reason the stochastic process has only :math:`(N+1)/2 \quad (N/2 + 1)` independent
-    time grid points for odd (even) :math:`N`.
+    For that reason the stochastic process has only :math:`(N+1)/2` (odd :math:`N`) and
+    :math:`(N/2 + 1)` (even :math:`N`) independent time grid points.
     
     Looking now from the other side, demanding that the process should run from 
     :math:`0` to :math:`t_\mathrm{max}` with :math:`n` equally distributed time grid points
@@ -395,7 +398,7 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
 
     Implementing the above noted considerations it follows
 
-    .. math:: X(l \Delta t) = DFT\left(\sqrt{\Delta \omega J(k \Delta \omega)} X_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
+    .. math:: X(l \Delta t) = DFT\left(\sqrt{\Delta \omega J(k \Delta \omega)} / \pi \times X_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
 
     Note: since :math:`\omega_\mathrm{max} = N \Delta \omega = 2 \pi / \Delta t = 2 \pi (n-1) / t_\mathrm{max}`
     
@@ -431,7 +434,7 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     #random complex normal samples
     xi = (np.random.normal(scale=1/np.sqrt(2), size = (2*num_samples*n_dft)).view(np.complex)).reshape(num_samples, n_dft)
     #each row contain a different integrand
-    weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega) * xi 
+    weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega / np.pi) * xi 
     #compute integral using fft routine
     z_ast = np.fft.fft(weighted_integrand, axis = 1)[:, 0:num_grid_points]
     #corresponding time axis

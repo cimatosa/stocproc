@@ -34,7 +34,9 @@ def _recur_laguerre(n, al=0.):
     return (a, b)
 
 def gauss_nodes_weights_laguerre(n, al=0.):
-    r"""int_0^intfy dx f(x) x^al exp(-x) ~= sum_i=1^n w_i f(x_i)
+    r"""
+        .. math::
+            \int_0^\infty dx \; f(x) x^\alpha \exp(-x) ~= \sum_{i=1}^n w_i f(x_i)
     """
     a, b = _recur_laguerre(n, al)
     return _gauss_nodes_weights(a, b)
@@ -48,7 +50,9 @@ def _recur_legendre(n):
     return (a, b)
 
 def gauss_nodes_weights_legendre(n, low=-1, high=1):
-    r"""int_-1^1 dx f(x) ~= sum_i=1^n w_i f(x_i)
+    r"""
+        .. math::
+            \int_{-1}^{1} dx \; f(x) ~= \sum_{i=1}^n w_i f(x_i)
     """
     a, b = _recur_legendre(n)
     x, w= _gauss_nodes_weights(a, b)

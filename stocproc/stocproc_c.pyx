@@ -1,10 +1,14 @@
-import numpy as np
+from numpy import zeros
+from numpy import empty
+from numpy import conj
+from numpy import complex128, float64
 cimport numpy as cnp
+from cpython cimport bool
 
-DTYPE_CPLX = np.complex128
+DTYPE_CPLX = complex128
 ctypedef cnp.complex128_t DTYPE_CPLX_t
 
-DTYPE_DBL = np.float64
+DTYPE_DBL = float64
 ctypedef cnp.float64_t DTYPE_DBL_t
 
 cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] eig_func_interp(unsigned int                     delta_t_fac,
@@ -21,11 +25,12 @@ cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] eig_func_interp(unsigned int            
     N2 = delta_t_fac * (N1 - 1) + 1
     
     cdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] u_res 
-    u_res = np.zeros(shape=N2, dtype=DTYPE_CPLX)
+    u_res = zeros(shape=N2, dtype=DTYPE_CPLX)
     
     cdef unsigned int j
     cdef unsigned int l
     cdef unsigned int k
+    
     for j in range(N2):
         for l in range(N1):
             k = j - delta_t_fac*l + N2-1
@@ -52,12 +57,13 @@ cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] eig_func_all_interp(unsigned int        
     num_ev = len(eigen_val)
     
     cdef  cnp.ndarray[DTYPE_CPLX_t, ndim=2] u_res 
-    u_res = np.zeros(shape=(N2,num_ev), dtype=DTYPE_CPLX)
+    u_res = zeros(shape=(N2,num_ev), dtype=DTYPE_CPLX)
     
     cdef unsigned int i
     cdef unsigned int j
     cdef unsigned int l
     cdef unsigned int k
+    
     for i in range(num_ev):
         for j in range(N2):
             for l in range(N1):
@@ -70,35 +76,50 @@ cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] eig_func_all_interp(unsigned int        
 
 
 
-cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] z_t(unsigned int                     delta_t_fac,
-                                            cnp.ndarray[DTYPE_DBL_t,  ndim=1] time_axis,
+cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] z_t(unsigned int                      delta_t_fac,
+                                            unsigned int                      N1,
                                             cnp.ndarray[DTYPE_CPLX_t, ndim=1] alpha_k,
-                                            cnp.ndarray[DTYPE_CPLX_t, ndim=1] Y,
-                                            cnp.ndarray[DTYPE_CPLX_t, ndim=2] A):
-    
-    cdef unsigned int N1
-    N1 = len(time_axis)
-    
+                                            cnp.ndarray[DTYPE_CPLX_t, ndim=1] a_tmp,
+                                            bool                              kahanSum):
     cdef unsigned int N2
     N2 = delta_t_fac * (N1 - 1) + 1
-    
-    cdef unsigned int num_ev
-    num_ev = len(Y)
-    
+       
     cdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] z_t_res 
-    z_t_res = np.zeros(shape=N2, dtype=DTYPE_CPLX)
+    z_t_res = empty(shape=N2, dtype=DTYPE_CPLX)
  
     cdef unsigned int i
     cdef unsigned int j
     cdef unsigned int a
+    cdef unsigned int k
     
-    for j in range(N2):
-        for i in range(N1):
-            k = j - delta_t_fac*i + N2-1
-            for a in range(num_ev):
-                z_t_res[j] = z_t_res[j] + Y[a]*alpha_k[k]*A[i,a]
-    
-    return z_t_res
+    cdef DTYPE_CPLX_t s
+    cdef DTYPE_CPLX_t c
+    cdef DTYPE_CPLX_t y
+    cdef DTYPE_CPLX_t t
+     
+    if kahanSum:
+        for j in range(N2):
+            s = 0.0
+            c = 0.0
+            for i in range(N1):
+                k = j - delta_t_fac*i + N2-1
+                
+                y = alpha_k[k] * a_tmp[i] - c          # the summand with come correction
+                t = s + y                              # do the summation, and store in tmp var 't'
+                c = (t - s) - y                        # see what got lost
+                s = t                                  # update sum
+     
+            z_t_res[j] = s
+        return z_t_res
+    else:
+        for j in range(N2):
+            s = 0.0
+            for i in range(N1):
+                t = 0.0
+                k = j - delta_t_fac*i + N2-1
+                s += alpha_k[k] * a_tmp[i]
+            z_t_res[j] = s
+        return z_t_res
 
 # cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] auto_correlation(cnp.ndarray[DTYPE_CPLX_t, ndim=2] x):
 def auto_correlation(cnp.ndarray[DTYPE_CPLX_t, ndim=2] x):
@@ -119,11 +140,11 @@ def auto_correlation(cnp.ndarray[DTYPE_CPLX_t, ndim=2] x):
     cdef unsigned int num_time_points = x.shape[1]
     
     cdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] ac_res
-    ac_res = np.empty(shape=(num_time_points, num_time_points), dtype=DTYPE_CPLX)
+    ac_res = empty(shape=(num_time_points, num_time_points), dtype=DTYPE_CPLX)
     cdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] ac_res_prime
-    ac_res_prime = np.empty(shape=(num_time_points, num_time_points), dtype=DTYPE_CPLX)
+    ac_res_prime = empty(shape=(num_time_points, num_time_points), dtype=DTYPE_CPLX)
     
-    cdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] x_conj = np.conj(x)
+    cdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] x_conj = conj(x)
     
     cdef DTYPE_CPLX_t tmp
     cdef DTYPE_CPLX_t tmp_prime

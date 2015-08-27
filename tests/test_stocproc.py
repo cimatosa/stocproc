@@ -61,7 +61,7 @@ def complex_quad(func, a, b, **kw_args):
 
 def corr(tau, s, gamma_s_plus_1):
     """ohmic bath correlation function"""
-    return (1 + 1j*(tau))**(-(s+1)) * gamma_s_plus_1
+    return (1 + 1j*(tau))**(-(s+1)) * gamma_s_plus_1 / np.pi
 
 def spectral_density(omega, s):
     return omega**s * np.exp(-omega)
@@ -248,19 +248,95 @@ def test_func_vs_class_KLE_FFT():
     stoc_proc.new_process()
     x_t_array_class = stoc_proc.get_z()
     
-    plt.plot(t, np.real(x_t_array_func[0,:]), color='k')
-    plt.plot(t, np.imag(x_t_array_func[0,:]), color='k')
-
-    plt.plot(t, np.real(x_t_array_class), color='r')
-    plt.plot(t, np.imag(x_t_array_class), color='r')
-    
-    plt.grid()
-    plt.show()
+#     plt.plot(t, np.real(x_t_array_func[0,:]), color='k')
+#     plt.plot(t, np.imag(x_t_array_func[0,:]), color='k')
+# 
+#     plt.plot(t, np.real(x_t_array_class), color='r')
+#     plt.plot(t, np.imag(x_t_array_class), color='r')
+#     
+#     plt.grid()
+#     plt.show()
     
     print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
 
+def test_stocproc_KLE_memsave():
+    s_param = 1
+    gamma_s_plus_1 = gamma(s_param+1)
+    # two parameter correlation function -> correlation matrix
+    r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)
+    # time interval [0,T]
+    t_max = 5
+    # number of subintervals
+    # leads to N+1 grid points
+    ng = 51
+    ng_fac = 4
+    ng_fine = (ng-1)*ng_fac + 1
     
+    seed = 0
+    sig_min = 1e-4
+    
+    stoc_proc = sp.StocProc.new_instance_by_name(name    = 'simpson', 
+                                                 r_tau   = r_tau, 
+                                                 t_max   = t_max, 
+                                                 ng      = ng, 
+                                                 seed    = seed, 
+                                                 sig_min = sig_min)
+    
+    finer_t = np.linspace(0, t_max, ng_fine)
+    t_memsave = stoc_proc.t_mem_save(ng_fac)
+    
+    assert np.max(np.abs(finer_t - t_memsave)) == 0
+    
+    for i in range(10):
+        stoc_proc.new_process()
+        t1 = time.clock()
+        x_t = stoc_proc.x_t_array(finer_t)
+        t2 = time.clock()
+
+        t1_ = time.clock()
+        x_t_memsave = stoc_proc.x_t_mem_save(ng_fac)
+        t2_ = time.clock()
+        
+        t3_ = time.clock()
+        x_t_memsave_k = stoc_proc.x_t_mem_save(ng_fac, kahanSum=True)
+        t4_ = time.clock()
+        
+        x_t_fsum = np.empty_like(x_t)
+        for j, t in enumerate(finer_t):
+            x_t_fsum[j] = stoc_proc.x_t_fsum(t)
+            
+        x_t_single = np.empty_like(x_t)
+        for j, t in enumerate(finer_t):
+            x_t_single[j] = stoc_proc._x(t)
+            
+        print("time reg      :{:.3g}".format(t2-t1))
+        print("time mem_save :{:.3g}".format(t2_-t1_))
+        print("time mem_savek:{:.3g}".format(t4_-t3_))
+ 
+        print("diff reg - memsave", np.max(np.abs(x_t - x_t_memsave))) 
+        print("diff reg - memsavek", np.max(np.abs(x_t - x_t_memsave_k)))
+        print("diff reg - fsum", np.max(np.abs(x_t - x_t_fsum)))
+        print("diff reg - single", np.max(np.abs(x_t - x_t_single)))
+         
+        print("diff memsave - memsavek", np.max(np.abs(x_t_memsave - x_t_memsave_k)))
+        print("diff memsave - fsum", np.max(np.abs(x_t_memsave - x_t_fsum)))
+        print("diff memsave - single", np.max(np.abs(x_t_memsave - x_t_single)))
+        
+        print("diff fsum - memsavek", np.max(np.abs(x_t_fsum - x_t_memsave_k)))
+        
+        print()
+
+        assert np.max(np.abs(x_t - x_t_memsave)) < 1e-12
+        assert np.max(np.abs(x_t - x_t_memsave_k)) < 1e-12
+        assert np.max(np.abs(x_t - x_t_fsum)) < 1e-12
+        assert np.max(np.abs(x_t - x_t_single)) < 1e-12
+        
+        assert np.max(np.abs(x_t_memsave - x_t_memsave_k)) < 1e-12
+        assert np.max(np.abs(x_t_memsave - x_t_fsum)) < 1e-12
+        assert np.max(np.abs(x_t_memsave - x_t_single)) < 1e-12
+        
+    print()
 def test_stochastic_process_KLE_interpolation(plot=False):
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
@@ -350,7 +426,7 @@ def test_stochastic_process_KLE_interpolation(plot=False):
         plt.show()    
     
     assert max_diff_not_conj < 4e-2
-    assert max_diff_conj < 4e-2    
+    assert max_diff_conj < 5e-2    
     
 def test_stocproc_KLE_splineinterpolation(plot=False):
     s_param = 1
@@ -361,7 +437,7 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
     t_max = 15
     # number of subintervals
     # leads to N+1 grid points
-    ng_fredholm   = 60
+    ng_fredholm   = 61
     ng_kle_interp = ng_fredholm*3 
     ng_fine       = ng_fredholm*15
     
@@ -972,25 +1048,25 @@ def test_ac_vs_ac_from_c():
 if __name__ == "__main__":
 #     test_solve_fredholm_ordered_eigen_values()
 #     test_ac_vs_ac_from_c()
-    
 #     test_stochastic_process_KLE_correlation_function_midpoint()
 #     test_stochastic_process_KLE_correlation_function_trapezoidal()
 #     test_stochastic_process_KLE_correlation_function_simpson()
-    
 #     test_stochastic_process_FFT_correlation_function(plot=False)
-    test_func_vs_class_KLE_FFT()
-    test_stochastic_process_KLE_interpolation(plot=False)
+# 
+#     test_func_vs_class_KLE_FFT()
+#     test_stocproc_KLE_memsave()
+#     test_stochastic_process_KLE_interpolation(plot=False)
     test_stocproc_KLE_splineinterpolation(plot=False)
     test_stochastic_process_FFT_interpolation(plot=False)
     test_stocProc_eigenfunction_extraction()
     test_orthonomality()
     test_auto_grid_points()
-  
+    
     test_chache()
     test_dump_load()
     test_ui_mem_save()
     test_z_t_mem_save()
-      
+        
     test_matrix_build()
     test_integral_equation()
 #     

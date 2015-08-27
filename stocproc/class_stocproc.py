@@ -192,7 +192,7 @@ class StocProc_FFT(_absStocProc):
         #omega axis
         omega = self.delta_omega*np.arange(self.n_dft)
         #reshape for multiplication with matrix xi
-        self.sqrt_spectral_density_over_pi_times_sqrt_delta_omega = np.sqrt(spectral_density(omega) / np.pi) * np.sqrt(self.delta_omega) 
+        self.sqrt_spectral_density_over_pi_times_sqrt_delta_omega = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega / np.pi) 
         
         if self._verbose > 0:
             print("stoc proc fft, spectral density sampling information:")

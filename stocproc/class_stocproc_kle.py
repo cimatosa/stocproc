@@ -12,6 +12,8 @@ from . import stocproc_c
 
 from scipy.integrate import quad
 from scipy.interpolate import InterpolatedUnivariateSpline
+from itertools import product
+from math import fsum
 
 class ComplexInterpolatedUnivariateSpline(object):
     def __init__(self, x, y, k=2):
@@ -169,8 +171,6 @@ class StocProc(object):
     
     @classmethod
     def new_instance_with_simpson_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
-        if ng % 2 == 0:
-            ng += 1
         t, w = get_simpson_weights_times(t_max, ng)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
 
@@ -242,6 +242,7 @@ class StocProc(object):
         else:
             self._Y = yi.reshape(self._num_ev,1)
 
+        self._a_tmp = np.tensordot(self._Y[:,0], self._A, axes=([0],[1]))
         
     def x_for_initial_time_grid(self):
         r"""Get process on initial time grid
@@ -270,44 +271,42 @@ class StocProc(object):
             return self.x(t)
 
     def _x(self, t):
-        # _Y                                      # (N_ev, 1   )
-        tmp = self._Y*self._r_tau(t-self._s.reshape(1, self._num_gp))
-                                                  # (N_ev, N_gp)
-        # A                                       # (N_gp, N_ev)
-        return np.tensordot(tmp, self._A, axes=([1,0],[0,1]))
-    
+        R = self._r_tau(t-self._s)
+        res = np.tensordot(R, self._a_tmp, axes=([0],[0]))
+        return res
+
     def get_cache_info(self):
         return self.x.cache_info()
     
     def clear_cache(self):
         self.x.cache_clear()
-        
-        
+
     def x_t_array(self, t_array):
-        t_array = t_array.reshape(1,1,len(t_array))    # (1   , 1   , N_t)
-        tmp = (self._Y.reshape(self._num_ev,1,1) *  
-               self._r_tau(t_array-self._s.reshape(1,self._num_gp,1)))
-                                                       # (N_ev, N_gp, N_t)
-        # A                                            # (N_gp, N_ev)
-        # A_j,i = w_j / sqrt(lambda_i) u_i(s_j)
-        if self.verbose > 1:
-            print("calc process via matrix prod ...")
-        res = np.tensordot(tmp, self._A, axes=([1,0],[0,1]))
-        if self.verbose > 1:
-            print("done!")
+        R = self._r_tau(t_array.reshape(1,-1,)-self._s.reshape(-1, 1))
+        res = np.tensordot(R, self._a_tmp, axes=([0],[0]))
         return res
     
-    def x_t_mem_save(self, delta_t_fac):
+    def x_t_mem_save(self, delta_t_fac, kahanSum=False):
         a = delta_t_fac        
         N1 = len(self._s)
         N2 = a * (N1 - 1) + 1        
         T = self._s[-1]
         alpha_k = self._r_tau(np.linspace(-T, T, 2*N2 - 1))        
         return stocproc_c.z_t(delta_t_fac = delta_t_fac,
-                              time_axis   = self._s,
+                              N1          = N1,
                               alpha_k     = alpha_k,
-                              Y           = self._Y[:,0],
-                              A           = self._A)
+                              a_tmp       = self._a_tmp,
+                              kahanSum    = kahanSum)
+        
+    def x_t_fsum(self, t):
+        alpha_k = self._r_tau(t - self._s)
+        terms = np.asarray([self._Y[a] * alpha_k[i] * self._A[i, a] for (a,i) in product(range(self._num_ev), range(self._num_gp))])
+        re = fsum(np.real(terms))
+        im = fsum(np.imag(terms))
+        
+        return re + 1j*im
+        
+        
 
     def u_i_mem_save(self, delta_t_fac, i):
         a = delta_t_fac        
@@ -322,17 +321,7 @@ class StocProc(object):
                                           self._w,
                                           self._eig_val[i],
                                           self._eig_vec[:, i])
-         
-#         print("WARNING! this needs to be cythonized")
-#         u_res = np.zeros(shape=N2, dtype=np.complex)
-#         for j in range(N2):
-#             for l in range(N1):
-#                 k = j - a*l + N2-1
-#                 u_res[j] += self._w[l] * alpha_k[k] * self._eig_vec[l, i]      
-# 
-#         return u_res / self._eig_val[i]
         
-    
     def u_i(self, t_array, i):
         r"""get eigenfunction of index i
         
@@ -523,7 +512,7 @@ def check_integral_eq(G, U, t_U, tmax, bcf, num_t = 50):
 def mean_error(r_t_s, r_t_s_exact):
     r"""mean error of the correlation function as function of s
     
-    .. math:: \mathtt{err} = \frac{1}{T}\int_0^T |r_\mathm{KLE}(t,r) - r_\mathrm{exact}(t,s)|^2 dt
+    .. math:: \mathrm{err} = \frac{1}{T}\int_0^T |r_\mathrm{KLE}(t,r) - r_\mathrm{exact}(t,s)|^2 dt
     
     :return: the mean error ``err`` 
     """
