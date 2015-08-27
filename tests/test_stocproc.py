@@ -24,7 +24,10 @@ import numpy as np
 from scipy.special import gamma
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("matplotlib not found -> any plotting will crash")
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import functools
 import time
