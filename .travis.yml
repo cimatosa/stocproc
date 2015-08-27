@@ -1,0 +1,16 @@
+language: python
+notifications:
+  email: false
+python:
+- '3.4'
+- '2.7'
+
+before_install:
+- which python
+- which python2.7
+- which python3.4
+install:
+- pip install numpy scipy matplotlib pytest
+- pip freeze
+script:
+- py.test tests/
