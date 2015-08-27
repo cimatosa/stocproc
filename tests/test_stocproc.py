@@ -26,9 +26,10 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
 try:
     import matplotlib.pyplot as plt
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:
     print("matplotlib not found -> any plotting will crash")
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 import functools
 import time
 
