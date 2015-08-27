@@ -11,7 +11,7 @@ before_install:
 - "./miniconda.sh -b"
 - export PATH=/home/travis/miniconda/bin:$PATH
 - conda update --yes conda
-- conda create -y python=3 pip numpy scipy
+# - conda create -y python=3 pip numpy scipy
 - which python
 - python setup.py build_ext --inplace
 
