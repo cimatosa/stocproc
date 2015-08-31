@@ -57,6 +57,7 @@ solutions of the time discrete version.
          
         .. todo:: implement convenient classes with fixed weights
 """
+from .stocproc_c import auto_correlation as auto_correlation_c
 
 import sys
 import os
@@ -64,7 +65,7 @@ from warnings import warn
 sys.path.append(os.path.dirname(__file__))
 import numpy as np
 from scipy.linalg import eigh as scipy_eigh
-from .stocproc_c import auto_correlation as auto_correlation_c 
+ 
     
 def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
     r"""Solves the discrete homogeneous Fredholm equation of the second kind

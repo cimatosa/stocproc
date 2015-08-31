@@ -93,15 +93,15 @@ def stochastic_process_KLE_correlation_function(name, err_tol, plot=False):
     sig_min = 1e-4
     
     if name == 'mid_point':
-        method = sp.stochastic_process_mid_point_weight
+        method = sp.stocproc.stochastic_process_mid_point_weight
     elif name == 'trapezoidal':
-        method = sp.stochastic_process_trapezoidal_weight
+        method = sp.stocproc.stochastic_process_trapezoidal_weight
     elif name == 'simpson':
-        method = sp.stochastic_process_simpson_weight
+        method = sp.stocproc.stochastic_process_simpson_weight
     
     print("use {} method".format(name))
     x_t_array_KLE, t = method(r_tau, t_max, num_grid_points, num_samples, seed, sig_min)
-    autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.auto_correlation(x_t_array_KLE)
+    autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.stocproc.auto_correlation(x_t_array_KLE)
     
     t_grid = np.linspace(0, t_max, num_grid_points)
     ac_true = r_tau(t_grid.reshape(num_grid_points, 1) - t_grid.reshape(1, num_grid_points))
@@ -166,8 +166,8 @@ def test_stochastic_process_FFT_correlation_function(plot = False):
     
     seed = 0
     
-    x_t_array_FFT, t = sp.stochastic_process_fft(spectral_density_omega, t_max, num_grid_points, num_samples, seed)
-    autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.auto_correlation(x_t_array_FFT)
+    x_t_array_FFT, t = sp.stocproc.stochastic_process_fft(spectral_density_omega, t_max, num_grid_points, num_samples, seed)
+    autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.stocproc.auto_correlation(x_t_array_FFT)
     
     t_grid = np.linspace(0, t_max, num_grid_points)
     ac_true = r_tau(t_grid.reshape(num_grid_points, 1) - t_grid.reshape(1, num_grid_points))
@@ -226,8 +226,8 @@ def test_func_vs_class_KLE_FFT():
     seed = 0
     sig_min = 0
 
-    x_t_array_func, t = sp.stochastic_process_trapezoidal_weight(r_tau, t_max, ng, num_samples, seed, sig_min)
-    stoc_proc = sp.StocProc.new_instance_by_name(name    = 'trapezoidal', 
+    x_t_array_func, t = sp.stocproc.stochastic_process_trapezoidal_weight(r_tau, t_max, ng, num_samples, seed, sig_min)
+    stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_by_name(name    = 'trapezoidal', 
                                                  r_tau   = r_tau, 
                                                  t_max   = t_max, 
                                                  ng      = ng, 
@@ -238,13 +238,13 @@ def test_func_vs_class_KLE_FFT():
     print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_kle vs. StocProc Class not identical"
 
-    x_t_array_func, t = sp.stochastic_process_fft(spectral_density  = J,
+    x_t_array_func, t = sp.stocproc.stochastic_process_fft(spectral_density  = J,
                                                   t_max             = t_max, 
                                                   num_grid_points   = ng, 
                                                   num_samples       = num_samples, 
                                                   seed              = seed)
     
-    stoc_proc = sp.StocProc_FFT(spectral_density = J,
+    stoc_proc = sp.class_stocproc.StocProc_FFT(spectral_density = J,
                                 t_max            = t_max,
                                 num_grid_points  = ng,
                                 seed             = seed)
@@ -287,7 +287,7 @@ def test_stocproc_KLE_memsave():
     seed = 0
     sig_min = 1e-4
     
-    stoc_proc = sp.StocProc.new_instance_by_name(name    = 'simpson', 
+    stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_by_name(name    = 'simpson', 
                                                  r_tau   = r_tau, 
                                                  t_max   = t_max, 
                                                  ng      = ng, 
@@ -367,7 +367,7 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     seed = 0
     sig_min = 1e-5
     
-    stoc_proc = sp.StocProc.new_instance_by_name(name    = 'trapezoidal', 
+    stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_by_name(name    = 'trapezoidal', 
                                                  r_tau   = r_tau, 
                                                  t_max   = t_max, 
                                                  ng      = ng, 
@@ -388,8 +388,8 @@ def test_stochastic_process_KLE_interpolation(plot=False):
         x_t_samples[n,:] = stoc_proc(finer_t)
         x_t_samples_ms[n,:] = stoc_proc.x_t_mem_save(delta_t_fac=3, kahanSum=True)
     print("done!")
-    ac_kle_int_conj, ac_kle_int_not_conj = sp.auto_correlation(x_t_samples)
-    ac_kle_int_conj_ms, ac_kle_int_not_conj_ms = sp.auto_correlation(x_t_samples_ms)
+    ac_kle_int_conj, ac_kle_int_not_conj = sp.stocproc.auto_correlation(x_t_samples)
+    ac_kle_int_conj_ms, ac_kle_int_not_conj_ms = sp.stocproc.auto_correlation(x_t_samples_ms)
     
     t_grid = np.linspace(0, t_max, ng_fine)
     t_memsave = stoc_proc.t_mem_save(delta_t_fac=3)
@@ -473,7 +473,7 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
     
     seed = 0
     sig_min = 1e-4
-    stoc_proc = sp.StocProc_KLE(r_tau       = r_tau,
+    stoc_proc = sp.class_stocproc.StocProc_KLE(r_tau       = r_tau,
                                 t_max       = t_max, 
                                 ng_fredholm = ng_fredholm,
                                 ng_fac      = ng_fac,
@@ -493,7 +493,7 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
         x_t_samples[n] = stoc_proc(finer_t)
     print("done!")
     
-    ac_conj, ac_not_conj = sp.auto_correlation(x_t_samples)
+    ac_conj, ac_not_conj = sp.stocproc.auto_correlation(x_t_samples)
     
     t_grid = np.linspace(0, t_max, ng_fine)
     ac_true = r_tau(t_grid.reshape(ng_fine, 1) - t_grid.reshape(1, ng_fine))
@@ -579,7 +579,7 @@ def test_stochastic_process_FFT_interpolation(plot=False):
     
     seed = 0
     
-    stoc_proc = sp.StocProc_FFT(spectral_density    = J,
+    stoc_proc = sp.class_stocproc.StocProc_FFT(spectral_density    = J,
                                 t_max               = t_max, 
                                 num_grid_points     = ng,
                                 seed                = seed,
@@ -681,8 +681,8 @@ def test_stocProc_eigenfunction_extraction():
     seed = 0
     sig_min = 1e-4
 
-    t, w = sp.get_trapezoidal_weights_times(t_max, ng)
-    stoc_proc = sp.StocProc(r_tau, t, w, seed, sig_min)
+    t, w = sp.stocproc.get_trapezoidal_weights_times(t_max, ng)
+    stoc_proc = sp.class_stocproc_kle.StocProc(r_tau, t, w, seed, sig_min)
     
     t_large = np.linspace(t[0], t[-1], int(8.7*ng))
     ui_all = stoc_proc.u_i_all(t_large)
@@ -705,8 +705,8 @@ def test_orthonomality():
     seed = 0
     sig_min = 1e-4
 
-    t, w = sp.get_trapezoidal_weights_times(t_max, ng)
-    stoc_proc = sp.StocProc(r_tau, t, w, seed, sig_min)
+    t, w = sp.stocproc.get_trapezoidal_weights_times(t_max, ng)
+    stoc_proc = sp.class_stocproc_kle.StocProc(r_tau, t, w, seed, sig_min)
 
     # check integral norm of eigenfunctions (non interpolated eigenfunctions)    
     ev = stoc_proc.eigen_vector_i_all()
@@ -746,7 +746,7 @@ def test_auto_grid_points():
     t_max = 15
     tol = 1e-8
     
-    ng = sp.auto_grid_points(r_tau   = r_tau, 
+    ng = sp.class_stocproc_kle.auto_grid_points(r_tau   = r_tau, 
                              t_max   = t_max,
                              tol     = tol,
                              sig_min = 0)
@@ -762,7 +762,7 @@ def test_chache():
     seed = 0
     sig_min = 1e-8
      
-    stocproc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+    stocproc = sp.class_stocproc_kle.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
     
     t = {}
     t[1] = 3
@@ -790,7 +790,7 @@ def test_dump_load():
     seed = 0
     sig_min = 1e-8
      
-    stocproc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
+    stocproc = sp.class_stocproc_kle.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min)
     
     t = np.linspace(0,4,30)
     
@@ -800,7 +800,7 @@ def test_dump_load():
     
     stocproc.save_to_file(fname)
     
-    stocproc_2 = sp.StocProc(seed = seed, fname = fname)
+    stocproc_2 = sp.class_stocproc_kle.StocProc(seed = seed, fname = fname)
     x_t_2 = stocproc_2.x_t_array(t)
     
     assert np.all(x_t == x_t_2)
@@ -824,16 +824,16 @@ def show_auto_grid_points_result():
 #     name = 'trapezoidal'
 #     name = 'gauss_legendre'
     
-    ng = sp.auto_grid_points(r_tau, t_max, tol, name=name, sig_min=sig_min)
+    ng = sp.class_stocproc_kle.auto_grid_points(r_tau, t_max, tol, name=name, sig_min=sig_min)
 
-    t, w = sp.get_trapezoidal_weights_times(t_max, ng)
-    stoc_proc = sp.StocProc(r_tau, t, w, seed, sig_min)
+    t, w = sp.stocproc.get_trapezoidal_weights_times(t_max, ng)
+    stoc_proc = sp.class_stocproc_kle.StocProc(r_tau, t, w, seed, sig_min)
     r_t_s = stoc_proc.recons_corr(t_large)
     
     r_t_s_exact = r_tau(t_large.reshape(ng_interpolation,1) - t_large.reshape(1, ng_interpolation))
     
-    diff = sp.mean_error(r_t_s, r_t_s_exact)
-    diff_max = sp.max_error(r_t_s, r_t_s_exact)
+    diff = sp.class_stocproc_kle.mean_error(r_t_s, r_t_s_exact)
+    diff_max = sp.class_stocproc_kle.max_error(r_t_s, r_t_s_exact)
     
 #     plt.plot(t_large, diff)
 #     plt.plot(t_large, diff_max)
@@ -855,7 +855,7 @@ def test_ui_mem_save():
     
     assert abs( (t_max/(N1-1)) - a*(t_fine[1]-t_fine[0]) ) < 1e-14, "{}".format(abs( (t_max/(N1-1)) - (t_fine[1]-t_fine[0]) ))
 
-    stoc_proc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min = 1e-4)
+    stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min = 1e-4)
     
     ui_all_ms = stoc_proc.u_i_all_mem_save(delta_t_fac=a)
     
@@ -895,7 +895,7 @@ def test_z_t_mem_save():
     
     assert abs( (t_max/(N1-1)) - a*(t_fine[1]-t_fine[0]) ) < 1e-14, "{}".format(abs( (t_max/(N1-1)) - (t_fine[1]-t_fine[0]) ))
 
-    stoc_proc = sp.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min=sig_min)
+    stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_with_trapezoidal_weights(r_tau, t_max, ng=N1, sig_min=sig_min)
     
     z_t_mem_save = stoc_proc.x_t_mem_save(delta_t_fac = a)
     z_t = stoc_proc.x_t_array(t_fine)
@@ -932,7 +932,7 @@ def show_ef():
     seed = 0
     sig_min = 1e-5
     
-    stoc_proc = sp.StocProc.new_instance_by_name(name    = 'trapezoidal', 
+    stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_by_name(name    = 'trapezoidal', 
                                                  r_tau   = r_tau, 
                                                  t_max   = t_max, 
                                                  ng      = ng, 
@@ -979,7 +979,7 @@ def test_integral_equation():
     # two parameter correlation function -> correlation matrix
     r_tau = lambda tau : corr(tau, s_param, gamma_s_plus_1)    
     
-    stocproc_simp = sp.StocProc.new_instance_with_simpson_weights(r_tau   = r_tau, 
+    stocproc_simp = sp.class_stocproc_kle.StocProc.new_instance_with_simpson_weights(r_tau   = r_tau, 
                                                                   t_max   = tmax, 
                                                                   ng      = 1001,
                                                                   sig_min = 0, 
@@ -1029,7 +1029,7 @@ def test_solve_fredholm_ordered_eigen_values():
     eig_val_min = 1e-6
     verbose=2
     
-    eval, evec = sp.solve_hom_fredholm(r, w, eig_val_min, verbose)
+    eval, evec = sp.stocproc.solve_hom_fredholm(r, w, eig_val_min, verbose)
     
     eval_old = np.Inf
     
@@ -1054,15 +1054,15 @@ def test_ac_vs_ac_from_c():
     seed = 0
     sig_min = 0
     
-    x_t_array_KLE, t = sp.stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed, sig_min)
+    x_t_array_KLE, t = sp.stocproc.stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed, sig_min)
     t1 = time.clock()
-    ac, ac_prime = sp.auto_correlation_numpy(x_t_array_KLE)
+    ac, ac_prime = sp.stocproc.auto_correlation_numpy(x_t_array_KLE)
     t2 = time.clock()
     print("ac (numpy): {:.3g}s".format(t2-t1))
 #     import stocproc_c as spc
 
     t1 = time.clock()
-    ac_c, ac_prime_c = sp.auto_correlation(x_t_array_KLE)
+    ac_c, ac_prime_c = sp.stocproc.auto_correlation(x_t_array_KLE)
     t2 = time.clock()
     
     print("ac (cython): {:.3g}s".format(t2-t1))
@@ -1073,31 +1073,31 @@ def test_ac_vs_ac_from_c():
     
         
 if __name__ == "__main__":
-#     test_solve_fredholm_ordered_eigen_values()
-#     test_ac_vs_ac_from_c()
-#     test_stochastic_process_KLE_correlation_function_midpoint()
-#     test_stochastic_process_KLE_correlation_function_trapezoidal()
-#     test_stochastic_process_KLE_correlation_function_simpson()
-#     test_stochastic_process_FFT_correlation_function(plot=False)
-# 
-#     test_func_vs_class_KLE_FFT()
-#     test_stocproc_KLE_memsave()
-#     test_stochastic_process_KLE_interpolation(plot=False)
-#     test_stocproc_KLE_splineinterpolation(plot=False)
-#     test_stochastic_process_FFT_interpolation(plot=False)
-#     test_stocProc_eigenfunction_extraction()
-#     test_orthonomality()
-#     test_auto_grid_points()
-#     
-#     test_chache()
-#     test_dump_load()
-#     test_ui_mem_save()
-#     test_z_t_mem_save()
-#         
-#     test_matrix_build()
-#     test_integral_equation()
-#     
+    test_solve_fredholm_ordered_eigen_values()
+    test_ac_vs_ac_from_c()
+    test_stochastic_process_KLE_correlation_function_midpoint()
+    test_stochastic_process_KLE_correlation_function_trapezoidal()
+    test_stochastic_process_KLE_correlation_function_simpson()
+    test_stochastic_process_FFT_correlation_function(plot=False)
+  
+    test_func_vs_class_KLE_FFT()
+    test_stocproc_KLE_memsave()
+    test_stochastic_process_KLE_interpolation(plot=False)
+    test_stocproc_KLE_splineinterpolation(plot=False)
+    test_stochastic_process_FFT_interpolation(plot=False)
+    test_stocProc_eigenfunction_extraction()
+    test_orthonomality()
+    test_auto_grid_points()
+      
+    test_chache()
+    test_dump_load()
+    test_ui_mem_save()
+    test_z_t_mem_save()
+         
+    test_matrix_build()
+    test_integral_equation()
+     
 #     show_auto_grid_points_result()
-    show_ef()        
+#     show_ef()        
 
     pass
