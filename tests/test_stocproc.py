@@ -22,8 +22,7 @@
 
 import numpy as np
 from scipy.special import gamma
-from scipy.interpolate import InterpolatedUnivariateSpline
-from scipy.integrate import quad
+
 try:
     import matplotlib.pyplot as plt
     from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -41,26 +40,11 @@ p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
 
 import stocproc as sp
+from stocproc.class_stocproc import complex_quad
+from stocproc.class_stocproc import ComplexInterpolatedUnivariateSpline
 
 import warnings
 warnings.simplefilter('default')
-
-
-class ComplexInterpolatedUnivariateSpline(object):
-    def __init__(self, x, y, k=2):
-        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
-        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
-        
-    def __call__(self, t):
-        return self.re_spline(t) + 1j*self.im_spline(t)
-    
-def complex_quad(func, a, b, **kw_args):
-    func_re = lambda t: np.real(func(t))
-    func_im = lambda t: np.imag(func(t))
-    I_re = quad(func_re, a, b, **kw_args)[0]
-    I_im = quad(func_im, a, b, **kw_args)[0]
-    
-    return I_re + 1j*I_im
 
 
 def corr(tau, s, gamma_s_plus_1):
@@ -86,6 +70,13 @@ def test_stochastic_process_KLE_correlation_function_simpson():
     stochastic_process_KLE_correlation_function(name, err_tol, False)
 
 def stochastic_process_KLE_correlation_function(name, err_tol, plot=False):
+    """
+        generate samples using KLE method
+        
+        compare <X_t X_s> and <X_t X^ast_s> from samples with true ac functions
+        
+        no interpolation at all
+    """
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
@@ -152,8 +143,14 @@ def stochastic_process_KLE_correlation_function(name, err_tol, plot=False):
 
         
             
-
 def test_stochastic_process_FFT_correlation_function(plot = False):
+    """
+        generate samples using FFT method
+        
+        compare <X_t X_s> and <X_t X^ast_s> from samples with true ac functions
+        
+        no interpolation at all
+    """
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
@@ -210,6 +207,9 @@ def test_stochastic_process_FFT_correlation_function(plot = False):
     assert max_diff_conj < 3e-2
     
 def test_func_vs_class_KLE_FFT():
+    """
+        make sure the class implementation returns the same results (Both for KLE and FFT)
+    """
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
@@ -265,6 +265,13 @@ def test_func_vs_class_KLE_FFT():
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
 
 def test_stocproc_KLE_memsave():
+    """
+        make sure the memsave method returns same data as non memsave
+        
+        note: since np.dot (np.tensordot) are most likely to run in parallel
+        and the order of summation matters we experience a difference between
+        the dot variant and cython implemented non parallel variant.
+    """
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
@@ -342,6 +349,9 @@ def test_stocproc_KLE_memsave():
         
     print()
 def test_stochastic_process_KLE_interpolation(plot=False):
+    """
+        check how well the interpolated processes follow the desired statistics
+    """
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
     # two parameter correlation function -> correlation matrix
@@ -351,7 +361,8 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     # number of subintervals
     # leads to N+1 grid points
     ng = 60
-    ng_fine = ng*3
+    ng_fac = 3
+    ng_fine = ng*ng_fac
     
     seed = 0
     sig_min = 1e-5
@@ -369,22 +380,34 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     ns = 6000
     
     x_t_samples = np.empty(shape=(ns, ng_fine), dtype=np.complex)
+    x_t_samples_ms = np.empty(shape=(ns, ng_fac*(ng-1) + 1), dtype=np.complex)
 
     print("generate samples ...")
     for n in range(ns):
         stoc_proc.new_process()
-        x_t_samples[n] = stoc_proc(finer_t)
+        x_t_samples[n,:] = stoc_proc(finer_t)
+        x_t_samples_ms[n,:] = stoc_proc.x_t_mem_save(delta_t_fac=3, kahanSum=True)
     print("done!")
     ac_kle_int_conj, ac_kle_int_not_conj = sp.auto_correlation(x_t_samples)
+    ac_kle_int_conj_ms, ac_kle_int_not_conj_ms = sp.auto_correlation(x_t_samples_ms)
     
     t_grid = np.linspace(0, t_max, ng_fine)
-    ac_true = r_tau(t_grid.reshape(ng_fine, 1) - t_grid.reshape(1, ng_fine))
+    t_memsave = stoc_proc.t_mem_save(delta_t_fac=3)
+    
+    ac_true = r_tau(t_grid.reshape(-1, 1) - t_grid.reshape(1, -1))
+    ac_true_ms = r_tau(t_memsave.reshape(-1, 1) - t_memsave.reshape(1, -1))
     
     max_diff_conj = np.max(np.abs(ac_true - ac_kle_int_conj))
     print("max diff <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj))
     
     max_diff_not_conj = np.max(np.abs(ac_kle_int_not_conj))
     print("max diff <x(t) x(s)>: {:.2e}".format(max_diff_not_conj))
+    
+    max_diff_conj_ms = np.max(np.abs(ac_true_ms - ac_kle_int_conj_ms))
+    print("max diff ms <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj_ms))
+    
+    max_diff_not_conj_ms = np.max(np.abs(ac_kle_int_not_conj_ms))
+    print("max diff ms <x(t) x(s)>: {:.2e}".format(max_diff_not_conj_ms))    
     
     if plot:
         v_min_real = np.floor(np.min(np.real(ac_true)))
@@ -432,6 +455,9 @@ def test_stochastic_process_KLE_interpolation(plot=False):
     assert max_diff_not_conj < 4e-2
     assert max_diff_conj < 5e-2    
     
+    assert max_diff_not_conj_ms < 4e-2
+    assert max_diff_conj_ms < 5e-2
+    
 def test_stocproc_KLE_splineinterpolation(plot=False):
     s_param = 1
     gamma_s_plus_1 = gamma(s_param+1)
@@ -442,35 +468,32 @@ def test_stocproc_KLE_splineinterpolation(plot=False):
     # number of subintervals
     # leads to N+1 grid points
     ng_fredholm   = 61
-    ng_kle_interp = ng_fredholm*3 
-    ng_fine       = ng_fredholm*15
+    ng_fac        = 3
+    ng_fine       = ng_fredholm*9
     
     seed = 0
-    sig_min = 1e-5
+    sig_min = 1e-4
     stoc_proc = sp.StocProc_KLE(r_tau       = r_tau,
                                 t_max       = t_max, 
                                 ng_fredholm = ng_fredholm,
-                                ng_fac      = 3,
+                                ng_fac      = ng_fac,
                                 seed        = seed, 
                                 sig_min     = sig_min)
   
     finer_t = np.linspace(0, t_max, ng_fine)
     
     ns = 6000
-    
-    ac_conj     = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
-    ac_not_conj = np.zeros(shape=(ng_fine, ng_fine), dtype=np.complex)
 
-    print("generate samples ...")    
+    print("generate samples ...")
+    x_t_samples = np.empty(shape=(ns, ng_fine), dtype=np.complex)
+
+        
     for n in range(ns):
         stoc_proc.new_process()
-        x_t = stoc_proc(finer_t)
-
-        ac_conj     += x_t.reshape(ng_fine, 1) * np.conj(x_t.reshape(1, ng_fine))
-        ac_not_conj += x_t.reshape(ng_fine, 1) * x_t.reshape(1, ng_fine)
+        x_t_samples[n] = stoc_proc(finer_t)
     print("done!")
-    ac_conj /= ns
-    ac_not_conj /= ns
+    
+    ac_conj, ac_not_conj = sp.auto_correlation(x_t_samples)
     
     t_grid = np.linspace(0, t_max, ng_fine)
     ac_true = r_tau(t_grid.reshape(ng_fine, 1) - t_grid.reshape(1, ng_fine))
@@ -1060,21 +1083,21 @@ if __name__ == "__main__":
 #     test_func_vs_class_KLE_FFT()
 #     test_stocproc_KLE_memsave()
 #     test_stochastic_process_KLE_interpolation(plot=False)
-    test_stocproc_KLE_splineinterpolation(plot=False)
-    test_stochastic_process_FFT_interpolation(plot=False)
-    test_stocProc_eigenfunction_extraction()
-    test_orthonomality()
-    test_auto_grid_points()
-    
-    test_chache()
-    test_dump_load()
-    test_ui_mem_save()
-    test_z_t_mem_save()
-        
-    test_matrix_build()
-    test_integral_equation()
+#     test_stocproc_KLE_splineinterpolation(plot=False)
+#     test_stochastic_process_FFT_interpolation(plot=False)
+#     test_stocProc_eigenfunction_extraction()
+#     test_orthonomality()
+#     test_auto_grid_points()
+#     
+#     test_chache()
+#     test_dump_load()
+#     test_ui_mem_save()
+#     test_z_t_mem_save()
+#         
+#     test_matrix_build()
+#     test_integral_equation()
 #     
 #     show_auto_grid_points_result()
-#     show_ef()        
+    show_ef()        
 
     pass

@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.integrate import quad
 from .class_stocproc_kle import StocProc
 
 class ComplexInterpolatedUnivariateSpline(object):
@@ -13,6 +14,14 @@ class ComplexInterpolatedUnivariateSpline(object):
         
     def __call__(self, t):
         return self.re_spline(t) + 1j*self.im_spline(t)
+    
+def complex_quad(func, a, b, **kw_args):
+    func_re = lambda t: np.real(func(t))
+    func_im = lambda t: np.imag(func(t))
+    I_re = quad(func_re, a, b, **kw_args)[0]
+    I_im = quad(func_im, a, b, **kw_args)[0]
+    
+    return I_re + 1j*I_im    
 
 class _absStocProc(object):
     r"""
