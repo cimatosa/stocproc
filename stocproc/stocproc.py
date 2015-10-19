@@ -348,7 +348,7 @@ def stochastic_process_simpson_weight(r_tau, t_max, num_grid_points, num_samples
     return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
    
 
-def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1):
+def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1, omega_min=0):
     r"""Simulate Stochastic Process using FFT method
     
     This method works only for correlations functions of the form
@@ -420,7 +420,10 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     
     n_dft = num_grid_points * 2 - 1
     delta_t = t_max / (num_grid_points-1)
-    delta_omega = 2 * np.pi / (delta_t * n_dft)  
+    delta_omega = 2 * np.pi / (delta_t * n_dft)
+    
+    t = np.linspace(0, t_max, num_grid_points)
+    omega_min_correction = np.exp(-1j * omega_min * t).reshape(1,-1)
       
     #omega axis
     omega = delta_omega*np.arange(n_dft)
@@ -437,9 +440,9 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     #each row contain a different integrand
     weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega / np.pi) * xi 
     #compute integral using fft routine
-    z_ast = np.fft.fft(weighted_integrand, axis = 1)[:, 0:num_grid_points]
+    z_ast = np.fft.fft(weighted_integrand, axis = 1)[:, 0:num_grid_points] * omega_min_correction
     #corresponding time axis
-    t = np.linspace(0, t_max, num_grid_points)
+    
     if verbose > 0:
         print("done!")
     return z_ast, t

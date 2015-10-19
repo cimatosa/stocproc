@@ -175,7 +175,7 @@ class StocProc_KLE(_absStocProc):
         
         if self.kle_interp:
             #return self.stocproc.x_t_array(np.linspace(0, self.t_max, self.num_grid_points))
-            return self.stocproc.x_t_mem_save(delta_t_fac = self.ng_fac)
+            return self.stocproc.x_t_mem_save(delta_t_fac = self.ng_fac, kahanSum=True)
         else:
             return self.stocproc.x_for_initial_time_grid()
         
@@ -187,7 +187,7 @@ class StocProc_FFT(_absStocProc):
     r"""
         Simulate Stochastic Process using FFT method 
     """
-    def __init__(self, spectral_density, t_max, num_grid_points, seed=None, verbose=0, k=3):
+    def __init__(self, spectral_density, t_max, num_grid_points, seed=None, verbose=0, k=3, omega_min=0):
         super().__init__(t_max           = t_max, 
                          num_grid_points = num_grid_points, 
                          seed            = seed, 
@@ -197,18 +197,23 @@ class StocProc_FFT(_absStocProc):
         self.n_dft           = num_grid_points * 2 - 1
         delta_t              = t_max / (num_grid_points-1)
         self.delta_omega     = 2 * np.pi / (delta_t * self.n_dft)
+        self.omega_min = omega_min
+        t = np.arange(num_grid_points) * delta_t
+        self.omega_min_correction = np.exp(-1j * self.omega_min * t)
+        
           
         #omega axis
         omega = self.delta_omega*np.arange(self.n_dft)
         #reshape for multiplication with matrix xi
-        self.sqrt_spectral_density_over_pi_times_sqrt_delta_omega = np.sqrt(spectral_density(omega)) * np.sqrt(self.delta_omega / np.pi) 
+        self.sqrt_spectral_density_over_pi_times_sqrt_delta_omega = np.sqrt(spectral_density(omega + self.omega_min)) * np.sqrt(self.delta_omega / np.pi) 
         
         if self._verbose > 0:
             print("stoc proc fft, spectral density sampling information:")
             print("  t_max      :", (t_max))
             print("  ng         :", (num_grid_points))
             
-            print("  omega_max  :", (self.delta_omega * self.n_dft))
+            print("  omega_min  :", (self.omega_min))
+            print("  omega_max  :", (self.omega_min + self.delta_omega * self.n_dft))
             print("  delta_omega:", (self.delta_omega))
             
     def _calc_z(self, y):
@@ -216,7 +221,7 @@ class StocProc_FFT(_absStocProc):
         #compute integral using fft routine
         if self._verbose > 1:
             print("calc process via fft ...")
-        z = np.fft.fft(weighted_integrand)[0:self.num_grid_points]
+        z = np.fft.fft(weighted_integrand)[0:self.num_grid_points] * self.omega_min_correction
         if self._verbose > 1:
             print("done")
         return z

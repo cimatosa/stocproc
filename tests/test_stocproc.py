@@ -264,6 +264,50 @@ def test_func_vs_class_KLE_FFT():
     print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
 
+def test_FFT_omega_min():
+    gamma = 0.03
+    wc = 4
+    w_min = 2
+    
+    J = lambda w : gamma**2 / ((w-wc)**2 + gamma**2)
+    # time interval [0,T]
+    t_max = 15
+    # number of subintervals
+    # leads to N+1 grid points
+    ng = 200
+    
+    num_samples = 1
+    seed = 0
+
+
+    x_t_array_func, t = sp.stocproc.stochastic_process_fft(spectral_density  = J,
+                                                           t_max             = t_max, 
+                                                           num_grid_points   = ng, 
+                                                           num_samples       = num_samples, 
+                                                           seed              = seed,
+                                                           omega_min         = w_min)
+    
+    stoc_proc = sp.class_stocproc.StocProc_FFT(spectral_density = J,
+                                               t_max            = t_max,
+                                               num_grid_points  = ng,
+                                               seed             = seed,
+                                               omega_min        = w_min)
+    
+    stoc_proc.new_process()
+    x_t_array_class = stoc_proc.get_z()
+    
+#     plt.plot(t, np.real(x_t_array_func[0,:]), color='k')
+#     plt.plot(t, np.imag(x_t_array_func[0,:]), color='k')
+# 
+#     plt.plot(t, np.real(x_t_array_class), color='r')
+#     plt.plot(t, np.imag(x_t_array_class), color='r')
+#     
+#     plt.grid()
+#     plt.show()
+    
+    print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
+    assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
+
 def test_stocproc_KLE_memsave():
     """
         make sure the memsave method returns same data as non memsave
@@ -1073,29 +1117,29 @@ def test_ac_vs_ac_from_c():
     
         
 if __name__ == "__main__":
-    test_solve_fredholm_ordered_eigen_values()
-    test_ac_vs_ac_from_c()
-    test_stochastic_process_KLE_correlation_function_midpoint()
-    test_stochastic_process_KLE_correlation_function_trapezoidal()
-    test_stochastic_process_KLE_correlation_function_simpson()
+#     test_solve_fredholm_ordered_eigen_values()
+#     test_ac_vs_ac_from_c()
+#     test_stochastic_process_KLE_correlation_function_midpoint()
+#     test_stochastic_process_KLE_correlation_function_trapezoidal()
+#     test_stochastic_process_KLE_correlation_function_simpson()
     test_stochastic_process_FFT_correlation_function(plot=False)
   
     test_func_vs_class_KLE_FFT()
-    test_stocproc_KLE_memsave()
-    test_stochastic_process_KLE_interpolation(plot=False)
-    test_stocproc_KLE_splineinterpolation(plot=False)
+#     test_stocproc_KLE_memsave()
+#     test_stochastic_process_KLE_interpolation(plot=False)
+#     test_stocproc_KLE_splineinterpolation(plot=False)
     test_stochastic_process_FFT_interpolation(plot=False)
-    test_stocProc_eigenfunction_extraction()
-    test_orthonomality()
-    test_auto_grid_points()
-      
-    test_chache()
-    test_dump_load()
-    test_ui_mem_save()
-    test_z_t_mem_save()
-         
-    test_matrix_build()
-    test_integral_equation()
+#     test_stocProc_eigenfunction_extraction()
+#     test_orthonomality()
+#     test_auto_grid_points()
+#       
+#     test_chache()
+#     test_dump_load()
+#     test_ui_mem_save()
+#     test_z_t_mem_save()
+#          
+#     test_matrix_build()
+#     test_integral_equation()
      
 #     show_auto_grid_points_result()
 #     show_ef()        

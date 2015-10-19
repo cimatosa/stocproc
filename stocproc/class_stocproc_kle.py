@@ -541,7 +541,7 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
     while err > tol:
         c *= 2
         ng = 2*c + 1
-        ng_fine = ng*10
+        ng_fine = ng*2-1
         t_fine = np.linspace(0, t_max, ng_fine)
         print("#"*40)
         print("c", c, "ng", ng)
@@ -565,7 +565,7 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
         c = (c_low + c_high) // 2
         ng = 2*c + 1
         print("ng", ng)
-        ng_fine = ng*10
+        ng_fine = ng*2-1
         t_fine = np.linspace(0, t_max, ng_fine)
         print("new process with {} weights ...".format(name))
         stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
