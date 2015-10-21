@@ -346,6 +346,31 @@ def stochastic_process_simpson_weight(r_tau, t_max, num_grid_points, num_samples
     """ 
     t, w = get_simpson_weights_times(t_max, num_grid_points)    
     return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
+
+def _FT(f, x_max, N, x_min=0):
+    """
+        calculate g(y) = int_x_min^x_max dx f(x) exp(-1j x y) using fft
+        
+        when setting x' = x - x_min we get
+        
+        g(y) = int_0^x_max-x_min dx' f(x'+x_min) exp(-1j x' y) exp(-1j x_min y) = exp(-1j x_min y) * int_0^x_max-x_min dx' f(x'+x_min) exp(-1j x' y)
+        
+        and in a discrete fashion with N gp such that x'_i = dx * i  and dx = (N-1) / (x_max - x_min)
+        further we find dy = 2pi / N / dx so we get y_k = dy * k
+        
+        g_k = exp(-1j x_min y_k) * sum_0^N dx f(x_i + x_min) exp(-1j dx * i dy * k)
+        
+        using dx * dk = 2 pi / N we end up with
+        
+        g_k = exp(-1j x_min y_k) * dx * sum_0^N f(x_i + x_min) exp(-1j 2 pi i k / N)
+            = exp(-1j x_min y_k) * dx * FFT( f(x_i + x_min) )
+    """
+    
+    x, dx = np.linspace(x_min, x_max, N, retstep=True)
+    f_i = f(x)
+    dy = 2*np.pi / dx / N
+    y_k = np.linspace(0, dy*(N-1), N)    
+    return np.exp(-1j * x_min * y_k) * dx * np.fft.fft(f_i), y_k    
    
 
 def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1, omega_min=0):
@@ -428,7 +453,7 @@ def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples
     #omega axis
     omega = delta_omega*np.arange(n_dft)
     #reshape for multiplication with matrix xi
-    sqrt_spectral_density = np.sqrt(spectral_density(omega)).reshape((1, n_dft))
+    sqrt_spectral_density = np.sqrt(spectral_density(omega + omega_min)).reshape((1, n_dft))
     if seed != None:
         np.random.seed(seed)
     if verbose > 0:

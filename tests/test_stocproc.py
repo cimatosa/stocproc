@@ -305,8 +305,28 @@ def test_FFT_omega_min():
 #     plt.grid()
 #     plt.show()
     
-    print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
-    assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_fft vs. StocProc Class not identical"
+    max_diff = np.max(np.abs(x_t_array_func - x_t_array_class))
+    print("max diff:", max_diff)
+    assert max_diff < 1e-15, "stochastic_process_fft vs. StocProc Class not identical"
+    
+def test_FT():
+    f = lambda x: np.exp(-x**2 / 2)
+    
+    x_max = 100
+    x_min = -100
+    N = 2**10+1
+    
+    g, y = sp.stocproc._FT(f, x_max, N, x_min)
+    
+    #plt.plot(y, np.real(g))
+    
+    g_an = np.sqrt(2*np.pi) * np.exp(-y**2 / 2)
+    
+    max_diff = np.max(np.abs(g[:N//2] - g_an[:N//2]))
+    print("max_diff:", max_diff)
+    assert max_diff < 2e-14
+
+    
 
 def test_stocproc_KLE_memsave():
     """
@@ -1113,8 +1133,8 @@ def test_ac_vs_ac_from_c():
     
     assert np.max(np.abs(ac - ac_c)) < 1e-15
     assert np.max(np.abs(ac_prime - ac_prime_c)) < 1e-15
-    
-    
+
+
         
 if __name__ == "__main__":
 #     test_solve_fredholm_ordered_eigen_values()
@@ -1122,13 +1142,15 @@ if __name__ == "__main__":
 #     test_stochastic_process_KLE_correlation_function_midpoint()
 #     test_stochastic_process_KLE_correlation_function_trapezoidal()
 #     test_stochastic_process_KLE_correlation_function_simpson()
-    test_stochastic_process_FFT_correlation_function(plot=False)
+#     test_stochastic_process_FFT_correlation_function(plot=False)
   
-    test_func_vs_class_KLE_FFT()
+#     test_func_vs_class_KLE_FFT()
 #     test_stocproc_KLE_memsave()
 #     test_stochastic_process_KLE_interpolation(plot=False)
 #     test_stocproc_KLE_splineinterpolation(plot=False)
-    test_stochastic_process_FFT_interpolation(plot=False)
+#     test_stochastic_process_FFT_interpolation(plot=False)
+#     test_FFT_omega_min()
+#     test_FT()
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
 #     test_auto_grid_points()
@@ -1143,5 +1165,4 @@ if __name__ == "__main__":
      
 #     show_auto_grid_points_result()
 #     show_ef()        
-
     pass

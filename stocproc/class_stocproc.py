@@ -61,6 +61,8 @@ class _absStocProc(object):
         :param t: time to evaluate the stochastic process as, float of array of floats
         evaluates the stochastic process via spline interpolation between the discrete process 
         """
+        if self._z is None:
+            raise RuntimeError("StocProc_FFT has NO random data, call 'new_process' to generate a new random process")
         if self._interpolator is None:
             if self._verbose > 1:
                 print("setup interpolator ...")
