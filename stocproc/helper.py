@@ -18,15 +18,18 @@ def get_param_single_lorentz(tmax, dw_max, eta, gamma, wc, x=1e-4, verbose=0):
         print('-> dw: {:.3}'.format(dw))
     
     if dw <= dw_max:
-        print('dw <= dw_max: {:.3}'.format(dw_max))
+        if verbose > 0:
+            print('dw <= dw_max: {:.3}'.format(dw_max))
         return N, w_min, tmax
     else:
-        print('dw > dw_max: {:.3}'.format(dw_max))
-        print('adjust tmax and N to fulfill dw <= dw_max')
+        if verbose > 0:
+            print('dw > dw_max: {:.3}'.format(dw_max))
+            print('adjust tmax and N to fulfill dw <= dw_max')
         N = int(np.ceil((w_max - w_min) / dw_max)) - 1
         dt = 2*np.pi / (dw_max*N)
         tmax_ = dt*N
-        print('N: {}'.format(N))
-        print('-> tmax: {:.3}'.format(tmax_))
+        if verbose > 0:
+            print('N: {}'.format(N))
+            print('-> tmax: {:.3}'.format(tmax_))
         assert tmax_ > tmax
         return N, w_min, tmax
