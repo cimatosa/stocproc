@@ -480,14 +480,14 @@ class StocProc(object):
         return u_t_discrete, data, norm
 
 def get_num_ef(G, rel_threshold):
-    print("WARNING: debugging check for sorted G still active!")
-    g_old = np.Inf
-    for g in G:
-        assert g_old >= g
-        g_old = g
+#     print("WARNING: debugging check for sorted G still active!")
+#     g_old = np.Inf
+#     for g in G:
+#         assert g_old >= g
+#         g_old = g
     
     # G must be in decreasing order
-    return sum(G/max(G) >= rel_threshold)
+    return int(sum(G/max(G) >= rel_threshold))
 
 def get_largest_indices(G, rel_threshold):
     
@@ -502,15 +502,18 @@ def get_largest_indices(G, rel_threshold):
     idx_selection = np.arange(0, idx)
     return idx_selection      
     
-def check_integral_eq(G, U, t_U, tmax, bcf, num_t = 50):
+def check_integral_eq(G, U, t_U, tmax, bcf, num_t=50, limit=5000, c=None):
     u_t = ComplexInterpolatedUnivariateSpline(t_U, U, k=3)
     data = np.empty(shape=(num_t, 2), dtype = np.complex128)
     tau = np.linspace(0, tmax, num_t)
-    for i, tau_ in enumerate(tau):
-        data[i, 0] = complex_quad(lambda s: bcf(tau_-s) * u_t(s), 0, tmax, limit=500)
+    for i, tau_ in enumerate(tau): 
+        data[i, 0] = complex_quad(lambda s: bcf(tau_-s) * u_t(s), 0, tmax, limit=limit)
         data[i, 1] = G**2*u_t(tau_)
+        if c is not None:
+            with c.get_lock():
+                c.value += 1        
         
-    norm = quad(lambda s: np.abs(u_t(s))**2, 0, tmax, limit=500)[0]
+    norm = quad(lambda s: np.abs(u_t(s))**2, 0, tmax, limit=limit)[0]
 
     return data, norm 
 
@@ -531,59 +534,73 @@ def max_error(r_t_s, r_t_s_exact):
 def max_rel_error(r_t_s, r_t_s_exact):
     return np.max(np.abs(r_t_s - r_t_s_exact) / np.abs(r_t_s_exact))
 
-def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'mid_point', sig_min = 1e-4):
+def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'mid_point', sig_min = 1e-4, verbose=2): 
     err = 1
     c = 2
     seed = None
     err_method_name = err_method.__name__
-    print("start auto_grid_points, determine ng ...")
+    if verbose > 0:
+        print("start auto_grid_points, determine ng ...")
     #exponential increase to get below error threshold
     while err > tol:
         c *= 2
         ng = 2*c + 1
         ng_fine = ng*2-1
         t_fine = np.linspace(0, t_max, ng_fine)
-        print("#"*40)
-        print("c", c, "ng", ng)
-        print("new process with {} weights ...".format(name))
-        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
-        print("reconstruct correlation function ({} points)...".format(ng_fine))
+        if verbose > 1:
+            print("#"*40)
+            print("c", c, "ng", ng)
+            print("new process with {} weights ...".format(name))
+        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose)
+        if verbose > 1:
+            print("reconstruct correlation function ({} points)...".format(ng_fine))
         r_t_s = stoc_proc.recons_corr(t_fine)
-        print("calculate exact correlation function ...")
+        if verbose > 1:
+            print("calculate exact correlation function ...")
         r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
-        print("calculate error using {} ...".format(err_method_name))
+        if verbose > 1:
+            print("calculate error using {} ...".format(err_method_name))
         err = np.max(err_method(r_t_s, r_t_s_exact))
-        print("ng {} -> err {:.3e}".format(ng, err))
+        if verbose > 0:
+            print("ng {} -> err {:.3e}".format(ng, err))
         
     c_low = c // 2
     c_high = c
     
     while (c_high - c_low) > 1:
-        print("#"*40)
-        print("c_low", c_low)
-        print("c_high", c_high)
+        if verbose > 1:
+            print("#"*40)
+            print("c_low", c_low)
+            print("c_high", c_high)
         c = (c_low + c_high) // 2
         ng = 2*c + 1
-        print("ng", ng)
+        if verbose > 1:
+            print("ng", ng)
         ng_fine = ng*2-1
         t_fine = np.linspace(0, t_max, ng_fine)
-        print("new process with {} weights ...".format(name))
-        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min)
-        print("reconstruct correlation function ({} points)...".format(ng_fine))
+        if verbose > 1:
+            print("new process with {} weights ...".format(name))
+        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose)
+        if verbose > 1:
+            print("reconstruct correlation function ({} points)...".format(ng_fine))
         r_t_s = stoc_proc.recons_corr(t_fine)
-        print("calculate exact correlation function ...")
+        if verbose > 1:
+            print("calculate exact correlation function ...")
         r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
-        print("calculate error using {} ...".format(err_method_name))
+        if verbose > 1:
+            print("calculate error using {} ...".format(err_method_name))
         err = np.max(err_method(r_t_s, r_t_s_exact))
-        print("ng {} -> err {:.3e}".format(ng, err))
+        if verbose > 0:
+            print("ng {} -> err {:.3e}".format(ng, err))
         if err > tol:
-            print("    err > tol!")
-            print("    c_low -> ", c)
+            if verbose > 1:
+                print("    err > tol!")
+                print("    c_low -> ", c)
             c_low = c
         else:
-            print("    err <= tol!")
-            print("    c_high -> ", c)
+            if verbose > 1:
+                print("    err <= tol!")
+                print("    c_high -> ", c)
             c_high = c
     
-
     return ng      

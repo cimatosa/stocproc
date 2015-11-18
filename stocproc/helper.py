@@ -12,7 +12,7 @@ def get_param_single_lorentz(tmax, dw_max, eta, gamma, wc, x=1e-4, verbose=0):
     C = (w_max - w_min)*tmax / 2 / np.pi
     
     N = int(np.ceil((2 + C)/2 + np.sqrt( (2+C)**2 / 4 - 1)))
-    dw = w_max - w_min
+    dw = (w_max - w_min)/N
     if verbose > 0:
         print('N: {}'.format(N))
         print('-> dw: {:.3}'.format(dw))
@@ -31,5 +31,5 @@ def get_param_single_lorentz(tmax, dw_max, eta, gamma, wc, x=1e-4, verbose=0):
         if verbose > 0:
             print('N: {}'.format(N))
             print('-> tmax: {:.3}'.format(tmax_))
-        assert tmax_ > tmax
+        assert tmax_ > tmax, "tmax_={} > tmax={} FAILED".format(tmax_, tmax)
         return N, w_min, tmax

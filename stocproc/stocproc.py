@@ -65,6 +65,10 @@ from warnings import warn
 sys.path.append(os.path.dirname(__file__))
 import numpy as np
 from scipy.linalg import eigh as scipy_eigh
+from collections import namedtuple
+
+stocproc_key_type = namedtuple(typename    = 'stocproc_key_type', 
+                               field_names = ['bcf', 't_max', 'ng', 'tol', 'cubatur_type', 'sig_min', 'ng_fac'] )
  
     
 def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
