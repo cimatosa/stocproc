@@ -1,3 +1,5 @@
+# -*- coding: utf8 -*-
+
 """
     advanced class to do all sort of things with KLE generated stochastic processes
 """

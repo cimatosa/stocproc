@@ -1,3 +1,5 @@
+# -*- coding: utf8 -*-
+
 """
 module to generate the weights and nodes for Guass quadrature
 
