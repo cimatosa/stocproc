@@ -1,7 +1,7 @@
 stocproc
 ========
 
-[![Travis](http://img.shields.io/travis/cimatosa/jobmanager.svg?label=tests)](https://travis-ci.org/cimatosa/jobmanager)
+[![Build Status](https://travis-ci.org/cimatosa/stocproc.svg?branch=master)](https://travis-ci.org/cimatosa/stocproc)
 
 generate time continuous stochastic process for a given correlation function using Karhunen-Loève expansion
 
