@@ -1,22 +1,24 @@
 language: python
+
 notifications:
   email: false
+
 python:
 - '3.4'
+- '3.5'
 
 before_install:
-- sudo apt-get update -qq -y
-- wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-- chmod +x miniconda.sh
-- "./miniconda.sh -b"
-- export PATH=/home/travis/miniconda3/bin:$PATH
-- conda update --yes conda
-- conda install -y numpy scipy pytest cython
 - which python
 - python --version
-- python setup.py build_ext --inplace
 
 install:
+- pip install pytest pytest-cov
+- pip install python-coveralls
 - pip freeze
+- python setup.py build_ext --inplace
+
 script:
-- py.test -v tests/
+- py.test tests/ -v --cov=progress --cov-report term-missing
+
+after_success:
+- coveralls
