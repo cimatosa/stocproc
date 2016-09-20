@@ -155,7 +155,7 @@ class StocProc(object):
         
     @classmethod
     def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min, verbose=1):
-        known_names = ['trapezoidal', 'mid_point', 'gauss_legendre']
+        known_names = ['trapezoidal', 'mid_point', 'simpson', 'gauss_legendre']
         
         if name == 'trapezoidal':
             ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min, verbose)
