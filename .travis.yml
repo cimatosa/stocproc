@@ -4,6 +4,7 @@ notifications:
   email: false
 
 python:
+- '2.7'
 - '3.4'
 - '3.5'
 
@@ -14,6 +15,8 @@ before_install:
 install:
 - pip install pytest pytest-cov
 - pip install python-coveralls
+- pip install cython
+- pip install numpy scipy
 - pip freeze
 - python setup.py build_ext --inplace
 
