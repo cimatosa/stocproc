@@ -15,7 +15,6 @@ before_install:
 
 install:
 - pip install pytest pytest-cov
-- pip install python-coveralls
 - pip install cython
 - pip install numpy scipy
 - pip freeze
@@ -25,4 +24,4 @@ script:
 - py.test tests/ -v --cov=stocproc --cov-report term-missing
 
 after_success:
-- coveralls
+- bash <(curl -s https://codecov.io/bash)
