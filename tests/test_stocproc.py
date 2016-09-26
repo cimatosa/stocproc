@@ -1134,6 +1134,51 @@ def test_ac_vs_ac_from_c():
     assert np.max(np.abs(ac - ac_c)) < 1e-15
     assert np.max(np.abs(ac_prime - ac_prime_c)) < 1e-15
 
+def test_align_eig_vecs():
+    r_tau = lambda tau: (1 + 1j*(tau))**(-1.8)
+
+    t_max = 30
+    ng_fredholm = 61
+    ng_fac = 4
+    num_grid_points = 100
+    seed = 0
+    verbose = 0
+    sigmin = 0
+
+    t_fine = np.linspace(0, t_max, num_grid_points * 10 + 1)
+
+    scale = 2.4
+    r_tau_scaled = lambda tau: scale * r_tau(tau)
+
+    for align_eig_vec in [False, True]:
+
+        # init sp class
+        sp_kle_scl = sp.class_stocproc.StocProc_KLE(r_tau=r_tau_scaled,
+                                                    t_max=t_max,
+                                                    ng_fredholm=ng_fredholm,
+                                                    ng_fac=ng_fac,
+                                                    seed=seed,
+                                                    sig_min=sigmin,
+                                                    verbose=verbose,
+                                                    align_eig_vec=align_eig_vec)
+        sp_kle = sp.class_stocproc.StocProc_KLE(r_tau=r_tau,
+                                                t_max=t_max,
+                                                ng_fredholm=ng_fredholm,
+                                                ng_fac=ng_fac,
+                                                seed=seed,
+                                                sig_min=sigmin,
+                                                verbose=verbose,
+                                                align_eig_vec=align_eig_vec)
+
+        # if eig_vecs are aligned this ration should be a constant
+        if align_eig_vec:
+            assert(np.allclose(sp_kle_scl._A / sp_kle._A, 1/np.sqrt(scale)))
+        else:
+            assert not np.allclose(sp_kle_scl._A / sp_kle._A, 1 / np.sqrt(scale))
+
+
+
+
 
         
 if __name__ == "__main__":
@@ -1164,5 +1209,6 @@ if __name__ == "__main__":
 #     test_integral_equation()
      
 #     show_auto_grid_points_result()
-#     show_ef()        
+#     show_ef()
+    test_align_eig_vecs()
     pass

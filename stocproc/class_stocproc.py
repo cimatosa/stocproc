@@ -133,7 +133,7 @@ class StocProc_KLE(_absStocProc):
         - Calculate discrete stochastic process (using interpolation solution of fredholm equation) with num_grid_points nodes
         - invoke spline interpolator when calling 
     """
-    def __init__(self, r_tau, t_max, ng_fredholm, ng_fac=4, seed=None, sig_min=1e-5, verbose=1, k=3):
+    def __init__(self, r_tau, t_max, ng_fredholm, ng_fac=4, seed=None, sig_min=1e-5, verbose=1, k=3, align_eig_vec=False):
         r"""
             :param r_tau: auto correlation function of the stochastic process
             :param t_max: specify time axis as [0, t_max]
@@ -154,7 +154,8 @@ class StocProc_KLE(_absStocProc):
                                                                    ng      = ng_fredholm, 
                                                                    sig_min = sig_min,
                                                                    seed    = seed,
-                                                                   verbose = verbose)
+                                                                   verbose = verbose,
+                                                                   align_eig_vec = align_eig_vec)
         
         ng = ng_fac * (ng_fredholm - 1) + 1  
         

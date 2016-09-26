@@ -118,7 +118,8 @@ class StocProc(object):
                  sig_min    = 1e-4, 
                  fname      = None,
                  cache_size = 1024,
-                 verbose    = 1):
+                 verbose    = 1,
+                 align_eig_vec = False):
         
         self.verbose = verbose
         self._one_over_sqrt_2 = 1/np.sqrt(2)
@@ -144,6 +145,12 @@ class StocProc(object):
             # eig_val = lambda
             # eig_vec = u(t)
             self._eig_val, self._eig_vec = solve_hom_fredholm(r, w, sig_min**2, verbose=self.verbose)
+            if align_eig_vec:
+                for i in range(self._eig_vec.shape[1]):
+                    s = np.sum(self._eig_vec[:,i])
+                    phase  = np.exp(1j*np.arctan2(np.real(s), np.imag(s)))
+                    self._eig_vec[:,i]/= phase
+
         else:
             self.__load(fname)
 
@@ -154,17 +161,17 @@ class StocProc(object):
         self.new_process(seed = seed)
         
     @classmethod
-    def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min, verbose=1):
+    def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min, verbose=1, align_eig_vec=False):
         known_names = ['trapezoidal', 'mid_point', 'simpson', 'gauss_legendre']
         
         if name == 'trapezoidal':
-            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min, verbose)
+            ob = cls.new_instance_with_trapezoidal_weights(r_tau, t_max, ng, seed, sig_min, verbose, align_eig_vec)
         elif name == 'mid_point':
-            ob = cls.new_instance_with_mid_point_weights(r_tau, t_max, ng, seed, sig_min, verbose)
+            ob = cls.new_instance_with_mid_point_weights(r_tau, t_max, ng, seed, sig_min, verbose, align_eig_vec)
         elif name == 'simpson':
-            ob = cls.new_instance_with_simpson_weights(r_tau, t_max, ng, seed, sig_min, verbose)
+            ob = cls.new_instance_with_simpson_weights(r_tau, t_max, ng, seed, sig_min, verbose, align_eig_vec)
         elif name == 'gauss_legendre':
-            ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min, verbose)
+            ob = cls.new_instance_with_gauss_legendre_weights(r_tau, t_max, ng, seed, sig_min, verbose, align_eig_vec)
         else:
             raise RuntimeError("unknown name '{}' to create StocProc instance\nknown names are {}".format(name, known_names))
         
@@ -172,24 +179,24 @@ class StocProc(object):
         return ob
 
     @classmethod
-    def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
+    def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
         t, w = get_trapezoidal_weights_times(t_max, ng)
-        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
     
     @classmethod
-    def new_instance_with_simpson_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
+    def new_instance_with_simpson_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
         t, w = get_simpson_weights_times(t_max, ng)
-        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
 
     @classmethod
-    def new_instance_with_mid_point_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
+    def new_instance_with_mid_point_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
         t, w = get_mid_point_weights(t_max, ng)
-        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
 
     @classmethod    
-    def new_instance_with_gauss_legendre_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1):
+    def new_instance_with_gauss_legendre_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
         t, w = gquad.gauss_nodes_weights_legendre(n=ng, low=0, high=t_max)
-        return cls(r_tau, t, w, seed, sig_min, verbose=verbose)
+        return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
     
     def __load(self, fname):
         with open(fname, 'rb') as f:
