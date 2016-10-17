@@ -583,9 +583,12 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
             print("c_high", c_high)
         c = (c_low + c_high) // 2
         ng = 2*c + 1
+        ng_fine = ng * 2 - 1
         if verbose > 1:
+            print("c", c)
             print("ng", ng)
-        ng_fine = ng*2-1
+            print("ng_fine", ng_fine)
+
         t_fine = np.linspace(0, t_max, ng_fine)
         if verbose > 1:
             print("new process with {} weights ...".format(name))
