@@ -135,11 +135,25 @@ class StocProc(object):
             assert w is not None
             self._w = w
             
-            t_row = self._s.reshape(1, self._num_gp)
-            t_col = self._s.reshape(self._num_gp, 1)
-            # correlation matrix
-            # r_tau(t-s) -> integral/sum over s -> s must be row in EV equation
-            r = self._r_tau(t_col-t_row) 
+            
+#             # old style, multiple calls of bcf with same tau_i
+#             # replaced in favour of single call per t_i 
+#             t_row = self._s.reshape(1, self._num_gp)
+#             t_col = self._s.reshape(self._num_gp, 1)
+#             # correlation matrix
+#             # r_tau(t-s) -> integral/sum over s -> s must be row in EV equation
+#             r = self._r_tau(t_col-t_row) 
+
+            n_ = self._num_gp
+            bcf_n_plus = self._r_tau(self._s-self._s[0])
+            bcf_n = np.hstack((bcf_n_plus[-1:0:-1], bcf_n_plus)) 
+            
+            r = np.empty(shape=(n_,n_), dtype = np.complex128)
+            for i in range(n_):
+                idx = n_-1-i
+                r[i] = bcf_n[idx:idx+n_]            
+            
+            
     
             # solve discrete Fredholm equation
             # eig_val = lambda
