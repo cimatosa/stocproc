@@ -228,26 +228,26 @@ def test_func_vs_class_KLE_FFT():
 
     x_t_array_func, t = sp.stocproc.stochastic_process_trapezoidal_weight(r_tau, t_max, ng, num_samples, seed, sig_min)
     stoc_proc = sp.class_stocproc_kle.StocProc.new_instance_by_name(name    = 'trapezoidal', 
-                                                 r_tau   = r_tau, 
-                                                 t_max   = t_max, 
-                                                 ng      = ng, 
-                                                 seed    = seed, 
-                                                 sig_min = sig_min)
+                                                                    r_tau   = r_tau, 
+                                                                    t_max   = t_max, 
+                                                                    ng      = ng, 
+                                                                    seed    = seed, 
+                                                                    sig_min = sig_min)
     x_t_array_class = stoc_proc.x_for_initial_time_grid()
 
     print("max diff:", np.max(np.abs(x_t_array_func - x_t_array_class)))
     assert np.all(x_t_array_func == x_t_array_class), "stochastic_process_kle vs. StocProc Class not identical"
 
     x_t_array_func, t = sp.stocproc.stochastic_process_fft(spectral_density  = J,
-                                                  t_max             = t_max, 
-                                                  num_grid_points   = ng, 
-                                                  num_samples       = num_samples, 
-                                                  seed              = seed)
+                                                           t_max             = t_max, 
+                                                           num_grid_points   = ng, 
+                                                           num_samples       = num_samples, 
+                                                           seed              = seed)
     
     stoc_proc = sp.class_stocproc.StocProc_FFT(spectral_density = J,
-                                t_max            = t_max,
-                                num_grid_points  = ng,
-                                seed             = seed)
+                                               t_max            = t_max,
+                                               num_grid_points  = ng,
+                                               seed             = seed)
     
     stoc_proc.new_process()
     x_t_array_class = stoc_proc.get_z()
@@ -810,11 +810,36 @@ def test_auto_grid_points():
     t_max = 15
     tol = 1e-8
     
+    name = 'mid_point'
+    
     ng = sp.class_stocproc_kle.auto_grid_points(r_tau   = r_tau, 
-                             t_max   = t_max,
-                             tol     = tol,
-                             sig_min = 0)
-    print(ng)
+                                                t_max   = t_max,
+                                                tol     = tol,
+                                                sig_min = 0,
+                                                name    = name)
+        
+    stp = sp.class_stocproc_kle.StocProc.new_instance_by_name(name  = name, 
+                                                              r_tau = r_tau, 
+                                                              t_max = t_max, 
+                                                              ng    = ng,
+                                                              seed  = None,
+                                                              sig_min = 0,
+                                                              verbose = 0)
+    
+    t_ = np.linspace(0, t_max, ng*3)
+    recs_bcf = stp.recons_corr(t_)
+    refc_bcf = r_tau(t_[:,np.newaxis] - t_)
+    assert np.max(np.abs(recs_bcf - refc_bcf)) < 2*tol
+    
+    delta_t_fac = 4
+    t_ = np.linspace(0, t_max, (ng-1)*delta_t_fac + 1)
+    recs_bcf = stp.recons_corr(t_)
+    recs_bcf_memsave = stp.recons_corr_memsave(delta_t_fac = delta_t_fac)
+    refc_bcf = r_tau(t_[:,np.newaxis] - t_)
+    
+    assert np.max(np.abs(recs_bcf - recs_bcf_memsave)) < 3e-15
+    assert np.max(np.abs(refc_bcf - recs_bcf_memsave)) < 2*tol
+    
     
 def test_chache():
     s_param = 1
@@ -1177,6 +1202,18 @@ def test_align_eig_vecs():
             assert not np.allclose(sp_kle_scl._A / sp_kle._A, 1 / np.sqrt(scale))
 
 
+def test_calc_corr_matrix():
+    r_tau = lambda tau: (1 + 1j*(tau))**(-1.8)
+    s = np.linspace(0, 5, 30)
+    
+    r = sp.class_stocproc_kle.StocProc._calc_corr_matrix(s, bcf=r_tau)
+ 
+    ng = len(s)
+    t_row = s.reshape(1, ng)
+    t_col = s.reshape(ng, 1)
+    r2 = r_tau(t_col-t_row)
+    d = np.max(np.abs(r-r2))
+    assert d < 1e-14, "d={}".format(d)
 
 
 
@@ -1198,7 +1235,7 @@ if __name__ == "__main__":
 #     test_FT()
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
-#     test_auto_grid_points()
+    test_auto_grid_points()
 #       
 #     test_chache()
 #     test_dump_load()
@@ -1210,5 +1247,6 @@ if __name__ == "__main__":
      
 #     show_auto_grid_points_result()
 #     show_ef()
-    test_align_eig_vecs()
+#     test_align_eig_vecs()
+#     test_calc_corr_matrix()
     pass

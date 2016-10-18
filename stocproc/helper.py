@@ -1,3 +1,6 @@
+# -*- coding: utf8 -*-
+from __future__ import print_function, division
+
 import numpy as np
 from scipy.optimize import brentq
 from . import class_stocproc 

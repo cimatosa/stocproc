@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- coding: utf8 -*-
 #
 #  Copyright 2014 Richard Hartmann
 #  
@@ -57,6 +56,8 @@ solutions of the time discrete version.
          
         .. todo:: implement convenient classes with fixed weights
 """
+from __future__ import print_function, division
+
 from .stocproc_c import auto_correlation as auto_correlation_c
 
 import sys
@@ -203,8 +204,23 @@ def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4
     
     # correlation matrix
     # r_tau(t-s) -> integral/sum over s -> s must be row in EV equation
-    r = r_tau(t_col-t_row)
+    r_old = r_tau(t_col-t_row)
     
+    n_ = len(t)
+    bcf_n_plus = r_tau(t-t[0])
+    #    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]
+    # == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]        
+    bcf_n = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
+    # we want
+    # r = bcf(0) bcf(-1), bcf(-2)
+    #     bcf(1) bcf( 0), bcf(-1)
+    #     bcf(2) bcf( 1), bcf( 0)
+    r = np.empty(shape=(n_,n_), dtype = np.complex128)
+    for i in range(n_):
+        idx = n_-1-i
+        r[:,i] = bcf_n[idx:idx+n_]
+        
+    assert np.max(np.abs(r_old - r)) < 1e-14
 
     # solve discrete Fredholm equation
     # eig_val = lambda

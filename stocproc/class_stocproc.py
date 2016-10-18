@@ -1,3 +1,6 @@
+# -*- coding: utf8 -*-
+from __future__ import print_function, division
+
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
