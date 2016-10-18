@@ -1,13 +1,14 @@
 # -*- coding: utf8 -*-
-
 """
     advanced class to do all sort of things with KLE generated stochastic processes
 """
 
+from __future__ import print_function, division
 
 import functools
 import numpy as np
 import pickle
+import sys
 
 from .stocproc import solve_hom_fredholm
 from .stocproc import get_mid_point_weights
@@ -134,13 +135,8 @@ class StocProc(object):
             
             assert w is not None
             self._w = w
-            
-            t_row = self._s.reshape(1, self._num_gp)
-            t_col = self._s.reshape(self._num_gp, 1)
-            # correlation matrix
-            # r_tau(t-s) -> integral/sum over s -> s must be row in EV equation
-            r = self._r_tau(t_col-t_row) 
-    
+
+            r = StocProc._calc_corr_matrix(self._s, self._r_tau)            
             # solve discrete Fredholm equation
             # eig_val = lambda
             # eig_vec = u(t)
@@ -160,8 +156,31 @@ class StocProc(object):
         self.x = self.my_cache_decorator(self._x)
         self.new_process(seed = seed)
         
+    @staticmethod
+    def _calc_corr_matrix(s, bcf):
+        """calculates the matrix alpha_ij = bcf(t_i-s_j)
+        
+        calls bcf only for s-s_0 and reconstructs the rest
+        """
+        n_ = len(s)
+        bcf_n_plus = bcf(s-s[0])
+        #    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]
+        # == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]        
+        bcf_n = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
+        # we want
+        # r = bcf(0) bcf(-1), bcf(-2)
+        #     bcf(1) bcf( 0), bcf(-1)
+        #     bcf(2) bcf( 1), bcf( 0)
+        r = np.empty(shape=(n_,n_), dtype = np.complex128)
+        for i in range(n_):
+            idx = n_-1-i
+            r[:,i] = bcf_n[idx:idx+n_]
+        return r
+            
+        
     @classmethod
     def new_instance_by_name(cls, name, r_tau, t_max, ng, seed, sig_min, verbose=1, align_eig_vec=False):
+        """create a new StocProc instance where the weights are given by name""" 
         known_names = ['trapezoidal', 'mid_point', 'simpson', 'gauss_legendre']
         
         if name == 'trapezoidal':
@@ -180,21 +199,25 @@ class StocProc(object):
 
     @classmethod
     def new_instance_with_trapezoidal_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
+        """use trapezoidal weights (see :py:func:`get_trapezoidal_weights_times`)"""
         t, w = get_trapezoidal_weights_times(t_max, ng)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
     
     @classmethod
     def new_instance_with_simpson_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
+        """use simpson weights (see :py:func:`get_simpson_weights_times`)"""
         t, w = get_simpson_weights_times(t_max, ng)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
 
     @classmethod
     def new_instance_with_mid_point_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
+        """use mid-point weights (see :py:func:`get_mid_point_weights`)"""
         t, w = get_mid_point_weights(t_max, ng)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
 
     @classmethod    
     def new_instance_with_gauss_legendre_weights(cls, r_tau, t_max, ng, seed=None, sig_min=0, verbose=1, align_eig_vec=False):
+        """use gauss legendre weights (see :py:func:`gauss_nodes_weights_legendre`)"""
         t, w = gquad.gauss_nodes_weights_legendre(n=ng, low=0, high=t_max)
         return cls(r_tau, t, w, seed, sig_min, verbose=verbose, align_eig_vec=align_eig_vec)
     
@@ -285,6 +308,7 @@ class StocProc(object):
             return self.x(t)
 
     def _x(self, t):
+        """calculates the stochastic process at time t"""
         R = self._r_tau(t-self._s)
         res = np.tensordot(R, self._a_tmp, axes=([0],[0]))
         return res
@@ -296,11 +320,22 @@ class StocProc(object):
         self.x.cache_clear()
 
     def x_t_array(self, t_array):
-        R = self._r_tau(t_array.reshape(1,-1,)-self._s.reshape(-1, 1))
+        """calculates the stochastic process at several times [t_i]"""
+        R = self._r_tau(t_array.reshape(1,-1,)-self._s.reshape(-1, 1))  # because t_array can be anything
+                                                                        # it can not be optimized with _calc_corr_matrix
         res = np.tensordot(R, self._a_tmp, axes=([0],[0]))
         return res
     
     def x_t_mem_save(self, delta_t_fac, kahanSum=False):
+        """calculate the stochastic process (SP) for a certain class fine grids
+        
+        when the SP is setup with n grid points, which means we know the eigenfunctions
+        for the n discrete times t_i = i/(n-1)*t_max, i = 0,1,...n-1
+        with delta_t = t_max/(n-1)
+        it is efficient to calculate the interpolated process
+        for finer grids with delta_t_fine = delta_t/delta_t_fac
+        because we only need to know the bcf on the finer grid
+        """
         a = delta_t_fac        
         N1 = len(self._s)
         N2 = a * (N1 - 1) + 1        
@@ -313,16 +348,17 @@ class StocProc(object):
                               kahanSum    = kahanSum)
         
     def x_t_fsum(self, t):
+        """slow fsum variant for testing / development reasons
+        """
         alpha_k = self._r_tau(t - self._s)
         terms = np.asarray([self._Y[a] * alpha_k[i] * self._A[i, a] for (a,i) in product(range(self._num_ev), range(self._num_gp))])
         re = fsum(np.real(terms))
         im = fsum(np.imag(terms))
         
-        return re + 1j*im
-        
-        
+        return re + 1j*im        
 
     def u_i_mem_save(self, delta_t_fac, i):
+        """efficient evaluation of the interpolated eigen function on special subgrids"""
         a = delta_t_fac        
         N1 = len(self._s)
         N2 = a * (N1 - 1) + 1        
@@ -348,6 +384,8 @@ class StocProc(object):
             will be evaluated.
         :param i: index of the eigenfunction
         :return: 1D array of length ``len(t_array)`` 
+        
+        scales like len(t_array)*num_gp
         """
         t_array = t_array.reshape(1,len(t_array))      # (1   , N_t)
         tmp = self._r_tau(t_array-self._s.reshape(self._num_gp,1))
@@ -370,6 +408,8 @@ class StocProc(object):
              (note, the number of eigenvalues may be smaller than the number
              of grid points because of the selections mechanism implemented
              by the value of ``sig_min``)
+             
+        scales like len(t_array)*num_gp*num_ev
         """
         t_array = t_array.reshape(1,len(t_array))      # (1   , N_t)
         tmp = self._r_tau(t_array-self._s.reshape(self._num_gp,1))
@@ -379,6 +419,7 @@ class StocProc(object):
         return np.tensordot(tmp, 1/self._sqrt_eig_val.reshape(1,self._num_ev) * self._A, axes=([0],[0]))
 
     def u_i_all_mem_save(self, delta_t_fac):
+        """efficient evaluation of the interpolated eigen function on special subgrids"""
         a = delta_t_fac        
         N1 = len(self._s)
         N2 = a * (N1 - 1) + 1        
@@ -471,6 +512,13 @@ class StocProc(object):
         tmp = lambda_i_all.reshape(1, self._num_ev) * u_i_all_t  #(N_gp, N_ev)
         return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))[:,0]
     
+    def recons_corr_memsave(self, delta_t_fac):
+        u_i_all_t = self.u_i_all_mem_save(delta_t_fac)           #(N_gp, N_ev)
+        u_i_all_ast_s = np.conj(u_i_all_t)                       #(N_gp, N_ev)
+        lambda_i_all = self.lambda_i_all()                       #(N_ev)        
+        tmp = lambda_i_all.reshape(1, self._num_ev) * u_i_all_t  #(N_gp, N_ev)  
+        return np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))    
+    
     def get_num_ef(self, rel_threshold):
         G = self._sqrt_eig_val
         return get_num_ef(G, rel_threshold)    
@@ -543,7 +591,36 @@ def max_error(r_t_s, r_t_s_exact):
 def max_rel_error(r_t_s, r_t_s_exact):
     return np.max(np.abs(r_t_s - r_t_s_exact) / np.abs(r_t_s_exact))
 
-def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'mid_point', sig_min = 1e-4, verbose=2): 
+def recons_corr_and_get_bcf(T, ng, w, eig_val, eig_vec, bcf):
+    """
+        doing things here again for efficiency reasons
+    """
+    delta_t_fac = 2        
+    N1 = ng
+    N2 = delta_t_fac * (N1 - 1) + 1        
+    alpha_k = bcf(np.linspace(-T, T, 2*N2 - 1))
+    
+    u_i_all_t =  stocproc_c.eig_func_all_interp(delta_t_fac = delta_t_fac,
+                                                time_axis   = np.linspace(0, T, N1),
+                                                alpha_k     = alpha_k, 
+                                                weights     = w,
+                                                eigen_val   = eig_val,
+                                                eigen_vec   = eig_vec)    
+    
+    u_i_all_ast_s = np.conj(u_i_all_t)                  #(N_gp, N_ev)
+    num_ev = len(eig_val)       
+    tmp = eig_val.reshape(1, num_ev) * u_i_all_t  #(N_gp, N_ev)  
+    recs_bcf = np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))
+    
+    refc_bcf = np.empty(shape=(N2,N2), dtype = np.complex128)
+    for i in range(N2):
+        idx = N2-1-i
+        refc_bcf[:,i] = alpha_k[idx:idx+N2]
+    
+    return recs_bcf, refc_bcf
+      
+
+def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'mid_point', sig_min = 1e-4, verbose=1): 
     err = 1
     c = 2
     seed = None
@@ -556,22 +633,27 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
         ng = 2*c + 1
         ng_fine = ng*2-1
         t_fine = np.linspace(0, t_max, ng_fine)
+        if verbose == 1:
+            print("ng:{} new proc ({}) ... ".format(ng, name), end='')
+            sys.stdout.flush()
         if verbose > 1:
             print("#"*40)
             print("c", c, "ng", ng)
             print("new process with {} weights ...".format(name))
-        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose)
+        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose-1)
         if verbose > 1:
             print("reconstruct correlation function ({} points)...".format(ng_fine))
-        r_t_s = stoc_proc.recons_corr(t_fine)
-        if verbose > 1:
-            print("calculate exact correlation function ...")
-        r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
+        r_t_s, r_t_s_exact = recons_corr_and_get_bcf(T  = t_max, 
+                                                     ng = ng, 
+                                                     w       = stoc_proc._w, 
+                                                     eig_val = stoc_proc._eig_val, 
+                                                     eig_vec = stoc_proc._eig_vec,
+                                                     bcf     = r_tau)
         if verbose > 1:
             print("calculate error using {} ...".format(err_method_name))
         err = np.max(err_method(r_t_s, r_t_s_exact))
         if verbose > 0:
-            print("ng {} -> err {:.3e}".format(ng, err))
+            print("err {:.3e}".format(err))
         
     c_low = c // 2
     c_high = c
@@ -590,9 +672,13 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
             print("ng_fine", ng_fine)
 
         t_fine = np.linspace(0, t_max, ng_fine)
+        if verbose == 1:
+            print("ng:{} new proc ({}) ... ".format(ng, name), end='')
+            sys.stdout.flush()
+            
         if verbose > 1:
             print("new process with {} weights ...".format(name))
-        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose)
+        stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose-1)
         if verbose > 1:
             print("reconstruct correlation function ({} points)...".format(ng_fine))
         r_t_s = stoc_proc.recons_corr(t_fine)
@@ -603,7 +689,7 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
             print("calculate error using {} ...".format(err_method_name))
         err = np.max(err_method(r_t_s, r_t_s_exact))
         if verbose > 0:
-            print("ng {} -> err {:.3e}".format(ng, err))
+            print("err {:.3e}".format(err))
         if err > tol:
             if verbose > 1:
                 print("    err > tol!")
