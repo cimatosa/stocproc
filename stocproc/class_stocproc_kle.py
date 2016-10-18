@@ -683,7 +683,7 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
             print("reconstruct correlation function ({} points)...".format(ng_fine))
         r_t_s = stoc_proc.recons_corr(t_fine)
         if verbose > 1:
-            print("calculate exact correlation function ...")
+            print("calculate exact correlation function ({} points)...".format(ng_fine))
         r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
         if verbose > 1:
             print("calculate error using {} ...".format(err_method_name))
