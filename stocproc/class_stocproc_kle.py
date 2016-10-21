@@ -597,16 +597,15 @@ def recons_corr_and_get_bcf(T, ng, w, eig_val, eig_vec, bcf):
     """
     delta_t_fac = 2        
     N1 = ng
-    N2 = delta_t_fac * (N1 - 1) + 1        
-    alpha_k = bcf(np.linspace(-T, T, 2*N2 - 1))
-    
+    N2 = delta_t_fac * (N1 - 1) + 1   
+    bcf_n_plus = bcf(np.linspace(0, T, N2))
+    bcf_n = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))    
     u_i_all_t =  stocproc_c.eig_func_all_interp(delta_t_fac = delta_t_fac,
                                                 time_axis   = np.linspace(0, T, N1),
-                                                alpha_k     = alpha_k, 
+                                                alpha_k     = bcf_n, 
                                                 weights     = w,
                                                 eigen_val   = eig_val,
                                                 eigen_vec   = eig_vec)    
-    
     u_i_all_ast_s = np.conj(u_i_all_t)                  #(N_gp, N_ev)
     num_ev = len(eig_val)       
     tmp = eig_val.reshape(1, num_ev) * u_i_all_t  #(N_gp, N_ev)  
@@ -615,12 +614,12 @@ def recons_corr_and_get_bcf(T, ng, w, eig_val, eig_vec, bcf):
     refc_bcf = np.empty(shape=(N2,N2), dtype = np.complex128)
     for i in range(N2):
         idx = N2-1-i
-        refc_bcf[:,i] = alpha_k[idx:idx+N2]
+        refc_bcf[:,i] = bcf_n[idx:idx+N2]
     
     return recs_bcf, refc_bcf
       
 
-def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'mid_point', sig_min = 1e-4, verbose=1): 
+def auto_grid_points(r_tau, t_max, tol = 1e-3, err_method = max_rel_error, name = 'simpson', sig_min = 1e-6, verbose=1): 
     err = 1
     c = 2
     seed = None
@@ -632,7 +631,6 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
         c *= 2
         ng = 2*c + 1
         ng_fine = ng*2-1
-        t_fine = np.linspace(0, t_max, ng_fine)
         if verbose == 1:
             print("ng:{} new proc ({}) ... ".format(ng, name), end='')
             sys.stdout.flush()
@@ -665,23 +663,28 @@ def auto_grid_points(r_tau, t_max, tol = 1e-8, err_method = max_error, name = 'm
             print("c_high", c_high)
         c = (c_low + c_high) // 2
         ng = 2*c + 1
+        ng_fine = ng * 2 - 1
         if verbose > 1:
+            print("c", c)
             print("ng", ng)
-        ng_fine = ng*2-1
-        t_fine = np.linspace(0, t_max, ng_fine)
+            print("ng_fine", ng_fine)
+
         if verbose == 1:
             print("ng:{} new proc ({}) ... ".format(ng, name), end='')
             sys.stdout.flush()
             
         if verbose > 1:
-            print("new process with {} weights ...".format(name))
+            print("new process with {} weights  ({} points)...".format(name, ng))
         stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose-1)
+
         if verbose > 1:
             print("reconstruct correlation function ({} points)...".format(ng_fine))
-        r_t_s = stoc_proc.recons_corr(t_fine)
-        if verbose > 1:
-            print("calculate exact correlation function ...")
-        r_t_s_exact = r_tau(t_fine.reshape(ng_fine,1) - t_fine.reshape(1, ng_fine))
+        r_t_s, r_t_s_exact = recons_corr_and_get_bcf(T  = t_max, 
+                                                     ng = ng, 
+                                                     w       = stoc_proc._w, 
+                                                     eig_val = stoc_proc._eig_val, 
+                                                     eig_vec = stoc_proc._eig_vec,
+                                                     bcf     = r_tau)
         if verbose > 1:
             print("calculate error using {} ...".format(err_method_name))
         err = np.max(err_method(r_t_s, r_t_s_exact))
