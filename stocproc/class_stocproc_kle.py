@@ -674,8 +674,9 @@ def auto_grid_points(r_tau, t_max, tol = 1e-3, err_method = max_rel_error, name 
             sys.stdout.flush()
             
         if verbose > 1:
-            print("new process with {} weights ...".format(name))
+            print("new process with {} weights  ({} points)...".format(name, ng))
         stoc_proc = StocProc.new_instance_by_name(name, r_tau, t_max, ng, seed, sig_min, verbose-1)
+
         if verbose > 1:
             print("reconstruct correlation function ({} points)...".format(ng_fine))
         r_t_s, r_t_s_exact = recons_corr_and_get_bcf(T  = t_max, 
