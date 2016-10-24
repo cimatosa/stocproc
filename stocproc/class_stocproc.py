@@ -5,6 +5,10 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
 from .class_stocproc_kle import StocProc
+from . import method_fft
+import logging
+
+log = logging.getLogger(__name__)
 
 class ComplexInterpolatedUnivariateSpline(object):
     r"""
@@ -233,4 +237,89 @@ class StocProc_FFT(_absStocProc):
         return z
 
     def get_num_y(self):
-        return self.n_dft            
+        return self.n_dft
+    
+    
+class StocProc_FFT_tol(_absStocProc):
+    r"""
+        Simulate Stochastic Process using FFT method 
+    """
+    def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-3, intpl_tol=1e-3, 
+                 seed=None, verbose=0, k=3, negative_frequencies=False, method='simps'):
+        if not negative_frequencies: 
+            log.debug("non neg freq only")
+            # assume the spectral_density is 0 for w<0 
+            # and decays fast for large w
+            b = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = 1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = 1)
+            log.debug("upper int bound b {:.3e}".format(b))
+            b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+                                                      intgr_tol = intgr_tol, 
+                                                      intpl_tol = intpl_tol, 
+                                                      tmax      = t_max, 
+                                                      a         = 0, 
+                                                      b         = b, 
+                                                      ft_ref    = bcf_ref, 
+                                                      N_max     = 2**20, 
+                                                      method    = method)
+            log.debug("required tol result in N {}".format(N))
+            a = 0
+        else:
+            # assume the spectral_density is non zero also for w<0 
+            # but decays fast for large |w|
+            b = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = 1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = 1)
+            a = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = -1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = -1)            
+            b_minus_a, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+                                                              intgr_tol = intgr_tol, 
+                                                              intpl_tol = intpl_tol, 
+                                                              tmax      = t_max, 
+                                                              a         = a, 
+                                                              b         = b, 
+                                                              ft_ref    = bcf_ref, 
+                                                              N_max     = 2**20, 
+                                                              method    = method)
+            b = b*b_minus_a/(b-a)
+            a = b-b_minus_a
+        
+        
+        num_grid_points = int(np.ceil(t_max/dt))+1
+        t_max = (num_grid_points-1)*dt
+        
+        super().__init__(t_max           = t_max, 
+                         num_grid_points = num_grid_points, 
+                         seed            = seed, 
+                         verbose         = verbose,
+                         k               = k)
+        
+        self.n_dft           = N
+        omega = dx*np.arange(self.n_dft)
+        if method == 'simps':
+            self.yl = spectral_density(omega + a) * dx / np.pi
+            self.yl = method_fft.get_fourier_integral_simps_weighted_values(self.yl)
+            self.yl = np.sqrt(self.yl)
+            self.omega_min_correction = np.exp(-1j*a*self.t)   #self.t is from the parent class
+        elif method == 'midp':
+            self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
+            self.yl = np.sqrt(self.yl)
+            self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
+        else:
+            raise ValueError("unknown method '{}'".format(method))
+            
+            
+    def _calc_z(self, y): 
+        z = np.fft.fft(self.yl * y)[0:self.num_grid_points] * self.omega_min_correction
+        return z
+
+    def get_num_y(self):
+        return self.n_dft        

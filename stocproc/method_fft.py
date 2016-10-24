@@ -1,8 +1,19 @@
 
 from scipy.optimize import brentq
+from scipy.interpolate import InterpolatedUnivariateSpline
 from numpy.fft import rfft as np_rfft
 import numpy as np
-from math import fsum
+import logging
+log = logging.getLogger(__name__)
+
+class ComplexInterpolatedUnivariateSpline(object):
+    def __init__(self, x, y, k=3):
+        self.k = k
+        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y), k=k)
+        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y), k=k)
+        
+    def __call__(self, t):
+        return self.re_spline(t) + 1j*self.im_spline(t)
 
 def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     """
@@ -55,7 +66,7 @@ def find_integral_boundary_auto(integrand, tol, ref_val=0, max_val=1e6,
     b = find_integral_boundary(integrand, tol, ref_val=ref_val_right, max_val=max_val_right, x0=+1)
     return a,b
 
-def fourier_integral(integrand, a, b, N):
+def fourier_integral_midpoint(integrand, a, b, N):
     """
         approximates int_a^b dx integrand(x) by the riemann sum with N terms
         
@@ -66,28 +77,113 @@ def fourier_integral(integrand, a, b, N):
     fft_vals = np_rfft(yl)
     tau = np.arange(len(fft_vals))*delta_k
     return tau, delta_x*np.exp(-1j*tau*(a+delta_x/2))*fft_vals
+
+def get_fourier_integral_simps_weighted_values(yl):
+    N = len(yl)
+    if N % 2 == 1:  # odd N  
+        yl[1:  :2] *= 4   # the mid interval points
+        yl[2:-2:2] *= 2   # points with left AND right interval
+        return yl/3
+        
+    else:                 # all weight with an overall factor of 1/6
+        yl[0]      *= 2   # the very first points
+        yl[1:-1:2] *= 8   # the mid interval points (excluding the last)
+        yl[2:-2:2] *= 4   # points with left AND right interval (excluding the last but one)
+        yl[-2]     *= 5   # trapeziodal rule for the last two points 
+        yl[-1]     *= 3
+        return yl/6
+
+def fourier_integral_simps(integrand, a, b, N):
+    """
+        approximates int_a^b dx integrand(x) by the riemann sum with N terms
+        using simpson integration scheme        
+    """
+    
+    delta_x = (b-a)/(N-1)
+    delta_k = 2*np.pi/N/delta_x
+    l = np.arange(0, N)    
+    yl = integrand(a + l*delta_x)
+    yl = get_fourier_integral_simps_weighted_values(yl)    
+    
+    fft_vals = np_rfft(yl)
+    tau = np.arange(len(fft_vals))*delta_k
+    return tau, delta_x*np.exp(-1j*tau*a)*fft_vals
     
 
-def get_N_for_accurate_fourier_integral(integrand, a, b, t_0, t_max, tol, ft_ref, N_max = 2**15):
+def get_N_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, N_max = 2**18, method='simps'):
     """
         chooses N such that the approximated Fourier integral 
         meets the exact solution within a given tolerance of the
         relative deviation for a given interval of interest
     """
+    if method == 'midp':
+        fourier_integral = fourier_integral_midpoint
+    elif method == 'simps':
+        fourier_integral = fourier_integral_simps
+    else:
+        raise ValueError("unknown method '{}'".format(method))
+    
+    log.debug("fft integral from {:.3e} to {:.3e}".format(a, b))
+    log.debug("error estimation up to tmax {:.3e}".format(t_max))
+    
     i = 10
     while True:
         N = 2**i 
         tau, ft_tau = fourier_integral(integrand, a, b, N)
         idx = np.where(tau <= t_max)
         ft_ref_tau = ft_ref(tau[idx])
-        rd = np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau)
+        rd = np.max(np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau))
+        log.debug("useing fft for integral N with {} yields max rd {:.3e} (tol {:.3e})".format(N, rd, tol))
         if rd < tol:
             return N
         
-        i += 2    
+        i += 1    
 
-
+def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
+    N = 64
+    sub_sampl = 8
     
+    while True:
+        tau = np.linspace(0, t_max, N+1)
+        ft_ref_n = ft_ref(tau)
+        tau_sub = tau[::sub_sampl]
+        
+        ft_intp = ComplexInterpolatedUnivariateSpline(x = tau_sub, y = ft_ref_n[::sub_sampl], k=3)
+        ft_intp_n = ft_intp(tau)
+        
+        d = np.max(np.abs(ft_intp_n-ft_ref_n))
+        if d < tol:
+            return t_max/N
+        N*=2
+
+def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, N_max = 2**15, method='simps'):
+    N   = get_N_for_accurate_fourier_integral(integrand, a, b, 
+                                              t_max  = tmax, 
+                                              tol    = intgr_tol, 
+                                              ft_ref = ft_ref, 
+                                              N_max  = N_max,
+                                              method = method)
+    dt  = get_dt_for_accurate_interpolation(t_max  = tmax, 
+                                            tol    = intpl_tol, 
+                                            ft_ref = ft_ref)
+    
+    if method == 'simps':
+        dx = (b-a)/(N-1)
+    elif method == 'midp':
+        dx = (b-a)/N  
+    N_min = 2*np.pi/dx/dt
+    N = 2**int(np.ceil(np.log2(N_min)))
+    scale = np.sqrt(N_min/N)
+    assert scale <= 1
+    dx_new = scale*dx
+    
+    if method == 'simps':
+        b_minus_a = dx_new*(N-1)
+    elif method == 'midp':
+        b_minus_a = dx_new*N
+    
+    dt_new = 2*np.pi/dx_new/N      
+    return b_minus_a, N, dx_new, dt_new
         
         
     

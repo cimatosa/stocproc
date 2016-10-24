@@ -1214,11 +1214,57 @@ def test_calc_corr_matrix():
     r2 = r_tau(t_col-t_row)
     d = np.max(np.abs(r-r2))
     assert d < 1e-14, "d={}".format(d)
+    
+def test_Srocproc_FFT_tol():
+    import warnings
+    warnings.filterwarnings('error')
+    s = 0.7
+    gamma_s_plus_1 = gamma(s+1)
+    r_tau = lambda tau : corr(tau, s, gamma_s_plus_1)*np.pi
+    J = lambda w : spectral_density(w, s)
+    
+    tol = 1e-3
+    
+    ffttol = sp.class_stocproc.StocProc_FFT_tol(spectral_density = J, 
+                                                t_max = 15, 
+                                                bcf_ref = r_tau, 
+                                                intgr_tol = tol, 
+                                                intpl_tol = tol,
+                                                method='midp')
+    
+    ns = 10000
+    ng_fine = ffttol.num_grid_points*4
+    finer_t = np.linspace(0,ffttol.t_max, ng_fine)
+    
+    x_t_samples = np.empty(shape=(ns, ng_fine), dtype=np.complex)
+
+    print("generate samples ...")
+    for n in range(ns):
+        ffttol.new_process()
+        x_t_samples[n,:] = ffttol(finer_t)
+    print("done!")
+    ac_fft_conj, ac_fft_not_conj = sp.stocproc.auto_correlation(x_t_samples)
+    
+    t_grid = np.linspace(0, ffttol.t_max, ng_fine)    
+    ac_true = r_tau(t_grid.reshape(-1, 1) - t_grid.reshape(1, -1))
+    
+    max_diff_conj = np.max(np.abs(ac_true - ac_fft_conj))
+    print("max diff <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj))
+    max_rel_diff_conj = np.max(np.abs(ac_true - ac_fft_conj)/np.abs(ac_true))
+    print("max rel diff <x(t) x^ast(s)>: {:.2e}".format(max_rel_diff_conj))
+    
+    max_diff_not_conj = np.max(np.abs(ac_fft_not_conj))
+    print("max diff <x(t) x(s)>: {:.2e}".format(max_diff_not_conj))
+    
+        
+
 
 
 
         
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
 #     test_solve_fredholm_ordered_eigen_values()
 #     test_ac_vs_ac_from_c()
 #     test_stochastic_process_KLE_correlation_function_midpoint()
@@ -1235,7 +1281,7 @@ if __name__ == "__main__":
 #     test_FT()
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
-    test_auto_grid_points()
+#     test_auto_grid_points()
 #       
 #     test_chache()
 #     test_dump_load()
@@ -1249,4 +1295,5 @@ if __name__ == "__main__":
 #     show_ef()
 #     test_align_eig_vecs()
 #     test_calc_corr_matrix()
+    test_Srocproc_FFT_tol()
     pass
