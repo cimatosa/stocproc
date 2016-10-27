@@ -4,7 +4,9 @@ import os
 import numpy as np
 import math
 from scipy.special import gamma as gamma_func
+import scipy.integrate as sp_int
 import matplotlib.pyplot as plt
+from math import fsum
 
 import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
@@ -119,7 +121,7 @@ def fourier_integral_trapz_simple_test(integrand, a, b, N):
         
     return k, res
         
-def test_fourier_integral():
+def test_fourier_integral_finite_boundary():
     intg = lambda x: x**2
     a = -1.23
     b = 4.87
@@ -127,7 +129,7 @@ def test_fourier_integral():
     ft_ref = lambda k: (np.exp(-1j*a*k)*(2j - a*k*(2 + 1j*a*k)) + np.exp(-1j*b*k)*(-2j + b*k*(2 + 1j*b*k)))/k**3
     N = 2**18
     N_test = 100
-    tau, ft_n = sp.method_fft.fourier_integral(intg, a, b, N)
+    tau, ft_n = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
     ft_ref_n = ft_ref(tau)
     tau = tau[1:N_test]
     ft_n = ft_n[1:N_test]
@@ -150,7 +152,7 @@ def test_fourier_integral():
     
     
     N = 512
-    tau, ft_n = sp.method_fft.fourier_integral(intg, a, b, N)
+    tau, ft_n = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
     ft_ref_n = ft_ref(tau)
    
     k, ft_simple = fourier_integral_simple_test(intg, a, b, N)
@@ -172,28 +174,57 @@ def test_fourier_integral():
 #     plt.yscale('log')
 #     plt.show()    
 #     sys.exit()
+
+
+
+    N = 1024
+    tau, ft_n = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
+    ft_ref_n = ft_ref(tau)
+    rd = np.abs(ft_ref_n-ft_n) / np.abs(ft_ref_n)
+    idx = np.where(np.logical_and(tau < 75, np.isfinite(rd)))
+    tau = tau[idx]
+    rd = rd[idx]
+    plt.plot(tau, rd, label='trapz N:{}'.format(N))
+    mrd_trapz = np.max(rd)
+     
+    N = 513
+    tau, ft_n = sp.method_fft.fourier_integral_simps(intg, a, b, N)
+    ft_ref_n = ft_ref(tau)
+    rd = np.abs(ft_ref_n-ft_n) / np.abs(ft_ref_n)
+    idx = np.where(np.logical_and(tau < 75, np.isfinite(rd)))    
+    tau = tau[idx]
+    rd = rd[idx]
+    plt.plot(tau, rd, label='simps N:{}'.format(N))
+    mrd_simps = np.max(rd)    
     
+    assert mrd_simps < mrd_trapz, "mrd_simps ({:.3e}) >= mrd_trapz ({:.3e})".format(mrd_simps, mrd_trapz)
+        
+#     plt.grid()
+#     plt.legend(loc='lower right')
+#     plt.yscale('log')
+#     plt.show()
     
-    
-    def osd(w, s, wc):
-        if not isinstance(w, np.ndarray):
-            if w < 0:
-                return 0
-            else:
-                return w**s*np.exp(-w/wc)
+
+def osd(w, s, wc):
+    if not isinstance(w, np.ndarray):
+        if w < 0:
+            return 0
         else:
-            res = np.zeros(shape=w.shape)
-            
-            w_flat = w.flatten()
-            idx_pos = np.where(w_flat > 0)
-            fv_res = res.flat
-            fv_res[idx_pos] = w_flat**s*np.exp(-w_flat/wc)
-            
-            return res
-            
-    s = 0.1
-    wc = 4
+            return w**s*np.exp(-w/wc)
+    else:
+        res = np.zeros(shape=w.shape)
+        
+        w_flat = w.flatten()
+        idx_pos = np.where(w_flat > 0)
+        fv_res = res.flat
+        fv_res[idx_pos] = w_flat[idx_pos]**s*np.exp(-w_flat[idx_pos]/wc)
+        
+        return res    
+
     
+def test_fourier_integral_infinite_boundary():
+    s = 0.5
+    wc = 4
     intg = lambda x: osd(x, s, wc)
     bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
     
@@ -203,33 +234,110 @@ def test_fourier_integral():
 #     sys.exit()
     
     a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)
+    print(a,b)
     N = 2**18
     
     for N in [2**16, 2**18, 2**20]:
     
-        tau, bcf_n = sp.method_fft.fourier_integral(intg, a, b, N=N)
+        tau, bcf_n = sp.method_fft.fourier_integral_midpoint(intg, a, b, N=N)
         bcf_ref_n = bcf_ref(tau)
         
-        tau_max = 100
+        tau_max = 5
         idx = np.where(tau <= tau_max)
         tau = tau[idx]
         bcf_n = bcf_n[idx]
         bcf_ref_n = bcf_ref_n[idx]
         
+        rd_trapz = np.abs(bcf_ref_n-bcf_n)/np.abs(bcf_ref_n)
+        p, = plt.plot(tau, rd_trapz, label="trapz N {}".format(N))
+        
+        
+        tau, bcf_n = sp.method_fft.fourier_integral_simps(intg, a, b=b, N=N-1)
+        bcf_ref_n = bcf_ref(tau)
+         
+        idx = np.where(tau <= tau_max)
+        
+        tau = tau[idx]
+        bcf_n = bcf_n[idx]
+        bcf_ref_n = bcf_ref_n[idx]
+         
         rd = np.abs(bcf_ref_n-bcf_n)/np.abs(bcf_ref_n)
-#         plt.plot(tau, rd, label="N {}".format(N))
+        plt.plot(tau, rd, label="simps N {}".format(N), color=p.get_color(), ls='--')
+        
+        t_ = 3
+        print(a,b)
+        
+        x_simps, dx = np.linspace(a,b,N-1, endpoint=True, retstep=True)
+        I = sp_int.simps(intg(x_simps)*np.exp(-1j*x_simps*t_), dx=dx)
+        err = np.abs(I-bcf_ref(t_))/np.abs(bcf_ref(t_))
+        plt.plot(t_, err, marker='o', color='g')
   
-    assert np.max(rd) < 5*1e-4
+    assert np.max(rd_trapz) < 5*1e-4, "max rd_trapz = {:.3e}".format(np.max(rd_trapz))
     
-#     plt.legend()    
+#     plt.legend(loc='lower right')
+#     plt.grid()    
 #     plt.yscale('log')
 #     plt.show()
     
+def test_get_N_for_accurate_fourier_integral():
+    s = 0.5
+    wc = 4
+    intg = lambda x: osd(x, s, wc)
+    bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
     
- 
+    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)    
+    N = sp.method_fft.get_N_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, N_max = 2**15, method='simps')
+    print(N)
+
+def test_get_dt_for_accurate_interpolation():
+    s = 0.5
+    wc = 4
+    intg = lambda x: osd(x, s, wc)
+    bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
+    dt = sp.method_fft.get_dt_for_accurate_interpolation(t_max=40, tol=1e-4, ft_ref=bcf_ref)
+    print(dt)
+    
+def test_sclicing():
+    yl = np.ones(10)
+    yl = sp.method_fft.get_fourier_integral_simps_weighted_values(yl)
+    assert yl[0] == 2/6
+    assert yl[1] == 8/6
+    assert yl[2] == 4/6
+    assert yl[3] == 8/6
+    assert yl[4] == 4/6
+    assert yl[5] == 8/6
+    assert yl[6] == 4/6
+    assert yl[7] == 8/6
+    assert yl[8] == 5/6
+    assert yl[9] == 3/6
+    
+def test_calc_abN():
+    s = 0.5
+    wc = 4
+    intg = lambda x: osd(x, s, wc)
+    bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
+    
+    tol = 1e-3
+    tmax=40
+    method='simps'
+    
+    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)    
+    ab, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand = intg, 
+                                                  intgr_tol = tol, 
+                                                  intpl_tol = tol, 
+                                                  tmax = tmax, 
+                                                  a    = 0, 
+                                                  b    = b, 
+                                                  ft_ref = bcf_ref)
+    assert (np.abs(dx*dt*N - np.pi*2)) < 1e-15
     
     
     
 if __name__ == "__main__":
-#     test_find_integral_boundary()
-    test_fourier_integral()
+    test_find_integral_boundary()
+    test_fourier_integral_finite_boundary()
+    test_fourier_integral_infinite_boundary()
+    test_get_N_for_accurate_fourier_integral()
+    test_get_dt_for_accurate_interpolation()
+    test_sclicing()
+    test_calc_abN()

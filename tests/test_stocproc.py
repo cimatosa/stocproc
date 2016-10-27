@@ -34,6 +34,7 @@ import time
 
 import sys
 import os
+import multiprocessing as mp
 
 import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
@@ -1214,11 +1215,109 @@ def test_calc_corr_matrix():
     r2 = r_tau(t_col-t_row)
     d = np.max(np.abs(r-r2))
     assert d < 1e-14, "d={}".format(d)
+    
+   
+def test_Srocproc_FFT_tol():
+    import warnings
+    warnings.filterwarnings('error')
+    s = 0.7
+    gamma_s_plus_1 = gamma(s+1)
+    r_tau = lambda tau : corr(tau, s, gamma_s_plus_1)
+    J = lambda w : spectral_density(w, s)
+    
+    
+    
+    t_max = 15
+    
+    tol = 1e-2
+    ffttol = sp.class_stocproc.StocProc_FFT_tol(spectral_density = J, 
+                                                t_max     = t_max, 
+                                                bcf_ref   = r_tau, 
+                                                intgr_tol = tol, 
+                                                intpl_tol = tol,
+                                                method    = 'midp',
+                                                seed      = 0)
+    tol = 1e-3
+    ffttol2 = sp.class_stocproc.StocProc_FFT_tol(spectral_density = J, 
+                                                t_max     = t_max, 
+                                                bcf_ref   = r_tau, 
+                                                intgr_tol = tol, 
+                                                intpl_tol = tol,
+                                                method    = 'midp',
+                                                seed      = 0)
+
+    fft = sp.class_stocproc.StocProc_FFT(spectral_density = J, 
+                                         t_max            = t_max, 
+                                         num_grid_points  = 101,
+                                         seed             = 0)
+    
+    kle = sp.class_stocproc.StocProc_KLE(r_tau = r_tau, 
+                                         t_max = t_max, 
+                                         ng_fredholm = 101, 
+                                         ng_fac = 4, 
+                                         seed = 0)    
+    
+    kle2 = sp.class_stocproc.StocProc_KLE(r_tau = r_tau, 
+                                         t_max = t_max, 
+                                         ng_fredholm = 513, 
+                                         ng_fac = 4, 
+                                         seed = 0)    
+    
+    ns = 1000000
+    ng_fine = ffttol.num_grid_points*4
+    print("ng", ffttol.num_grid_points)
+    finer_t = np.linspace(0,ffttol.t_max, ng_fine)
+    
+    for sp_class in [ffttol, ffttol2, fft, kle, kle2]:
+    
+        x_t_samples = np.empty(shape=(ns, ng_fine), dtype=np.complex)
+        
+        t_newp = 0
+        t_eval = 0
+    
+        print("generate samples ...")
+        for n in range(ns):
+            t0 = time.time()
+            sp_class.new_process()
+            t1 = time.time()
+            x_t_samples[n,:] = sp_class(finer_t)
+            t2 = time.time()
+            t_newp += (t1-t0)
+            t_eval += (t2-t1)
+        print("done!")
+        ac_conj, ac_not_conj = sp.stocproc.auto_correlation_zero(x_t_samples)
+        bcf_ref =  r_tau(finer_t)
+        
+        p, = plt.plot(finer_t, np.abs(ac_conj - bcf_ref)/np.abs(bcf_ref), label=sp_class.__class__.__name__)
+        plt.plot(finer_t, np.abs(ac_conj - bcf_ref), color=p.get_color(), ls='--')
+        plt.plot(finer_t, np.abs(ac_not_conj), color=p.get_color(), ls=':')
+    
+    plt.legend()
+    plt.grid()
+    plt.yscale('log')
+    plt.show()
+    
+    
+#     t_grid = np.linspace(0, ffttol.t_max, ng_fine)    
+#     ac_true = r_tau(t_grid.reshape(-1, 1) - t_grid.reshape(1, -1))
+#     
+#     max_diff_conj = np.max(np.abs(ac_true - ac_fft_conj))
+#     print("max diff <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj))
+#     max_rel_diff_conj = np.max(np.abs(ac_true - ac_fft_conj)/np.abs(ac_true))
+#     print("max rel diff <x(t) x^ast(s)>: {:.2e}".format(max_rel_diff_conj))
+#     
+#     max_diff_not_conj = np.max(np.abs(ac_fft_not_conj))
+#     print("max diff <x(t) x(s)>: {:.2e}".format(max_diff_not_conj))
+    
+        
+
 
 
 
         
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
 #     test_solve_fredholm_ordered_eigen_values()
 #     test_ac_vs_ac_from_c()
 #     test_stochastic_process_KLE_correlation_function_midpoint()
@@ -1235,7 +1334,7 @@ if __name__ == "__main__":
 #     test_FT()
 #     test_stocProc_eigenfunction_extraction()
 #     test_orthonomality()
-    test_auto_grid_points()
+#     test_auto_grid_points()
 #       
 #     test_chache()
 #     test_dump_load()
@@ -1249,4 +1348,5 @@ if __name__ == "__main__":
 #     show_ef()
 #     test_align_eig_vecs()
 #     test_calc_corr_matrix()
+    test_Srocproc_FFT_tol()
     pass

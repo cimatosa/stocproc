@@ -4,7 +4,15 @@ from __future__ import print_function, division
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
-from .class_stocproc_kle import StocProc
+#from .class_stocproc_kle import StocProc
+from .stocproc import solve_hom_fredholm
+from .stocproc import get_simpson_weights_times
+from . import method_kle
+from . import method_fft
+from . import stocproc_c
+import logging
+
+log = logging.getLogger(__name__)
 
 class ComplexInterpolatedUnivariateSpline(object):
     r"""
@@ -125,7 +133,7 @@ class _absStocProc(object):
             if self._verbose > 1:
                 print("done")        
 
-        self._z = self._calc_z(y)
+        self._z = self._calc_z(y)               
 
 class StocProc_KLE(_absStocProc):
     r"""
@@ -143,50 +151,213 @@ class StocProc_KLE(_absStocProc):
             :param seed: if not ``None`` set seed to ``seed``
             :param sig_min: eigenvalue threshold (see KLE method to generate stochastic processes)
             :param verbose: 0: no output, 1: informational output, 2: (eventually some) debug info
-            :param k: polynomial degree used for spline interpolation  
-             
+            :param k: polynomial degree used for spline interpolation             
         """
+        self.verbose = verbose
         self.ng_fac = ng_fac
         if ng_fac == 1:
             self.kle_interp = False
         else:
             self.kle_interp = True
+            
+        t, w = method_kle.get_simpson_weights_times(t_max, ng_fredholm)
+        self._one_over_sqrt_2 = 1/np.sqrt(2)
+        self._r_tau = r_tau
+        self._s = t
+        self._num_gp = len(self._s)
+        self._w = w
 
-        self.stocproc = StocProc.new_instance_with_simpson_weights(r_tau   = r_tau,
-                                                                   t_max   = t_max,
-                                                                   ng      = ng_fredholm, 
-                                                                   sig_min = sig_min,
-                                                                   seed    = seed,
-                                                                   verbose = verbose,
-                                                                   align_eig_vec = align_eig_vec)
-        
-        ng = ng_fac * (ng_fredholm - 1) + 1  
-        
-        super().__init__(t_max=t_max, num_grid_points=ng, seed=seed, verbose=verbose, k=k)
+        r = self._calc_corr_matrix(self._s, self._r_tau)            
+        # solve discrete Fredholm equation
+        # eig_val = lambda
+        # eig_vec = u(t)
+        self._eig_val, self._eig_vec = method_kle.solve_hom_fredholm(r, w, sig_min**2, verbose=self.verbose-1)
+        if align_eig_vec:
+            for i in range(self._eig_vec.shape[1]):
+                s = np.sum(self._eig_vec[:,i])
+                phase  = np.exp(1j*np.arctan2(np.real(s), np.imag(s)))
+                self._eig_vec[:,i]/= phase
+
+
+        self.__calc_missing()
+          
+        ng_fine = self.ng_fac * (self._num_gp - 1) + 1        
+        self.alpha_k = self._calc_corr_min_t_plus_t(s   = np.linspace(0, t_max, ng_fine), 
+                                                    bcf = self._r_tau) 
+        super().__init__(t_max=t_max, num_grid_points=ng_fine, seed=seed, verbose=verbose, k=k)
                 
-        # this is only needed access the underlaying stocproc KLE class
-        # in a convenient fashion 
-        self._r_tau = self.stocproc._r_tau
-        self._s = self.stocproc._s
-        self._A = self.stocproc._A
-        self.num_y = self.stocproc._num_ev
+        self.num_y = self._num_ev
+        self.verbose = verbose    
+    
+    @staticmethod
+    def _calc_corr_min_t_plus_t(s, bcf):
+        bcf_n_plus = bcf(s-s[0])
+        #    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]
+        # == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]        
+        return np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))        
+    
+    @staticmethod
+    def _calc_corr_matrix(s, bcf):
+        """calculates the matrix alpha_ij = bcf(t_i-s_j)
         
-        self.verbose = verbose
+        calls bcf only for s-s_0 and reconstructs the rest
+        """
+        n_ = len(s)
+        bcf_n = StocProc_KLE._calc_corr_min_t_plus_t(s, bcf)
+        # we want
+        # r = bcf(0) bcf(-1), bcf(-2)
+        #     bcf(1) bcf( 0), bcf(-1)
+        #     bcf(2) bcf( 1), bcf( 0)
+        r = np.empty(shape=(n_,n_), dtype = np.complex128)
+        for i in range(n_):
+            idx = n_-1-i
+            r[:,i] = bcf_n[idx:idx+n_]
+        return r
+        
+    
+        
+    def __calc_missing(self):
+        self._num_gp = len(self._s)
+        self._sqrt_eig_val = np.sqrt(self._eig_val)
+        self._num_ev = len(self._eig_val)
+        self._A = self._w.reshape(self._num_gp,1) * self._eig_vec / self._sqrt_eig_val.reshape(1, self._num_ev)
+    
+    def _x_t_mem_save(self, kahanSum=False):
+        """calculate the stochastic process (SP) for a certain class fine grids
+        
+        when the SP is setup with n grid points, which means we know the eigenfunctions
+        for the n discrete times t_i = i/(n-1)*t_max, i = 0,1,...n-1
+        with delta_t = t_max/(n-1)
+        it is efficient to calculate the interpolated process
+        for finer grids with delta_t_fine = delta_t/delta_t_fac
+        because we only need to know the bcf on the finer grid
+        """               
+        return stocproc_c.z_t(delta_t_fac = self.ng_fac,
+                              N1          = self._num_gp,
+                              alpha_k     = self.alpha_k,
+                              a_tmp       = self._a_tmp,
+                              kahanSum    = kahanSum)
+        
+    def _x_for_initial_time_grid(self):
+        r"""Get process on initial time grid
+        
+        Returns the value of the Stochastic Process for 
+        the times given to the constructor in order to discretize the Fredholm
+        equation. This is equivalent to calling :py:func:`stochastic_process_kle` with the
+        same weights :math:`w_i` and time grid points :math:`s_i`.
+        """
+        tmp = self._Y * self._sqrt_eig_val.reshape(self._num_ev,1) 
+        if self.verbose > 1:
+            print("calc process via matrix prod ...")
+        res = np.tensordot(tmp, self._eig_vec, axes=([0],[1])).flatten()
+        if self.verbose > 1:
+            print("done!")
+        
+        return res
+    
+    def _new_process(self, yi=None, seed=None):
+        r"""setup new process
+        
+        Generates a new set of independent normal random variables :math:`Y_i`
+        which correspondent to the expansion coefficients of the
+        Karhunen-Loève expansion for the stochastic process
+        
+        .. math:: X(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)
+        
+        :param seed: a seed my be given which is passed to the random number generator
+        """
+        if seed != None:
+            np.random.seed(seed)
+
+        if yi is None:
+            if self.verbose > 1:
+                print("generate samples ...")
+            self._Y = np.random.normal(scale = self._one_over_sqrt_2, size=2*self._num_ev).view(np.complex).reshape(self._num_ev,1)
+            if self.verbose > 1:
+                print("done!")
+        else:
+            self._Y = yi.reshape(self._num_ev,1)
+
+        self._a_tmp = np.tensordot(self._Y[:,0], self._A, axes=([0],[1]))            
 
     def _calc_z(self, y):
         r"""
         uses the underlaying stocproc class to generate the process (see :py:class:`StocProc` for details) 
         """
-        self.stocproc.new_process(y)
+        self._new_process(y)
         
         if self.kle_interp:
             #return self.stocproc.x_t_array(np.linspace(0, self.t_max, self.num_grid_points))
-            return self.stocproc.x_t_mem_save(delta_t_fac = self.ng_fac, kahanSum=True)
+            return self._x_t_mem_save(kahanSum=True)
         else:
-            return self.stocproc.x_for_initial_time_grid()
+            return self._x_for_initial_time_grid()
         
     def get_num_y(self):
         return self.num_y
+    
+    
+    
+class StocProc_KLE_tol(StocProc_KLE):
+    r"""
+        same as StocProc_KLE except that ng_fredholm is determined from given tolerance
+    """
+    
+    def __init__(self, tol, **kwargs):
+        self.tol = tol
+        self._auto_grid_points(**kwargs)
+        
+    def _init_StocProc_KLE_and_get_error(self, ng, **kwargs):
+        super().__init__(ng_fredholm=ng, **kwargs)
+            
+        ng_fine = self.ng_fac*(ng-1)+1
+        #t_fine = np.linspace(0, self.t_max, ng_fine)
+        
+
+        u_i_all_t =  stocproc_c.eig_func_all_interp(delta_t_fac = self.ng_fac,
+                                                    time_axis   = self._s,
+                                                    alpha_k     = self.alpha_k, 
+                                                    weights     = self._w,
+                                                    eigen_val   = self._eig_val,
+                                                    eigen_vec   = self._eig_vec)    
+
+        u_i_all_ast_s = np.conj(u_i_all_t)                  #(N_gp, N_ev)
+        num_ev = len(self._eig_val)       
+        tmp = self._eig_val.reshape(1, num_ev) * u_i_all_t  #(N_gp, N_ev)  
+        recs_bcf = np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))
+        
+        refc_bcf = np.empty(shape=(ng_fine,ng_fine), dtype = np.complex128)
+        for i in range(ng_fine):
+            idx = ng_fine-1-i
+            refc_bcf[:,i] = self.alpha_k[idx:idx+ng_fine]
+        
+        err = np.max(np.abs(recs_bcf-refc_bcf)/np.abs(refc_bcf))
+        return err
+        
+    
+    def _auto_grid_points(self, **kwargs): 
+        err = np.inf
+        c = 2
+        #exponential increase to get below error threshold
+        while err > self.tol:
+            c *= 2
+            ng = 2*c + 1
+            print("ng {}".format(ng), end='', flush=True)
+            err = self._init_StocProc_KLE_and_get_error(ng, **kwargs)
+            print(" -> err {:.3g}".format(err))
+                       
+        c_low = c // 2
+        c_high = c
+         
+        while (c_high - c_low) > 1:            
+            c = (c_low + c_high) // 2
+            ng = 2*c + 1
+            print("ng {}".format(ng), end='', flush=True)
+            err = self._init_StocProc_KLE_and_get_error(ng, **kwargs)
+            print(" -> err {:.3g}".format(err))
+            if err > self.tol:
+                c_low = c
+            else:
+                c_high = c         
         
 
 class StocProc_FFT(_absStocProc):
@@ -233,4 +404,89 @@ class StocProc_FFT(_absStocProc):
         return z
 
     def get_num_y(self):
-        return self.n_dft            
+        return self.n_dft
+    
+    
+class StocProc_FFT_tol(_absStocProc):
+    r"""
+        Simulate Stochastic Process using FFT method 
+    """
+    def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-3, intpl_tol=1e-3, 
+                 seed=None, verbose=0, k=3, negative_frequencies=False, method='simps'):
+        if not negative_frequencies: 
+            log.debug("non neg freq only")
+            # assume the spectral_density is 0 for w<0 
+            # and decays fast for large w
+            b = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = 1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = 1)
+            log.debug("upper int bound b {:.3e}".format(b))
+            b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+                                                      intgr_tol = intgr_tol, 
+                                                      intpl_tol = intpl_tol, 
+                                                      tmax      = t_max, 
+                                                      a         = 0, 
+                                                      b         = b, 
+                                                      ft_ref    = lambda tau:bcf_ref(tau)*np.pi, 
+                                                      N_max     = 2**20, 
+                                                      method    = method)
+            log.debug("required tol result in N {}".format(N))
+            a = 0
+        else:
+            # assume the spectral_density is non zero also for w<0 
+            # but decays fast for large |w|
+            b = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = 1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = 1)
+            a = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = -1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = -1)            
+            b_minus_a, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+                                                              intgr_tol = intgr_tol, 
+                                                              intpl_tol = intpl_tol, 
+                                                              tmax      = t_max, 
+                                                              a         = a, 
+                                                              b         = b, 
+                                                              ft_ref    = lambda tau:bcf_ref(tau)*np.pi, 
+                                                              N_max     = 2**20, 
+                                                              method    = method)
+            b = b*b_minus_a/(b-a)
+            a = b-b_minus_a
+        
+        
+        num_grid_points = int(np.ceil(t_max/dt))+1
+        t_max = (num_grid_points-1)*dt
+        
+        super().__init__(t_max           = t_max, 
+                         num_grid_points = num_grid_points, 
+                         seed            = seed, 
+                         verbose         = verbose,
+                         k               = k)
+        
+        self.n_dft           = N
+        omega = dx*np.arange(self.n_dft)
+        if method == 'simps':
+            self.yl = spectral_density(omega + a) * dx / np.pi
+            self.yl = method_fft.get_fourier_integral_simps_weighted_values(self.yl)
+            self.yl = np.sqrt(self.yl)
+            self.omega_min_correction = np.exp(-1j*a*self.t)   #self.t is from the parent class
+        elif method == 'midp':
+            self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
+            self.yl = np.sqrt(self.yl)
+            self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
+        else:
+            raise ValueError("unknown method '{}'".format(method))
+            
+            
+    def _calc_z(self, y): 
+        z = np.fft.fft(self.yl * y)[0:self.num_grid_points] * self.omega_min_correction
+        return z
+
+    def get_num_y(self):
+        return self.n_dft        
