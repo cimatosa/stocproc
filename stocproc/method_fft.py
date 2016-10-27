@@ -126,7 +126,7 @@ def get_N_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, N_m
     log.debug("fft integral from {:.3e} to {:.3e}".format(a, b))
     log.debug("error estimation up to tmax {:.3e}".format(t_max))
     
-    i = 10
+    i = 4
     while True:
         N = 2**i 
         tau, ft_tau = fourier_integral(integrand, a, b, N)
@@ -140,7 +140,7 @@ def get_N_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, N_m
         i += 1    
 
 def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
-    N = 64
+    N = 32
     sub_sampl = 8
     
     while True:
@@ -153,7 +153,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
         
         d = np.max(np.abs(ft_intp_n-ft_ref_n))
         if d < tol:
-            return t_max/N
+            return t_max/(N/sub_sampl)
         N*=2
 
 def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, N_max = 2**15, method='simps'):
