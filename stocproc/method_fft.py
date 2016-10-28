@@ -185,7 +185,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
             return t_max/(N/sub_sampl)
         N*=2
 
-def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, N_max = 2**15, method='simps'):
+def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, N_max = 2**20, method='simps'):
     N   = get_N_for_accurate_fourier_integral(integrand, a, b, 
                                               t_max  = tmax, 
                                               tol    = intgr_tol, 

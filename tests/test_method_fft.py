@@ -14,6 +14,11 @@ sys.path.insert(0, str(p.parent.parent))
 
 import stocproc as sp
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+
+
 def test_find_integral_boundary():
     def f(x):
         return np.exp(-(x)**2)
@@ -286,7 +291,7 @@ def test_get_N_for_accurate_fourier_integral():
     bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
     
     a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)    
-    N = sp.method_fft.get_N_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, N_max = 2**15, method='simps')
+    N = sp.method_fft.get_N_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, N_max = 2**20, method='simps')
     print(N)
 
 def test_get_dt_for_accurate_interpolation():
