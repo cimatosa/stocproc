@@ -5,8 +5,11 @@ import numpy as np
 import math
 from scipy.special import gamma as gamma_func
 import scipy.integrate as sp_int
-import matplotlib.pyplot as plt
-from math import fsum
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("matplotlib not found -> any plotting will crash")
+
 
 import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
