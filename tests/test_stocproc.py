@@ -109,7 +109,7 @@ def test_stochastic_process_KLE_correlation_function(plot=False):
     t_max = 15
     num_grid_points = 101
     num_samples = 1000
-    tol = 2.5e-2
+    tol = 3e-2
     stp = sp.StocProc_KLE(r_tau       = corr,
                           t_max       = t_max,
                           ng_fredholm = num_grid_points,
@@ -129,7 +129,7 @@ def test_stochastic_process_KLE_tol_correlation_function(plot=False):
 
     t_max = 15
     num_samples = 1000
-    tol = 2.5e-2
+    tol = 3e-2
     stp = sp.StocProc_KLE_tol(tol         = 1e-2,
                               r_tau       = corr,
                               t_max       = t_max,
@@ -150,7 +150,7 @@ def test_stochastic_process_FFT_correlation_function(plot = False):
 
     t_max = 15
     num_samples = 1000
-    tol = 2.5e-2
+    tol = 3e-2
     stp = sp.StocProc_FFT_tol(spectral_density = spectral_density,
                               t_max            = t_max,
                               bcf_ref          = corr,
@@ -201,7 +201,7 @@ def test_stocproc_dump_load():
     stp2 = pickle.loads(bin_data)
     t1 = time.time()
     dt2 = t1 - t0
-    assert dt2 / dt1 < 0.01 # loading should be way faster
+    assert dt2 / dt1 < 0.1 # loading should be way faster
 
     stp2.new_process()
     x2 = stp2()
@@ -229,6 +229,7 @@ def test_stocproc_dump_load():
 
     assert np.all(x == x2)
 
+# def test
 
 if __name__ == "__main__":
     import logging

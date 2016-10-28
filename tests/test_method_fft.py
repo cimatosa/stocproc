@@ -18,8 +18,6 @@ sys.path.insert(0, str(p.parent.parent))
 import stocproc as sp
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
-
 
 
 def test_find_integral_boundary():
@@ -192,7 +190,7 @@ def test_fourier_integral_finite_boundary():
     idx = np.where(np.logical_and(tau < 75, np.isfinite(rd)))
     tau = tau[idx]
     rd = rd[idx]
-    plt.plot(tau, rd, label='trapz N:{}'.format(N))
+    # plt.plot(tau, rd, label='trapz N:{}'.format(N))
     mrd_trapz = np.max(rd)
      
     N = 513
@@ -202,7 +200,7 @@ def test_fourier_integral_finite_boundary():
     idx = np.where(np.logical_and(tau < 75, np.isfinite(rd)))    
     tau = tau[idx]
     rd = rd[idx]
-    plt.plot(tau, rd, label='simps N:{}'.format(N))
+    # plt.plot(tau, rd, label='simps N:{}'.format(N))
     mrd_simps = np.max(rd)    
     
     assert mrd_simps < mrd_trapz, "mrd_simps ({:.3e}) >= mrd_trapz ({:.3e})".format(mrd_simps, mrd_trapz)
@@ -242,9 +240,10 @@ def test_fourier_integral_infinite_boundary():
 #     sys.exit()
     
     a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)
-    print(a,b)
 
-    for N in [2**16, 2**18, 2**20]:
+    errs = [8e-5, 1e-5, 1.3e-6]
+
+    for i, N in enumerate([2**16, 2**18, 2**20]):
     
         tau, bcf_n = sp.method_fft.fourier_integral_midpoint(intg, a, b, N=N)
         bcf_ref_n = bcf_ref(tau)
@@ -255,8 +254,8 @@ def test_fourier_integral_infinite_boundary():
         bcf_n = bcf_n[idx]
         bcf_ref_n = bcf_ref_n[idx]
         
-        rd_trapz = np.abs(bcf_ref_n-bcf_n)/np.abs(bcf_ref_n)
-        p, = plt.plot(tau, rd_trapz, label="trapz N {}".format(N))
+        rd_mp = np.abs(bcf_ref_n-bcf_n)/np.abs(bcf_ref_n)
+        # p, = plt.plot(tau, rd_mp, label="trapz N {}".format(N))
         
         
         tau, bcf_n = sp.method_fft.fourier_integral_simps(intg, a, b=b, N=N-1)
@@ -268,23 +267,22 @@ def test_fourier_integral_infinite_boundary():
         bcf_n = bcf_n[idx]
         bcf_ref_n = bcf_ref_n[idx]
          
-        rd = np.abs(bcf_ref_n-bcf_n)/np.abs(bcf_ref_n)
-        plt.plot(tau, rd, label="simps N {}".format(N), color=p.get_color(), ls='--')
+        rd_sm = np.abs(bcf_ref_n-bcf_n)/np.abs(bcf_ref_n)
+ #       plt.plot(tau, rd_sm, label="simps N {}".format(N), color=p.get_color(), ls='--')
         
         t_ = 3
-        print(a,b)
-        
+
         x_simps, dx = np.linspace(a,b,N-1, endpoint=True, retstep=True)
         I = sp_int.simps(intg(x_simps)*np.exp(-1j*x_simps*t_), dx=dx)
         err = np.abs(I-bcf_ref(t_))/np.abs(bcf_ref(t_))
-        plt.plot(t_, err, marker='o', color='g')
-  
-    assert np.max(rd_trapz) < 5*1e-4, "max rd_trapz = {:.3e}".format(np.max(rd_trapz))
-    
-#     plt.legend(loc='lower right')
-#     plt.grid()    
-#     plt.yscale('log')
-#     plt.show()
+        assert np.max(rd_mp) < errs[i]
+        assert np.max(rd_sm) < errs[i]
+#        plt.plot(t_, err, marker='o', color='g')
+
+    # plt.legend(loc='lower right')
+    # plt.grid()
+    # plt.yscale('log')
+    # plt.show()
     
 def test_get_N_for_accurate_fourier_integral():
     s = 0.5
@@ -340,8 +338,9 @@ def test_calc_abN():
     
     
 if __name__ == "__main__":
-    test_find_integral_boundary()
-    test_fourier_integral_finite_boundary()
+    logging.basicConfig(level=logging.INFO)
+    # test_find_integral_boundary()
+    # test_fourier_integral_finite_boundary()
     test_fourier_integral_infinite_boundary()
     test_get_N_for_accurate_fourier_integral()
     test_get_dt_for_accurate_interpolation()
