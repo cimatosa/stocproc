@@ -71,7 +71,9 @@ def test_find_integral_boundary():
 def fourier_integral_trapz(integrand, a, b, N):
     """
         approximates int_a^b dx integrand(x) by the riemann sum with N terms
-        
+
+        this function is here and not in method_fft because it has almost no
+        advantage over the modpoint method. so only for testing purposes.
     """
     yl = integrand(np.linspace(a, b, N+1, endpoint=True))
     yl[0] = yl[0]/2
@@ -88,8 +90,7 @@ def fourier_integral_trapz(integrand, a, b, N):
 def fourier_integral_simple_test(integrand, a, b, N):
     delta_x = (b-a)/N
     delta_k = 2*np.pi/(b-a)
-    
-    #x = np.arange(N)*delta_x+a
+
     x = np.linspace(a, b, N, endpoint = False) + delta_x/2
     k = np.arange(N//2+1)*delta_k
     
@@ -111,7 +112,6 @@ def fourier_integral_trapz_simple_test(integrand, a, b, N):
     delta_x = (b-a)/N
     delta_k = 2*np.pi*N/(b-a)/(N+1)
     
-    #x = np.arange(N)*delta_x+a
     x = np.linspace(a, b, N+1, endpoint = True)
     k = np.arange((N+1)//2+1)*delta_k
        
@@ -240,8 +240,7 @@ def test_fourier_integral_infinite_boundary():
     
     a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)
     print(a,b)
-    N = 2**18
-    
+
     for N in [2**16, 2**18, 2**20]:
     
         tau, bcf_n = sp.method_fft.fourier_integral_midpoint(intg, a, b, N=N)
@@ -290,7 +289,7 @@ def test_get_N_for_accurate_fourier_integral():
     intg = lambda x: osd(x, s, wc)
     bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
     
-    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)    
+    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)
     N = sp.method_fft.get_N_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, N_max = 2**20, method='simps')
     print(N)
 
@@ -303,7 +302,7 @@ def test_get_dt_for_accurate_interpolation():
     print(dt)
     
 def test_sclicing():
-    yl = np.ones(10)
+    yl = np.ones(10, dtype=int)
     yl = sp.method_fft.get_fourier_integral_simps_weighted_values(yl)
     assert yl[0] == 2/6
     assert yl[1] == 8/6
@@ -324,8 +323,7 @@ def test_calc_abN():
     
     tol = 1e-3
     tmax=40
-    method='simps'
-    
+
     a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)    
     ab, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand = intg, 
                                                   intgr_tol = tol, 

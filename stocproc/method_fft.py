@@ -1,19 +1,11 @@
-
+from __future__ import division, print_function
 from scipy.optimize import brentq
-from scipy.interpolate import InterpolatedUnivariateSpline
 from numpy.fft import rfft as np_rfft
 import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-class ComplexInterpolatedUnivariateSpline(object):
-    def __init__(self, x, y, k=3):
-        self.k = k
-        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y), k=k)
-        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y), k=k)
-        
-    def __call__(self, t):
-        return self.re_spline(t) + 1j*self.im_spline(t)
+from .tools import ComplexInterpolatedUnivariateSpline
 
 def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     """
@@ -30,6 +22,8 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
             1/|x-ref_val| > max_val
         this assured that the function does not search forever
     """
+    _max_num_iteration = 100
+    _i = 0
     assert x0 != 0
     if integrand(ref_val) <= tol:
         raise ValueError("the integrand at ref_val needs to be greater that tol")
@@ -48,6 +42,9 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
                 raise RuntimeError("|x-ref_val| > max_val was reached")
             x *= 2
             I = integrand(x + ref_val)
+            _i += 1
+            if _i > _max_num_iteration:
+                raise RuntimeError("iteration limit reached")
 
         log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol".format(x, I))
         a = brentq(lambda x: integrand(x)-tol, x+ref_val, x0+ref_val)
@@ -63,6 +60,9 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
                 raise RuntimeError("1/|x-ref_val| > max_val was reached")
             x /= 2
             I = integrand(x+ref_val)
+            _i += 1
+            if _i > _max_num_iteration:
+                raise RuntimeError("iteration limit reached")
 
         log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol".format(x, I))
         log.debug("search for root in interval [{:.3e},{:.3e}]".format(x0+ref_val, x+ref_val))

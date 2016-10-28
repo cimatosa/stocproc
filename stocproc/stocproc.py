@@ -1,549 +1,382 @@
 # -*- coding: utf8 -*-
-#
-#  Copyright 2014 Richard Hartmann
-#  
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#  
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#  
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-"""
-**Stochastic Process Module**
- 
-This module contains various methods to generate stochastic processes for a 
-given correlation function. There are two different kinds of generators. The one kind
-allows to generate the process for a given time grid, where as the other one generates a
-time continuous process in such a way that it allows to "correctly" interpolate between the
-solutions of the time discrete version.
- 
-    **time discrete methods:**
-        :py:func:`stochastic_process_kle` 
-        Simulate Stochastic Process using Karhunen-Loève expansion
-        
-            This method still needs explicit integrations weights for the 
-            numeric integrations. For convenience you can use
-             
-                :py:func:`stochastic_process_mid_point_weight` simplest approach, for
-                test reasons only, uses :py:func:`get_mid_point_weights` 
-                to calculate the weights
-                 
-                :py:func:`stochastic_process_trapezoidal_weight` little more sophisticated,
-                uses :py:func:`get_trapezoidal_weights_times` to calculate the weights
-                 
-                :py:func:`stochastic_process_simpson_weight`,
-                **so far for general use**, uses :py:func:`get_simpson_weights_times` 
-                to calculate the weights
-     
-         
-        :py:func:`stochastic_process_fft`
-        Simulate Stochastic Process using FFT method
-         
-    **time continuous methods:**
-        :py:class:`StocProc` 
-        Simulate Stochastic Process using Karhunen-Loève expansion and allows
-        for correct interpolation. This class still needs explicit integrations 
-        weights for the numeric integrations (use :py:func:`get_trapezoidal_weights_times`
-        for general purposes).
-         
-        .. todo:: implement convenient classes with fixed weights
-"""
 from __future__ import print_function, division
 
-from .stocproc_c import auto_correlation as auto_correlation_c
-
-import sys
-import os
-from warnings import warn
-sys.path.append(os.path.dirname(__file__))
 import numpy as np
-from scipy.linalg import eigh as scipy_eigh
-from collections import namedtuple
+import time
 
-stocproc_key_type = namedtuple(typename    = 'stocproc_key_type', 
-                               field_names = ['bcf', 't_max', 'ng', 'tol', 'cubatur_type', 'sig_min', 'ng_fac'] )
- 
-    
-def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
-    r"""Solves the discrete homogeneous Fredholm equation of the second kind
-    
-    .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)
-    
-    Quadrature approximation of the integral gives a discrete representation of the
-    basis functions and leads to a regular eigenvalue problem.
-    
-    .. math:: \sum_i w_i R(t_j-s_i) u(s_i) = \lambda u(t_j) \equiv \mathrm{diag(w_i)} \cdot R \cdot u = \lambda u 
-    
-    Note: If :math:`t_i = s_i \forall i` the matrix :math:`R(t_j-s_i)` is 
-    a hermitian matrix. In order to preserve hermiticity for arbitrary :math:`w_i` 
-    one defines the diagonal matrix :math:`D = \mathrm{diag(\sqrt{w_i})}` 
-    with leads to the equivalent expression:
-    
-    .. math:: D \cdot R \cdot D \cdot D \cdot u = \lambda D \cdot u \equiv \tilde R \tilde u = \lambda \tilde u
-    
-    where :math:`\tilde R` is hermitian and :math:`u = D^{-1}\tilde u`    
-    
-    Setting :math:`t_i = s_i` and due to the definition of the correlation function the 
-    matrix :math:`r_{ij} = R(t_i, s_j)` is hermitian.
-    
-    :param r: correlation matrix :math:`R(t_j-s_i)`
-    :param w: integrations weights :math:`w_i` 
-        (they have to correspond to the discrete time :math:`t_i`)
-    :param eig_val_min: discards all eigenvalues and eigenvectos with
-         :math:`\lambda_i < \mathtt{eig\_val\_min} / \mathrm{max}(\lambda)`
-         
-    :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, ordered in decreasing order)
-    """
-    
-    # weighted matrix r due to quadrature weights
-    if verbose > 0:
-        print("build matrix ...")
-#     d = np.diag(np.sqrt(w))
-#     r = np.dot(d, np.dot(r, d))
-    n = len(w)
-    w_sqrt = np.sqrt(w)
-    r = w_sqrt.reshape(n,1) * r * w_sqrt.reshape(1,n)
-    
-    if verbose > 0:
-        print("solve eigenvalue equation ...")
-    eig_val, eig_vec = scipy_eigh(r, overwrite_a=True)   # eig_vals in ascending
+from . import method_kle
+from . import method_fft
+from . import stocproc_c
+from .tools import ComplexInterpolatedUnivariateSpline
 
-    # use only eigenvalues larger than sig_min**2
-    
-    min_idx = sum(eig_val < eig_val_min)
-     
-    eig_val = eig_val[min_idx:][::-1]
-    eig_vec = eig_vec[:, min_idx:][:, ::-1]
-    
-    num_of_functions = len(eig_val)
-    if verbose > 0:
-        print("use {} / {} eigenfunctions (sig_min = {})".format(num_of_functions, len(w), np.sqrt(eig_val_min)))
-    
-    
-    # inverse scale of the eigenvectors
-#     d_inverse = np.diag(1/np.sqrt(w))
-#     eig_vec = np.dot(d_inverse, eig_vec)
-    eig_vec = np.reshape(1/w_sqrt, (n,1)) * eig_vec
+import logging
+log = logging.getLogger(__name__)
 
-    if verbose > 0:
-        print("done!")
+class _absStocProc(object):
+    r"""
+    Abstract base class to stochastic process interface
     
-    
-    return eig_val, eig_vec
-
-def stochastic_process_kle(r_tau, t, w, num_samples, seed = None, sig_min = 1e-4, verbose=1):
-    r"""Simulate Stochastic Process using Karhunen-Loève expansion
-    
-    Simulate :math:`N_\mathrm{S}` wide-sense stationary stochastic processes 
-    with given correlation :math:`R(\tau) = \langle X(t) X^\ast(s) \rangle = R (t-s)`.
-     
-    Expanding :math:`X(t)` in a Karhunen–Loève manner 
-    
-    .. math:: X(t) = \sum_i X_i u_i(t)
-    
-    with
-    
-    .. math:: 
-        \langle X_i X^\ast_j \rangle = \lambda_i \delta_{i,j} \qquad \langle u_i | u_j \rangle = 
-        \int_0^{t_\mathrm{max}} u_i(t) u^\ast_i(t) dt = \delta_{i,j} 
-    
-    where :math:`\lambda_i` and :math:`u_i` are solutions of the following 
-    homogeneous Fredholm equation of the second kind.
-    
-    .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)
-    
-    Discrete solutions are provided by :py:func:`solve_hom_fredholm`.
-    With these solutions and expressing the random variables :math:`X_i` through
-    independent normal distributed random variables :math:`Y_i` with variance one
-    the Stochastic Process at discrete times :math:`t_j` can be calculates as follows
-    
-    .. math:: X(t_j) = \sum_i Y_i \sqrt{\lambda_i} u_i(t_j)
-    
-    To calculate the Stochastic Process for abitrary times 
-    :math:`t \in [0,t_\mathrm{max}]` use :py:class:`StocProc`.
-    
-    References:
-        [1] Kobayashi, H., Mark, B.L., Turin, W.,
-        2011. Probability, Random Processes, and Statistical Analysis,
-        Cambridge University Press, Cambridge. (pp. 363)
-    
-        [2] Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P., 
-        2007. Numerical Recipes 3rd Edition: The Art of Scientific Computing, 
-        Auflage: 3. ed. Cambridge University Press, Cambridge, UK ; New York. (pp. 989)
-
-    :param r_tau: function object of the one parameter correlation function :math:`R(\tau) = R (t-s) = \langle X(t) X^\ast(s) \rangle`
-    :param t: list of grid points for the time axis
-    :param w: appropriate weights to integrate along the time axis using the grid points given by :py:obj:`t`
-    :param num_samples: number of stochastic process to sample
-    :param seed: seed for the random number generator used
-    :param sig_min: minimal standard deviation :math:`\sigma_i` the random variable :math:`X_i` 
-        viewed as coefficient for the base function :math:`u_i(t)` must have to be considered as 
-        significant for the Karhunen-Loève expansion (note: :math:`\sigma_i` results from the 
-        square root of the eigenvalue :math:`\lambda_i`)
+    general work flow:
+        - Specify the time axis of interest [0, t_max] and it resolution (number of grid points), :math:`t_i = i \frac{t_max}{N_t-1}.  
+        - To evaluate the stochastic process at these points, a mapping from :math:`N_z` normal distributed 
+          random complex numbers with :math:`\langle y_i y_j^\ast \rangle = 2 \delta_{ij}`
+          to the stochastic process :math:`z_{t_i}` is needed and depends on the implemented method (:py:func:`_calc_z').
+        - A new process should be generated by calling :py:func:`new_process'.
+        - When the __call__ method is invoked the results will be interpolated between the :math:`z_t_i`.
         
-    :return: returns a 2D array of the shape (num_samples, len(t)). Each row of the returned array contains one sample of the
-        stochastic process.
-    """
-    
-    if verbose > 0:
-        print("__ stochastic_process __")
-
-    if seed != None:
-        np.random.seed(seed)
-    
-    t_row = t
-    t_col = t_row[:,np.newaxis]
-    
-    # correlation matrix
-    # r_tau(t-s) -> integral/sum over s -> s must be row in EV equation
-    r_old = r_tau(t_col-t_row)
-    
-    n_ = len(t)
-    bcf_n_plus = r_tau(t-t[0])
-    #    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]
-    # == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]        
-    bcf_n = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
-    # we want
-    # r = bcf(0) bcf(-1), bcf(-2)
-    #     bcf(1) bcf( 0), bcf(-1)
-    #     bcf(2) bcf( 1), bcf( 0)
-    r = np.empty(shape=(n_,n_), dtype = np.complex128)
-    for i in range(n_):
-        idx = n_-1-i
-        r[:,i] = bcf_n[idx:idx+n_]
-        
-    assert np.max(np.abs(r_old - r)) < 1e-14
-
-    # solve discrete Fredholm equation
-    # eig_val = lambda
-    # eig_vec = u(t)
-    eig_val, eig_vec = solve_hom_fredholm(r, w, sig_min**2)
-    num_of_functions = len(eig_val)
-    # generate samples
-    sig = np.sqrt(eig_val).reshape(1, num_of_functions)               # variance of the random quantities of the  Karhunen-Loève expansion
-
-    if verbose > 0:
-        print("generate samples ...")
-    x = np.random.normal(scale=1/np.sqrt(2), size=(2*num_samples*num_of_functions)).view(np.complex).reshape(num_of_functions, num_samples).T
-                                                                      # random quantities all aligned for num_samples samples
-    x_t_array = np.tensordot(x*sig, eig_vec, axes=([1],[1]))              # multiplication with the eigenfunctions == base of Karhunen-Loève expansion
-    
-    if verbose > 0:
-        print("done!")
-    
-    return x_t_array
-
-def _stochastic_process_alternative_samples(num_samples, num_of_functions, t, sig, eig_vec, seed):
-    r"""used for debug and test reasons
-    
-    generate each sample independently in a for loop
-    
-    should be slower than using numpy's array operations to do it all at once  
-    """
-    np.random.seed(seed)
-    x_t_array = np.empty(shape=(num_samples, len(t)), dtype = complex)
-    for i in range(num_samples):
-        x = np.random.normal(size=num_of_functions) * sig
-        x_t_array[i,:] = np.dot(eig_vec, x.T)
-    return x_t_array
-
-def get_mid_point_weights(t_max, num_grid_points):
-    r"""Returns the time gridpoints and wiehgts for numeric integration via **mid point rule**.
-        
-    The idea is to use :math:`N_\mathrm{GP}` time grid points located in the middle
-    each of the :math:`N_\mathrm{GP}` equally distributed subintervals of :math:`[0, t_\mathrm{max}]`.
-    
-    .. math:: t_i = \left(i + \frac{1}{2}\right)\frac{t_\mathrm{max}}{N_\mathrm{GP}} \qquad i = 0,1, ... N_\mathrm{GP} - 1 
-
-    The corresponding trivial weights for integration are
-    
-    .. math:: w_i = \Delta t = \frac{t_\mathrm{max}}{N_\mathrm{GP}} \qquad i = 0,1, ... N_\mathrm{GP} - 1
-    
-    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`
-        (note: this would corespond to an integration from :math:`0-\Delta t / 2`
-        to :math:`t_\mathrm{max}+\Delta t /2`)  
-    :param num_grid_points: number of 
-    """
-    # generate mid points
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
-    # equal weights for grid points
-    w = np.ones(num_grid_points)*delta_t
-    return t, w
-
-def stochastic_process_mid_point_weight(r_tau, t_max, num_grid_points, num_samples, seed = None, sig_min = 1e-4):
-    r"""Simulate Stochastic Process using Karhunen-Loève expansion with **mid point rule** for integration
-        
-    The idea is to use :math:`N_\mathrm{GP}` time grid points located in the middle
-    each of the :math:`N_\mathrm{GP}` equally distributed subintervals of :math:`[0, t_\mathrm{max}]`.
-    
-    .. math:: t_i = \left(i + \frac{1}{2}\right)\frac{t_\mathrm{max}}{N_\mathrm{GP}} \qquad i = 0,1, ... N_\mathrm{GP} - 1 
-
-    The corresponding trivial weights for integration are
-    
-    .. math:: w_i = \Delta t = \frac{t_\mathrm{max}}{N_\mathrm{GP}} \qquad i = 0,1, ... N_\mathrm{GP} - 1
-    
-    Since the autocorrelation function depends solely on the time difference :math:`\tau` the static shift for :math:`t_i` does not
-    alter matrix used to solve the Fredholm equation. So for the reason of convenience the time grid points are not centered at
-    the middle of the intervals, but run from 0 to :math:`t_\mathrm{max}` equally distributed.    
-    
-    Calling :py:func:`stochastic_process` with these calculated :math:`t_i, w_i` gives the corresponding processes.        
-    
-    :param t_max: right end of the considered time interval :math:`[0,t_\mathrm{max}]`
-    :param num_grid_points: :math:`N_\mathrm{GP}` number of time grid points used for the discretization of the
-        integral of the Fredholm integral (see :py:func:`stochastic_process`)
-    
-    :return: returns the tuple (set of stochastic processes, time grid points) 
-        
-    See :py:func:`stochastic_process` for other parameters
-    """
-    t,w = get_trapezoidal_weights_times(t_max, num_grid_points)    
-    return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
-    
-def get_trapezoidal_weights_times(t_max, num_grid_points):
-    # generate mid points
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
-    # equal weights for grid points
-    w = np.ones(num_grid_points)*delta_t
-    w[0] /= 2
-    w[-1] /= 2
-    return t, w
-
-def stochastic_process_trapezoidal_weight(r_tau, t_max, num_grid_points, num_samples, seed = None, sig_min = 1e-4):
-    r"""Simulate Stochastic Process using Karhunen-Loève expansion with **trapezoidal rule** for integration
-       
-    .. math:: t_i = i \frac{t_\mathrm{max}}{N_\mathrm{GP}} = i \Delta t \qquad i = 0,1, ... N_\mathrm{GP} 
-
-    The corresponding weights for integration are
-    
-    .. math:: w_0 = w_{N_\mathrm{GP}} = \frac{\Delta t}{2}, \qquad w_i = \Delta t = \qquad i = 1, ... N_\mathrm{GP} - 1
-    
-    Calling :py:func:`stochastic_process` with these calculated :math:`t_i, w_i` gives the corresponding processes.        
-    
-    :param t_max: right end of the considered time interval :math:`[0,t_\mathrm{max}]`
-    :param num_grid_points: :math:`N_\mathrm{GP}` number of time grid points used for the discretization of the
-        integral of the Fredholm integral (see :py:func:`stochastic_process`)
-    
-    :return: returns the tuple (set of stochastic processes, time grid points) 
-        
-    See :py:func:`stochastic_process` for other parameters
-    """ 
-    t, w = get_trapezoidal_weights_times(t_max, num_grid_points)    
-    return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
-
-def get_simpson_weights_times(t_max, num_grid_points):
-    if num_grid_points % 2 == 0:
-        raise RuntimeError("simpson weight need odd number of grid points, but git ng={}".format(num_grid_points))
-    # generate mid points
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
-    # equal weights for grid points
-    w = np.empty(num_grid_points, dtype=np.float64)
-    w[0::2] = 2/3*delta_t
-    w[1::2] = 4/3*delta_t
-    w[0]    = 1/3*delta_t
-    w[-1]   = 1/3*delta_t
-    return t, w
-
-def stochastic_process_simpson_weight(r_tau, t_max, num_grid_points, num_samples, seed = None, sig_min = 1e-4):
-    r"""Simulate Stochastic Process using Karhunen-Loève expansion with **simpson rule** for integration
-    
-    Calling :py:func:`stochastic_process` with these calculated :math:`t_i, w_i` gives the corresponding processes.        
-    
-    :param t_max: right end of the considered time interval :math:`[0,t_\mathrm{max}]`
-    :param num_grid_points: :math:`N_\mathrm{GP}` number of time grid points (need to be odd) used for the discretization of the
-        integral of the Fredholm integral (see :py:func:`stochastic_process`)
-    
-    :return: returns the tuple (set of stochastic processes, time grid points) 
-        
-    See :py:func:`stochastic_process` for other parameters
-    """ 
-    t, w = get_simpson_weights_times(t_max, num_grid_points)    
-    return stochastic_process_kle(r_tau, t, w, num_samples, seed, sig_min), t
-
-def _FT(f, x_max, N, x_min=0):
-    """
-        calculate g(y) = int_x_min^x_max dx f(x) exp(-1j x y) using fft
-        
-        when setting x' = x - x_min we get
-        
-        g(y) = int_0^x_max-x_min dx' f(x'+x_min) exp(-1j x' y) exp(-1j x_min y) = exp(-1j x_min y) * int_0^x_max-x_min dx' f(x'+x_min) exp(-1j x' y)
-        
-        and in a discrete fashion with N gp such that x'_i = dx * i  and dx = (N-1) / (x_max - x_min)
-        further we find dy = 2pi / N / dx so we get y_k = dy * k
-        
-        g_k = exp(-1j x_min y_k) * sum_0^N dx f(x_i + x_min) exp(-1j dx * i dy * k)
-        
-        using dx * dk = 2 pi / N we end up with
-        
-        g_k = exp(-1j x_min y_k) * dx * sum_0^N f(x_i + x_min) exp(-1j 2 pi i k / N)
-            = exp(-1j x_min y_k) * dx * FFT( f(x_i + x_min) )
-    """
-    
-    x, dx = np.linspace(x_min, x_max, N, retstep=True)
-    f_i = f(x)
-    dy = 2*np.pi / dx / N
-    y_k = np.linspace(0, dy*(N-1), N)    
-    return np.exp(-1j * x_min * y_k) * dx * np.fft.fft(f_i), y_k    
-   
-
-def stochastic_process_fft(spectral_density, t_max, num_grid_points, num_samples, seed = None, verbose=1, omega_min=0):
-    r"""Simulate Stochastic Process using FFT method
-    
-    This method works only for correlations functions of the form
-    
-    .. math:: \alpha(\tau) = \int_0^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
-    
-    where :math:`J(\omega)` is a real non negative spectral density. 
-    Then the intrgal can be approximated by the Riemann sum
-    
-    .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} \Delta \omega \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \Delta \omega \tau}
-    
-    For a process defined by
-    
-    .. math:: X(t) = \sum_{k=0}^{N-1} \sqrt{\frac{\Delta \omega J(\omega_k)}{\pi}} X_k \exp^{-\mathrm{i}\omega_k t}
-    
-    with compelx random variables :math:`X_k` such that :math:`\langle X_k \rangle = 0`, 
-    :math:`\langle X_k X_{k'}\rangle = 0` and :math:`\langle X_k X^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}` it is easy to see
-    that it fullfills the Riemann approximated correlation function.
-
-    .. math:: 
-        \begin{align}
-            \langle X(t) X^\ast(s) \rangle = & \sum_{k,k'} \frac{\Delta \omega}{\pi} \sqrt{J(\omega_k)J(\omega_{k'})} \langle X_k X_{k'}\rangle \exp^{-\mathrm{i}\omega_k (t-s)} \\
-                                           = & \sum_{k}    \frac{\Delta \omega}{\pi} J(\omega_k) \exp^{-\mathrm{i}\omega_k (t-s)} \\
-                                           = & \alpha(t-s)
-        \end{align}
-    
-    In order to use the sheme of the Discrete Fourier Transfrom (DFT) to calculate :math:`X(t)`
-    :math:`t` has to be disrcetized as well. Some trivial rewriting leads
-    
-    .. math:: X(t_l) = \sum_{k=0}^{N-1} \sqrt{\frac{\Delta \omega J(\omega_k)}{\pi}} X_k e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
-    
-    For the DFT sheme to be applicable :math:`\Delta t` has to be chosen such that
-    
-    .. math:: 1 = \frac{\Delta \omega \Delta t}{2 \pi} N
-    
-    holds. Since :math:`J(\omega)` is real it follows that :math:`X(t_l) = X^\ast(t_{N-l})`.
-    For that reason the stochastic process has only :math:`(N+1)/2` (odd :math:`N`) and
-    :math:`(N/2 + 1)` (even :math:`N`) independent time grid points.
-    
-    Looking now from the other side, demanding that the process should run from 
-    :math:`0` to :math:`t_\mathrm{max}` with :math:`n` equally distributed time grid points
-    :math:`N = 2n-1` points for the DFT have to be considered. This also sets the time
-    increment :math:`\Delta t = t_\mathrm{max} / (n-1)`.
-    
-    With that the frequency increment is determined by
-    
-    .. math:: \Delta \omega = \frac{2 \pi}{\Delta t N} 
-
-    Implementing the above noted considerations it follows
-
-    .. math:: X(l \Delta t) = DFT\left(\sqrt{\Delta \omega J(k \Delta \omega)} / \pi \times X_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
-
-    Note: since :math:`\omega_\mathrm{max} = N \Delta \omega = 2 \pi / \Delta t = 2 \pi (n-1) / t_\mathrm{max}`
-    
-    :param spectral_density: the spectral density :math:`J(\omega)` as callable function object
-    :param t_max: :math:`[0,t_\mathrm{max}]` is the interval for which the process will be calculated
-    :param num_grid_points: number :math:`n` of euqally distributed times :math:`t_k` on the intervall :math:`[0,t_\mathrm{max}]`
-        for which the process will be evaluated
-    :param num_samples: number of independent processes to be returned
-    :param seed: seed passed to the random number generator used
-    
-    :return: returns the tuple (2D array of the set of stochastic processes, 
-        1D array of time grid points). Each row of the stochastic process 
-        array contains one sample of the stochastic process.
-    """
-    
-    if verbose > 0:
-        print("__ stochastic_process_fft __")
-    
-    n_dft = num_grid_points * 2 - 1
-    delta_t = t_max / (num_grid_points-1)
-    delta_omega = 2 * np.pi / (delta_t * n_dft)
-    
-    t = np.linspace(0, t_max, num_grid_points)
-    omega_min_correction = np.exp(-1j * omega_min * t).reshape(1,-1)
       
-    #omega axis
-    omega = delta_omega*np.arange(n_dft)
-    #reshape for multiplication with matrix xi
-    sqrt_spectral_density = np.sqrt(spectral_density(omega + omega_min)).reshape((1, n_dft))
-    if seed != None:
-        np.random.seed(seed)
-    if verbose > 0:
-        print("  omega_max  : {:.2}".format(delta_omega * n_dft))
-        print("  delta_omega: {:.2}".format(delta_omega))
-        print("generate samples ...")
-    #random complex normal samples
-    xi = (np.random.normal(scale=1/np.sqrt(2), size = (2*num_samples*n_dft)).view(np.complex)).reshape(num_samples, n_dft)
-    #each row contain a different integrand
-    weighted_integrand = sqrt_spectral_density * np.sqrt(delta_omega / np.pi) * xi 
-    #compute integral using fft routine
-    z_ast = np.fft.fft(weighted_integrand, axis = 1)[:, 0:num_grid_points] * omega_min_correction
-    #corresponding time axis
-    
-    if verbose > 0:
-        print("done!")
-    return z_ast, t
-    
-    
-def auto_correlation_numpy(x, verbose=1):
-    warn("use 'auto_correlation' instead", DeprecationWarning)
-    
-    # handle type error
-    if x.ndim != 2:
-        raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
-    
-    num_samples, num_time_points = x.shape
-    
-    x_prime = x.reshape(num_samples, 1, num_time_points)
-    x       = x.reshape(num_samples, num_time_points, 1)
-    
-    if verbose > 0:
-        print("calculate auto correlation function ...")
-    res = np.mean(x * np.conj(x_prime), axis = 0), np.mean(x * x_prime, axis = 0)
-    if verbose > 0:
-        print("done!")
-        
-    return res
+    """
+    def __init__(self, t_max, num_grid_points, seed=None, k=3):
+        r"""
+            :param t_max: specify time axis as [0, t_max]
+            :param num_grid_points: number of equidistant times on that axis
+            :param seed: if not ``None`` set seed to ``seed``
+            :param verbose: 0: no output, 1: informational output, 2: (eventually some) debug info
+            :param k: polynomial degree used for spline interpolation  
+        """
+        self.t_max = t_max
+        self.num_grid_points = num_grid_points
+        self.t = np.linspace(0, t_max, num_grid_points)
+        self._z = None
+        self._interpolator = None
+        self._k = k
+        self._seed = seed
+        if seed is not None:
+            np.random.seed(seed)
+        self._one_over_sqrt_2 = 1/np.sqrt(2)
+        self._proc_cnt = 0
+        log.debug("init StocProc with t_max {} and {} grid points".format(t_max, num_grid_points))
 
-def auto_correlation(x, verbose=1):
-    r"""Computes the auto correlation function for a set of wide-sense stationary stochastic processes
+    def __call__(self, t=None):
+        r"""
+        :param t: time to evaluate the stochastic process as, float of array of floats
+        evaluates the stochastic process via spline interpolation between the discrete process 
+        """
+        if self._z is None:
+            raise RuntimeError("StocProc_FFT has NO random data, call 'new_process' to generate a new random process")
+
+        if t is None:
+            return self._z
+        else:
+            if self._interpolator is None:
+                t0 = time.time()
+                self._interpolator = ComplexInterpolatedUnivariateSpline(self.t, self._z, k=self._k)
+                log.debug("created interpolator [{:.2e}s]".format(time.time() - t0))
+            return self._interpolator(t)
     
-    Computes the auto correlation function for the given set :math:`{X_i(t)}` of stochastic processes:
+    def _calc_z(self, y):
+        r"""
+        maps the normal distributed complex valued random variables y to the stochastic process
+        
+        :return: the stochastic process, array of complex numbers 
+        """
+        pass
     
-    .. math:: \alpha(s, t) = \langle X(t)X^\ast(s) \rangle
+    def get_num_y(self):
+        r"""
+        :return: number of complex random variables needed to calculate the stochastic process 
+        """
+        pass        
     
-    For wide-sense stationary processes :math:`\alpha` is independent of :math:`s`.
+    def get_time(self):
+        r"""
+        :return: time axis
+        """
+        return self.t
     
-    :param x: 2D array of the shape (num_samples, num_time_points) containing the set of stochastic processes where each row represents one process
+    def get_z(self):
+        r"""
+        use :py:func:`new_process` to generate a new process
+        :return: the current process 
+        """
+        return self._z
     
-    :return: 2D array containing the correlation function as function of :math:`s, t` 
+    def new_process(self, y=None, seed=None):
+        r"""
+        generate a new process by evaluating :py:func:`_calc_z'
+        
+        When ``y`` is given use these random numbers as input for :py:func:`_calc_z`
+        otherwise generate a new set of random numbers.
+        
+        :param y: independent normal distributed complex valued random variables with :math:`\sig_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}
+        :param seed: if not ``None`` set seed to ``seed`` before generating samples 
+        """
+        t0 = time.time()
+        self._interpolator = None
+        self._proc_cnt += 1
+        if seed != None:
+            log.info("use fixed seed ({})for new process".format(seed))
+            np.random.seed(seed)
+        if y is None:
+            #random complex normal samples
+            y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
+        self._z = self._calc_z(y)
+        log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
+
+class StocProc_KLE(_absStocProc):
+    r"""
+    class to simulate stochastic processes using KLE method
+        - Solve fredholm equation on grid with ``ng_fredholm nodes`` (trapezoidal_weights).
+          If case ``ng_fredholm`` is ``None`` set ``ng_fredholm = num_grid_points``. In general it should
+          hold ``ng_fredholm < num_grid_points`` and ``num_grid_points = 10*ng_fredholm`` might be a good ratio. 
+        - Calculate discrete stochastic process (using interpolation solution of fredholm equation) with num_grid_points nodes
+        - invoke spline interpolator when calling 
+    """
+    def __init__(self, r_tau, t_max, ng_fredholm, ng_fac=4, seed=None, sig_min=1e-5, k=3, align_eig_vec=False):
+        r"""
+            :param r_tau: auto correlation function of the stochastic process
+            :param t_max: specify time axis as [0, t_max]
+            :param seed: if not ``None`` set seed to ``seed``
+            :param sig_min: eigenvalue threshold (see KLE method to generate stochastic processes)
+            :param verbose: 0: no output, 1: informational output, 2: (eventually some) debug info
+            :param k: polynomial degree used for spline interpolation             
+        """
+
+        # this lengthy part will be skipped when init class from dump, as _A and alpha_k will be stored
+        t0 = time.time()
+        t, w = method_kle.get_simpson_weights_times(t_max, ng_fredholm)
+        r = self._calc_corr_matrix(t, r_tau)
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w, sig_min ** 2)
+        if align_eig_vec:
+            for i in range(_eig_vec.shape[1]):
+                s = np.sum(_eig_vec[:, i])
+                phase = np.exp(1j * np.arctan2(np.real(s), np.imag(s)))
+                _eig_vec[:, i] /= phase
+        _sqrt_eig_val = np.sqrt(_eig_val)
+        _A = w.reshape(-1, 1) * _eig_vec / _sqrt_eig_val.reshape(1, -1)
+        ng_fine = ng_fac * (ng_fredholm - 1) + 1
+        alpha_k = self._calc_corr_min_t_plus_t(s=np.linspace(0, t_max, ng_fine), bcf=r_tau)
+        log.debug("new KLE StocProc class prepared [{:.2e}]".format(time.time() - t0))
+
+        data = (_A, alpha_k, seed, k, t_max, ng_fac)
+        self.__setstate__(data)
+
+        # needed for getkey / getstate
+        self.key = (r_tau, t_max, ng_fredholm, ng_fac, sig_min, align_eig_vec)
+
+        # save these guys as they are needed to estimate the autocorrelation
+        self._s = t
+        self._w = w
+        self._eig_val = _eig_val
+        self._eig_vec = _eig_vec
+
+    def _getkey(self):
+        return self.__class__.__name__, self.key
+
+    def __getstate__(self):
+        return self._A, self.alpha_k, self._seed, self._k, self.t_max, self.ng_fac
+
+    def __setstate__(self, state):
+        self._A, self.alpha_k, seed, k, t_max, self.ng_fac = state
+        if self.ng_fac == 1:
+            self.kle_interp = False
+        else:
+            self.kle_interp = True
+        self._one_over_sqrt_2 = 1 / np.sqrt(2)
+        num_gp, self.num_y = self._A.shape
+        ng_fine = self.ng_fac * (num_gp - 1) + 1
+        super().__init__(t_max=t_max, num_grid_points=ng_fine, seed=seed, k=k)
+
+
+
+
+    
+    @staticmethod
+    def _calc_corr_min_t_plus_t(s, bcf):
+        bcf_n_plus = bcf(s-s[0])
+        #    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]
+        # == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]        
+        return np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))        
+    
+    @staticmethod
+    def _calc_corr_matrix(s, bcf):
+        """calculates the matrix alpha_ij = bcf(t_i-s_j)
+        
+        calls bcf only for s-s_0 and reconstructs the rest
+        """
+        n_ = len(s)
+        bcf_n = StocProc_KLE._calc_corr_min_t_plus_t(s, bcf)
+        # we want
+        # r = bcf(0) bcf(-1), bcf(-2)
+        #     bcf(1) bcf( 0), bcf(-1)
+        #     bcf(2) bcf( 1), bcf( 0)
+        r = np.empty(shape=(n_,n_), dtype = np.complex128)
+        for i in range(n_):
+            idx = n_-1-i
+            r[:,i] = bcf_n[idx:idx+n_]
+        return r
+        
+    def __calc_missing(self):
+        raise NotImplementedError
+
+    def _calc_z(self, y):
+        if self.kle_interp:
+            _a_tmp = np.tensordot(y, self._A, axes=([0], [1]))
+            _num_gp = self._A.shape[0]
+            return stocproc_c.z_t(delta_t_fac = self.ng_fac,
+                                  N1          = _num_gp,
+                                  alpha_k     = self.alpha_k,
+                                  a_tmp       = _a_tmp,
+                                  kahanSum    = True)
+
+        else:
+            return np.tensordot(y*self._sqrt_eig_val, self._eig_vec, axes=([0], [1])).flatten()
+        
+    def get_num_y(self):
+        return self.num_y
+    
+    
+    
+class StocProc_KLE_tol(StocProc_KLE):
+    r"""
+        same as StocProc_KLE except that ng_fredholm is determined from given tolerance
     """
     
-    # handle type error
-    if x.ndim != 2:
-        raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
-        
-    if verbose > 0:
-        print("calculate auto correlation function ...")
-    res = auto_correlation_c(x)
-    if verbose > 0:
-        print("done!")
-        
-    return res   
+    def __init__(self, tol=1e-2, **kwargs):
+        self.tol = tol
+        self._auto_grid_points(**kwargs)
+        # overwrite ng_fac in key from StocProc_KLE with value of tol
+        # self.key = (r_tau, t_max, ng_fredholm, ng_fac, sig_min, align_eig_vec)
+        self.key = (self.key[0], self.key[1], tol, self.key[3],self.key[4], self.key[5])
 
-def auto_correlation_zero(x, s_0_idx = 0):
-    # handle type error
-    if x.ndim != 2:
-        raise TypeError('expected 2D numpy array, but {} given'.format(type(x)))
+    def _init_StocProc_KLE_and_get_error(self, ng, **kwargs):
+        super().__init__(ng_fredholm=ng, **kwargs)
+            
+        ng_fine = self.ng_fac*(ng-1)+1
+        u_i_all_t =  stocproc_c.eig_func_all_interp(delta_t_fac = self.ng_fac,
+                                                    time_axis   = self._s,
+                                                    alpha_k     = self.alpha_k, 
+                                                    weights     = self._w,
+                                                    eigen_val   = self._eig_val,
+                                                    eigen_vec   = self._eig_vec)    
+
+        u_i_all_ast_s = np.conj(u_i_all_t)                  #(N_gp, N_ev)
+        num_ev = len(self._eig_val)       
+        tmp = self._eig_val.reshape(1, num_ev) * u_i_all_t  #(N_gp, N_ev)  
+        recs_bcf = np.tensordot(tmp, u_i_all_ast_s, axes=([1],[1]))
+        
+        refc_bcf = np.empty(shape=(ng_fine,ng_fine), dtype = np.complex128)
+        for i in range(ng_fine):
+            idx = ng_fine-1-i
+            refc_bcf[:,i] = self.alpha_k[idx:idx+ng_fine]
+        
+        err = np.max(np.abs(recs_bcf-refc_bcf)/np.abs(refc_bcf))
+        return err
+        
     
-    num_samples = x.shape[0]
-    x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
-    return np.mean(x * np.conj(x_s_0), axis = 0), np.mean(x * x_s_0, axis = 0)
+    def _auto_grid_points(self, **kwargs): 
+        err = np.inf
+        c = 2
+        #exponential increase to get below error threshold
+        while err > self.tol:
+            c *= 2
+            ng = 2*c + 1
+            err = self._init_StocProc_KLE_and_get_error(ng, **kwargs)
+            log.info("ng {} -> err {:.3e}".format(ng, err))
+                       
+        c_low = c // 2
+        c_high = c
+         
+        while (c_high - c_low) > 1:            
+            c = (c_low + c_high) // 2
+            ng = 2*c + 1
+            err = self._init_StocProc_KLE_and_get_error(ng, **kwargs)
+            log.info("ng {} -> err {:.3e}".format(ng, err))
+            if err > self.tol:
+                c_low = c
+            else:
+                c_high = c
+
+
+class StocProc_FFT_tol(_absStocProc):
+    r"""
+        Simulate Stochastic Process using FFT method 
+    """
+    def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
+                 seed=None, k=3, negative_frequencies=False, method='simps'):
+        if not negative_frequencies: 
+            log.debug("non neg freq only")
+            # assume the spectral_density is 0 for w<0 
+            # and decays fast for large w
+            b = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = 1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = 1)
+            log.debug("upper int bound b {:.3e}".format(b))
+            b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+                                                      intgr_tol = intgr_tol, 
+                                                      intpl_tol = intpl_tol, 
+                                                      tmax      = t_max, 
+                                                      a         = 0, 
+                                                      b         = b, 
+                                                      ft_ref    = lambda tau:bcf_ref(tau)*np.pi, 
+                                                      N_max     = 2**20, 
+                                                      method    = method)
+            log.debug("required tol result in N {}".format(N))
+            a = 0
+        else:
+            # assume the spectral_density is non zero also for w<0 
+            # but decays fast for large |w|
+            b = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = 1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = 1)
+            a = method_fft.find_integral_boundary(integrand = spectral_density, 
+                                                  tol       = intgr_tol**2, 
+                                                  ref_val   = -1, 
+                                                  max_val   = 1e6, 
+                                                  x0        = -1)            
+            b_minus_a, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+                                                              intgr_tol = intgr_tol, 
+                                                              intpl_tol = intpl_tol, 
+                                                              tmax      = t_max, 
+                                                              a         = a, 
+                                                              b         = b, 
+                                                              ft_ref    = lambda tau:bcf_ref(tau)*np.pi, 
+                                                              N_max     = 2**20, 
+                                                              method    = method)
+            b = b*b_minus_a/(b-a)
+            a = b-b_minus_a
+        
+        
+        num_grid_points = int(np.ceil(t_max/dt))+1
+        t_max = (num_grid_points-1)*dt
+        
+        super().__init__(t_max           = t_max, 
+                         num_grid_points = num_grid_points, 
+                         seed            = seed,
+                         k               = k)
+        
+        omega = dx*np.arange(N)
+        if method == 'simps':
+            self.yl = spectral_density(omega + a) * dx / np.pi
+            self.yl = method_fft.get_fourier_integral_simps_weighted_values(self.yl)
+            self.yl = np.sqrt(self.yl)
+            self.omega_min_correction = np.exp(-1j*a*self.t)   #self.t is from the parent class
+        elif method == 'midp':
+            self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
+            self.yl = np.sqrt(self.yl)
+            self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
+        else:
+            raise ValueError("unknown method '{}'".format(method))
+
+
+    def __getstate__(self):
+        return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed, self._k
+
+    def __setstate__(self, state):
+        self.yl, num_grid_points, self.omega_min_correction, t_max, seed, k = state
+        super().__init__(t_max           = t_max,
+                         num_grid_points = num_grid_points,
+                         seed            = seed,
+                         k               = k)
+            
+            
+    def _calc_z(self, y): 
+        z = np.fft.fft(self.yl * y)[0:self.num_grid_points] * self.omega_min_correction
+        return z
+
+    def get_num_y(self):
+        return len(self.yl)

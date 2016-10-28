@@ -23,21 +23,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from itertools import product
 from math import fsum
 
-class ComplexInterpolatedUnivariateSpline(object):
-    def __init__(self, x, y, k=2):
-        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
-        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
-        
-    def __call__(self, t):
-        return self.re_spline(t) + 1j*self.im_spline(t)
-    
-def complex_quad(func, a, b, **kw_args):
-    func_re = lambda t: np.real(func(t))
-    func_im = lambda t: np.imag(func(t))
-    I_re = quad(func_re, a, b, **kw_args)[0]
-    I_im = quad(func_im, a, b, **kw_args)[0]
-    
-    return I_re + 1j*I_im
+
 
 class StocProc(object):
     r"""Simulate Stochastic Process using Karhunen-Loève expansion 

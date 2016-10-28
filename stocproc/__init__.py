@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from . import stocproc_c
-from . import stocproc
-from . import class_stocproc_kle
-from . import class_stocproc
-from . import gquad
-from . import helper
-from . import method_fft
-
+from .stocproc import StocProc_FFT_tol
+from .stocproc import StocProc_KLE
+from .stocproc import StocProc_KLE_tol

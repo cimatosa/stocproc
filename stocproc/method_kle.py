@@ -1,7 +1,11 @@
 import numpy as np
 from scipy.linalg import eigh as scipy_eigh
+import time
 
-def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
+import logging
+log = logging.getLogger(__name__)
+
+def solve_hom_fredholm(r, w, eig_val_min):
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
     
     .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)
@@ -31,41 +35,21 @@ def solve_hom_fredholm(r, w, eig_val_min, verbose=1):
          
     :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, ordered in decreasing order)
     """
-    
+    t0 = time.time()
     # weighted matrix r due to quadrature weights
-    if verbose > 0:
-        print("build matrix ...")
-#     d = np.diag(np.sqrt(w))
-#     r = np.dot(d, np.dot(r, d))
     n = len(w)
     w_sqrt = np.sqrt(w)
     r = w_sqrt.reshape(n,1) * r * w_sqrt.reshape(1,n)
-    
-    if verbose > 0:
-        print("solve eigenvalue equation ...")
     eig_val, eig_vec = scipy_eigh(r, overwrite_a=True)   # eig_vals in ascending
-
-    # use only eigenvalues larger than sig_min**2
-    
     min_idx = sum(eig_val < eig_val_min)
-     
     eig_val = eig_val[min_idx:][::-1]
     eig_vec = eig_vec[:, min_idx:][:, ::-1]
-    
+    log.debug("discrete fredholm equation of size {} solved [{:.2e}]".format(n, time.time()-t0))
+
     num_of_functions = len(eig_val)
-    if verbose > 0:
-        print("use {} / {} eigenfunctions (sig_min = {})".format(num_of_functions, len(w), np.sqrt(eig_val_min)))
-    
-    
-    # inverse scale of the eigenvectors
-#     d_inverse = np.diag(1/np.sqrt(w))
-#     eig_vec = np.dot(d_inverse, eig_vec)
+    log.debug("use {} / {} eigenfunctions (sig_min = {})".format(num_of_functions, len(w), np.sqrt(eig_val_min)))
     eig_vec = np.reshape(1/w_sqrt, (n,1)) * eig_vec
 
-    if verbose > 0:
-        print("done!")
-    
-    
     return eig_val, eig_vec
 
 def get_mid_point_weights(t_max, num_grid_points):
