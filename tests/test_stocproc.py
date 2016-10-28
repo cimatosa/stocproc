@@ -24,9 +24,6 @@ p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
 
 import stocproc as sp
-from stocproc.tools import complex_quad
-from stocproc.tools import ComplexInterpolatedUnivariateSpline
-
 import warnings
 warnings.simplefilter('default')
 
@@ -41,7 +38,8 @@ def corr(tau):
 def spectral_density(omega):
     return omega**_S_ * np.exp(-omega)
 
-def stocproc_metatest(stp, num_samples, tol, plot):
+def stocproc_metatest(stp, num_samples, tol, corr, plot):
+    print("generate samples")
     x_t_array_KLE = np.empty(shape=(num_samples, stp.num_grid_points), dtype=np.complex128)
     for i in range(num_samples):
         stp.new_process()
@@ -115,7 +113,7 @@ def test_stochastic_process_KLE_correlation_function(plot=False):
                           ng_fredholm = num_grid_points,
                           ng_fac      = 4,
                           seed        = 0)
-    stocproc_metatest(stp, num_samples, tol, plot)
+    stocproc_metatest(stp, num_samples, tol, corr, plot)
 
 
 def test_stochastic_process_KLE_tol_correlation_function(plot=False):
@@ -135,7 +133,7 @@ def test_stochastic_process_KLE_tol_correlation_function(plot=False):
                               t_max       = t_max,
                               ng_fac      = 4,
                               seed        = 0)
-    stocproc_metatest(stp, num_samples, tol, plot)
+    stocproc_metatest(stp, num_samples, tol, corr, plot)
 
 
             
@@ -157,7 +155,7 @@ def test_stochastic_process_FFT_correlation_function(plot = False):
                               intgr_tol        = 1e-2,
                               intpl_tol        = 1e-2,
                               seed             = 0)
-    stocproc_metatest(stp, num_samples, tol, plot)
+    stocproc_metatest(stp, num_samples, tol, corr, plot)
 
 def test_stocproc_dump_load():
     t_max = 15
@@ -229,14 +227,45 @@ def test_stocproc_dump_load():
 
     assert np.all(x == x2)
 
-# def test
+def test_lorentz_SD(plot=False):
+    _WC_ = 1
+    def lsp(w):
+        return 1/(1 + (w - _WC_)**2)# / np.pi
+
+    def lac(t):
+        return np.exp(- np.abs(t) - 1j*_WC_*t)
+
+
+    t_max = 15
+    num_samples = 1000
+    tol = 3e-2
+    stp = sp.StocProc_KLE(r_tau=lac,
+                          t_max=t_max,
+                          ng_fredholm=201,
+                          ng_fac=4,
+                          seed=0)
+    #stocproc_metatest(stp, num_samples, tol, lac, True)
+
+    num_samples = 50000
+    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=9*1e-5)
+    stocproc_metatest(stp, num_samples, tol, lac, True)
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     import logging
-    #logging.basicConfig(level=logging.DEBUG)
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.INFO)
     # test_stochastic_process_KLE_correlation_function(plot=True)
     # test_stochastic_process_FFT_correlation_function(plot=True)
     # test_stochastic_process_KLE_tol_correlation_function(plot=True)
-    test_stocproc_dump_load()
+    # test_stocproc_dump_load()
+
+
+    test_lorentz_SD(plot=False)
     pass
