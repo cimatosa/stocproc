@@ -284,15 +284,15 @@ def test_fourier_integral_infinite_boundary():
     # plt.yscale('log')
     # plt.show()
     
-def test_get_N_for_accurate_fourier_integral():
+def test_get_N_a_b_for_accurate_fourier_integral():
     s = 0.5
     wc = 4
     intg = lambda x: osd(x, s, wc)
     bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
     
-    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)
-    N = sp.method_fft.get_N_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, N_max = 2**20, method='simps')
-    print(N)
+    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
+    N,a,b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, opt_b_only=True, N_max = 2**20, )
+    print(N,a,b)
 
 def test_get_dt_for_accurate_interpolation():
     s = 0.5
@@ -325,24 +325,42 @@ def test_calc_abN():
     tol = 1e-3
     tmax=40
 
-    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-12, ref_val=1)    
-    ab, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand = intg, 
+    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
+    a, b, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand = intg,
                                                   intgr_tol = tol, 
                                                   intpl_tol = tol, 
                                                   tmax = tmax, 
                                                   a    = 0, 
                                                   b    = b, 
-                                                  ft_ref = bcf_ref)
+                                                  ft_ref = bcf_ref,
+                                                  opt_b_only = True)
+
+    tau, ft_tau = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
+    print(dt, tau[1])
+    idx = np.where(tau <= tmax)
+    ft_ref_tau = bcf_ref(tau[idx])
+    rd = np.max(np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau))
+    print("rd {:.3e} <= tol {:.3e}".format(rd, tol))
+    assert rd < tol
+
+    tau_fine = np.linspace(0, tmax, 1500)
+    ft_ref_n = bcf_ref(tau_fine)
+    ft_intp = sp.tools.ComplexInterpolatedUnivariateSpline(x=tau[idx], y=ft_tau[idx], k=3)
+    ft_intp_n = ft_intp(tau_fine)
+    d = np.max(np.abs(ft_intp_n - ft_ref_n))
+    print("d {:.3e} <= tol {:.3e}".format(d, tol))
+    assert d < tol
+
     assert (np.abs(dx*dt*N - np.pi*2)) < 1e-15
     
     
     
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     # test_find_integral_boundary()
     # test_fourier_integral_finite_boundary()
-    test_fourier_integral_infinite_boundary()
-    test_get_N_for_accurate_fourier_integral()
-    test_get_dt_for_accurate_interpolation()
-    test_sclicing()
+    # test_fourier_integral_infinite_boundary()
+    # test_get_N_a_b_for_accurate_fourier_integral()
+    # test_get_dt_for_accurate_interpolation()
+    # test_sclicing()
     test_calc_abN()

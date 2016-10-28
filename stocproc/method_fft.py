@@ -1,5 +1,6 @@
 from __future__ import division, print_function
 from scipy.optimize import brentq
+from scipy.optimize import minimize
 from numpy.fft import rfft as np_rfft
 import numpy as np
 import logging
@@ -25,18 +26,20 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     _max_num_iteration = 100
     _i = 0
     assert x0 != 0
-    if integrand(ref_val) <= tol:
+    I_at_ref = integrand(ref_val)
+    if I_at_ref <= tol:
         raise ValueError("the integrand at ref_val needs to be greater that tol")
 
     log.debug("ref_value for search: {} tol: {}".format(ref_val, tol))
 
+
     I = integrand(x0+ref_val)
 
-    if I > tol:
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol -> veer x away from ref_value".format(x0, I))
+    if I/I_at_ref > tol:
+        log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol I(rev_val) -> veer x away from ref_value".format(x0, I))
         x = 2*x0
         I = integrand(x + ref_val)
-        while I > tol:
+        while I/I_at_ref > tol:
             log.debug("x={:.3e} I(x+ref_val) = {:.3e}".format(x, I))
             if abs(x) > max_val:
                 raise RuntimeError("|x-ref_val| > max_val was reached")
@@ -46,15 +49,15 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
             if _i > _max_num_iteration:
                 raise RuntimeError("iteration limit reached")
 
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol".format(x, I))
+        log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol I(rev_val)".format(x, I))
         a = brentq(lambda x: integrand(x)-tol, x+ref_val, x0+ref_val)
         log.debug("found I(a={:.3e}) = {:.3e} = tol".format(a, integrand(a)))
 
-    elif I < tol:
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol -> approach x towards ref_value".format(x0, I))
+    elif I/I_at_ref < tol:
+        log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol I(rev_val) -> approach x towards ref_value".format(x0, I))
         x = x0/2
         I = integrand(x + ref_val)
-        while I < tol:
+        while I/I_at_ref < tol:
             log.debug("x={:.3e} I(x+ref_val) = {:.3e}".format(x, I))
             if (1/abs(x)) > max_val:
                 raise RuntimeError("1/|x-ref_val| > max_val was reached")
@@ -64,10 +67,10 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
             if _i > _max_num_iteration:
                 raise RuntimeError("iteration limit reached")
 
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol".format(x, I))
+        log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol I(rev_val)".format(x, I))
         log.debug("search for root in interval [{:.3e},{:.3e}]".format(x0+ref_val, x+ref_val))
         a = brentq(lambda x_: integrand(x_)-tol, x+ref_val, x0+ref_val)
-        log.debug("found I(a={:.3e}) = {:.3e} = tol".format(a, integrand(a)))
+        log.debug("found I(a={:.3e}) = {:.3e} = tol I(rev_val)".format(a, integrand(a)))
     else:
         a = x0
         log.debug("I(ref_val) = tol -> no search necessary")
@@ -134,9 +137,27 @@ def fourier_integral_simps(integrand, a, b, N):
     fft_vals = np_rfft(yl)
     tau = np.arange(len(fft_vals))*delta_k
     return tau, delta_x*np.exp(-1j*tau*a)*fft_vals
-    
 
-def get_N_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, N_max = 2**20, method='simps'):
+
+def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, opt_b_only, N_max = 2**20, method='midp'):
+    def f_opt_b_only(x, a, integrand, N, t_max):
+        b = x[0]
+        tau, ft_tau = fourier_integral(integrand, a, b, N)
+        idx = np.where(tau <= t_max)
+        ft_ref_tau = ft_ref(tau[idx])
+        rd = np.max(np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau))
+        return np.log10(rd)
+
+    def f_opt(x, integrand, N, t_max):
+        a = x[0]
+        b = x[1]
+        tau, ft_tau = fourier_integral(integrand, a, b, N)
+        idx = np.where(tau <= t_max)
+        ft_ref_tau = ft_ref(tau[idx])
+        rd = np.max(np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau))
+        return np.log10(rd)
+
+
     """
         chooses N such that the approximated Fourier integral 
         meets the exact solution within a given tolerance of the
@@ -152,17 +173,25 @@ def get_N_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, N_m
     log.debug("fft integral from {:.3e} to {:.3e}".format(a, b))
     log.debug("error estimation up to tmax {:.3e} (tol={:.3e}".format(t_max, tol))
     
-    i = 4
+    i = 10
     while True:
-        N = 2**i 
-        tau, ft_tau = fourier_integral(integrand, a, b, N)
-        idx = np.where(tau <= t_max)
-        ft_ref_tau = ft_ref(tau[idx])
-        rd = np.max(np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau))
-        log.debug("useing fft for integral N with {} yields max rd {:.3e} (tol {:.3e})".format(N, rd, tol))
+        N = 2**i
+        if opt_b_only:
+            r = minimize(f_opt_b_only, x0=[b],      args=(a, integrand, N, t_max), method='bfgs')
+            r = minimize(f_opt_b_only, x0=[r.x[0]], args=(a, integrand, N, t_max), method='slsqp')
+            b = r.x[0]
+        else:
+            r = minimize(f_opt, x0=[a,b],            args=(integrand, N, t_max), method='bfgs')
+            r = minimize(f_opt, x0=[r.x[0], r.x[1]], args=(integrand, N, t_max), method='slsqp')
+            a = r.x[0]
+            b = r.x[1]
+
+        rd = 10**r.fun
+        log.debug("using fft for integral [{:.2e},{:.2e}] N {} yields max rd {:.3e} (tol {:.3e})".format(a, b, N, rd, tol))
+
         if rd < tol:
             log.debug("reached rd ({:.3e}) < tol ({:.3e}), return N={}".format(rd, tol, N))
-            return N
+            return N, a, b
         if N > N_max:
             raise RuntimeError("maximum number of points for Fourier Transform reached")
         
@@ -185,22 +214,29 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
             return t_max/(N/sub_sampl)
         N*=2
 
-def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, N_max = 2**20, method='simps'):
-    N   = get_N_for_accurate_fourier_integral(integrand, a, b, 
-                                              t_max  = tmax, 
-                                              tol    = intgr_tol, 
-                                              ft_ref = ft_ref, 
-                                              N_max  = N_max,
-                                              method = method)
-    dt  = get_dt_for_accurate_interpolation(t_max  = tmax, 
-                                            tol    = intpl_tol, 
-                                            ft_ref = ft_ref)
+
+def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, opt_b_only, N_max = 2**20, method='midp'):
+    N, a, b = get_N_a_b_for_accurate_fourier_integral(integrand, a, b,
+                                                      t_max  = tmax,
+                                                      tol    = intgr_tol,
+                                                      ft_ref = ft_ref,
+                                                      opt_b_only=opt_b_only,
+                                                      N_max  = N_max,
+                                                      method = method)
+    dt = get_dt_for_accurate_interpolation(t_max  = tmax,
+                                           tol    = intpl_tol,
+                                           ft_ref = ft_ref)
     
     if method == 'simps':
         dx = (b-a)/(N-1)
     elif method == 'midp':
         dx = (b-a)/N  
     N_min = 2*np.pi/dx/dt
+    if N_min <= N:
+        log.debug("dt criterion fulfilled")
+        return N,a,b
+    else:
+        log.debug("down scale dx and dt to match new power of 2 N")
     N = 2**int(np.ceil(np.log2(N_min)))
     scale = np.sqrt(N_min/N)
     assert scale <= 1
@@ -211,8 +247,15 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, tmax, a, b, ft_ref, N_max =
     elif method == 'midp':
         b_minus_a = dx_new*N
     
-    dt_new = 2*np.pi/dx_new/N      
-    return b_minus_a, N, dx_new, dt_new
+    dt_new = 2*np.pi/dx_new/N
+    if opt_b_only:
+        b = a + b_minus_a
+    else:
+        delta = b_minus_a - (b-a)
+        b += delta/2
+        a -= delta/2
+
+    return a, b, N, dx_new, dt_new
         
         
     
