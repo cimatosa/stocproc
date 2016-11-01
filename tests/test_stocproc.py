@@ -40,14 +40,15 @@ def spectral_density(omega):
 
 def stocproc_metatest(stp, num_samples, tol, corr, plot):
     print("generate samples")
-    x_t_array_KLE = np.empty(shape=(num_samples, stp.num_grid_points), dtype=np.complex128)
+    t = np.linspace(0, stp.t_max, 487)
+    x_t_array_KLE = np.empty(shape=(num_samples, 487), dtype=np.complex128)
     for i in range(num_samples):
         stp.new_process()
-        x_t_array_KLE[i] = stp()
-    t = stp.t
+        x_t_array_KLE[i] = stp(t)
+
     autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.tools.auto_correlation(x_t_array_KLE)
 
-    ac_true = corr(t.reshape(stp.num_grid_points, 1) - t.reshape(1, stp.num_grid_points))
+    ac_true = corr(t.reshape(487, 1) - t.reshape(1, 487))
 
     max_diff_conj = np.max(np.abs(ac_true - autoCorr_KLE_conj))
     print("max diff <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj))
@@ -237,21 +238,123 @@ def test_lorentz_SD(plot=False):
 
 
     t_max = 15
-    num_samples = 1000
+    num_samples = 5000
     tol = 3e-2
     stp = sp.StocProc_KLE(r_tau=lac,
                           t_max=t_max,
-                          ng_fredholm=201,
-                          ng_fac=4,
+                          ng_fredholm=1025,
+                          ng_fac=2,
                           seed=0)
-    #stocproc_metatest(stp, num_samples, tol, lac, True)
-
-    num_samples = 50000
-    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=9*1e-5)
-    stocproc_metatest(stp, num_samples, tol, lac, True)
+    t = stp.t
+    stp.new_process()
+    plt.plot(t, np.abs(stp()))
 
 
+    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=1e-9)
+    t = stp.t
+    stp.new_process()
+    plt.plot(t, np.abs(stp()), ls='', marker='.')
 
+    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=1e-11)
+    t = stp.t
+    stp.new_process()
+    plt.plot(t, np.abs(stp()), ls='', marker='.')
+
+
+    plt.show()
+    return
+
+    print("generate samples")
+    t = np.linspace(0, stp.t_max, 487)
+    t_fine = np.linspace(0, stp.t_max, 4870)
+
+    t_ref_list = [0,1,7]
+
+
+
+    # for num_samples in [100, 1000]:
+    #     x_t0 = np.zeros(shape=(3), dtype=np.complex128)
+    #     for i in range(num_samples):
+    #         stp.new_process()
+    #         x_t = stp(t)
+    #         for j, ti in enumerate(t_ref_list):
+    #             x_t0[j] += np.conj(stp(ti)) * stp(ti)
+    #     x_t0 /= num_samples
+    #     print(np.abs(1-x_t0))
+
+    num_samples = 1000
+    x_t_array = np.zeros(shape=(487, 3), dtype=np.complex128)
+    for i in range(num_samples):
+        stp.new_process()
+        x_t = stp(t)
+        for j, ti in enumerate(t_ref_list):
+            x_t_array[:, j] += x_t * np.conj(stp(ti))
+
+    x_t_array /= num_samples
+    for j, ti in enumerate(t_ref_list):
+        p, = plt.plot(t, np.abs(x_t_array[:, j]))
+        plt.plot(t_fine, np.abs(lac(t_fine-ti)), color=p.get_color())
+
+    plt.show()
+
+
+
+
+    #num_samples = 1000
+    #stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=1e-2)
+    #stocproc_metatest(stp, num_samples, tol, lambda tau:lac(tau)/np.pi, plot)
+
+
+
+def test_subohmic_SD(plot=False):
+
+    def lsp(omega):
+        return omega ** _S_ * np.exp(-omega)
+
+    def lac(tau):
+        return (1 + 1j*(tau))**(-(_S_+1)) * _GAMMA_S_PLUS_1 / np.pi
+
+
+    t_max = 15
+    stp = sp.StocProc_KLE(r_tau=lac,
+                          t_max=t_max,
+                          ng_fredholm=1025,
+                          ng_fac=2,
+                          seed=0)
+    t = stp.t
+    stp.new_process()
+    plt.plot(t, np.abs(stp()))
+
+
+    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=False, seed=0, intgr_tol=1e-3, intpl_tol=1e-3)
+    t = stp.t
+    stp.new_process()
+    plt.plot(t, np.abs(stp()))
+    plt.show()
+    return
+
+
+
+    print("generate samples")
+    t = np.linspace(0, stp.t_max, 487)
+    t_fine = np.linspace(0, stp.t_max, 4870)
+
+    t_ref_list = [0,1,7]
+
+    num_samples = 1000
+    x_t_array = np.zeros(shape=(487, 3), dtype=np.complex128)
+    for i in range(num_samples):
+        stp.new_process()
+        x_t = stp(t)
+        for j, ti in enumerate(t_ref_list):
+            x_t_array[:, j] += x_t * np.conj(stp(ti))
+
+    x_t_array /= num_samples
+    for j, ti in enumerate(t_ref_list):
+        p, = plt.plot(t, np.abs(x_t_array[:, j]))
+        plt.plot(t_fine, np.abs(lac(t_fine-ti)), color=p.get_color())
+
+    plt.show()
 
 
 
@@ -259,7 +362,7 @@ def test_lorentz_SD(plot=False):
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     #logging.basicConfig(level=logging.INFO)
     # test_stochastic_process_KLE_correlation_function(plot=True)
     # test_stochastic_process_FFT_correlation_function(plot=True)
@@ -267,5 +370,6 @@ if __name__ == "__main__":
     # test_stocproc_dump_load()
 
 
-    test_lorentz_SD(plot=False)
+    test_lorentz_SD(plot=True)
+    # test_subohmic_SD()
     pass

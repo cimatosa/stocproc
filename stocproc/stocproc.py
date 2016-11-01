@@ -293,29 +293,29 @@ class StocProc_FFT_tol(_absStocProc):
         Simulate Stochastic Process using FFT method 
     """
     def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
-                 seed=None, k=3, negative_frequencies=False, method='simps'):
+                 seed=None, k=3, negative_frequencies=False):
         if not negative_frequencies: 
-            log.debug("non neg freq only")
+            log.info("non neg freq only")
             # assume the spectral_density is 0 for w<0 
             # and decays fast for large w
             b = method_fft.find_integral_boundary(integrand = spectral_density, 
-                                                  tol       = intgr_tol**2, 
+                                                  tol       = intgr_tol**2,
                                                   ref_val   = 1, 
                                                   max_val   = 1e6, 
                                                   x0        = 1)
-            log.debug("upper int bound b {:.3e}".format(b))
-            b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
-                                                      intgr_tol = intgr_tol, 
-                                                      intpl_tol = intpl_tol, 
-                                                      tmax      = t_max, 
-                                                      a         = 0, 
-                                                      b         = b, 
-                                                      ft_ref    = lambda tau:bcf_ref(tau)*np.pi, 
-                                                      N_max     = 2**24,
-                                                      method    = method)
-            log.debug("required tol result in N {}".format(N))
-            a = 0
+            log.info("upper int bound b {:.3e}".format(b))
+            a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
+                                                         intgr_tol = intgr_tol,
+                                                         intpl_tol = intpl_tol,
+                                                         t_max     = t_max,
+                                                         a         = 0,
+                                                         b         = b,
+                                                         ft_ref    = lambda tau:bcf_ref(tau)*np.pi,
+                                                         opt_b_only= True,
+                                                         N_max     = 2**24)
+            log.info("required tol results in N {}".format(N))
         else:
+            log.info("use neg freq")
             # assume the spectral_density is non zero also for w<0 
             # but decays fast for large |w|
             b = method_fft.find_integral_boundary(integrand = spectral_density, 
@@ -328,19 +328,17 @@ class StocProc_FFT_tol(_absStocProc):
                                                   ref_val   = -1, 
                                                   max_val   = 1e6, 
                                                   x0        = -1)            
-            b_minus_a, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density, 
+            a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
                                                               intgr_tol = intgr_tol, 
                                                               intpl_tol = intpl_tol, 
-                                                              tmax      = t_max, 
-                                                              a         = a*1000,
-                                                              b         = b*1000,
-                                                              ft_ref    = lambda tau:bcf_ref(tau)*np.pi, 
-                                                              N_max     = 2**24,
-                                                              method    = method)
-            b = b*b_minus_a/(b-a)
-            a = b-b_minus_a
-        
-        
+                                                              t_max     = t_max,
+                                                              a         = a,
+                                                              b         = b,
+                                                              ft_ref    = lambda tau:bcf_ref(tau)*np.pi,
+                                                              opt_b_only= False,
+                                                              N_max     = 2**24)
+            log.info("required tol result in N {}".format(N))
+
         num_grid_points = int(np.ceil(t_max/dt))+1
         t_max = (num_grid_points-1)*dt
         
@@ -350,18 +348,9 @@ class StocProc_FFT_tol(_absStocProc):
                          k               = k)
         
         omega = dx*np.arange(N)
-        if method == 'simps':
-            self.yl = spectral_density(omega + a) * dx / np.pi
-            self.yl = method_fft.get_fourier_integral_simps_weighted_values(self.yl)
-            self.yl = np.sqrt(self.yl)
-            self.omega_min_correction = np.exp(-1j*a*self.t)   #self.t is from the parent class
-        elif method == 'midp':
-            self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
-            self.yl = np.sqrt(self.yl)
-            self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
-        else:
-            raise ValueError("unknown method '{}'".format(method))
-
+        self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
+        self.yl = np.sqrt(self.yl)
+        self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
 
     def __getstate__(self):
         return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed, self._k

@@ -328,8 +328,8 @@ def test_calc_abN():
     a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
     a, b, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand = intg,
                                                   intgr_tol = tol, 
-                                                  intpl_tol = tol, 
-                                                  tmax = tmax, 
+                                                  intpl_tol = tol,
+                                                  t_max = tmax,
                                                   a    = 0, 
                                                   b    = b, 
                                                   ft_ref = bcf_ref,
