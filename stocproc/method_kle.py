@@ -52,7 +52,7 @@ def solve_hom_fredholm(r, w, eig_val_min):
 
     return eig_val, eig_vec
 
-def get_mid_point_weights(t_max, num_grid_points):
+def get_mid_point_weights_times(t_max, num_grid_points):
     r"""Returns the time gridpoints and wiehgts for numeric integration via **mid point rule**.
         
     The idea is to use :math:`N_\mathrm{GP}` time grid points located in the middle

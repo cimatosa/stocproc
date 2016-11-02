@@ -40,15 +40,16 @@ def spectral_density(omega):
 
 def stocproc_metatest(stp, num_samples, tol, corr, plot):
     print("generate samples")
-    t = np.linspace(0, stp.t_max, 487)
-    x_t_array_KLE = np.empty(shape=(num_samples, 487), dtype=np.complex128)
+    N = 287
+    t = np.linspace(0, stp.t_max, N)
+    x_t_array_KLE = np.empty(shape=(num_samples, N), dtype=np.complex128)
     for i in range(num_samples):
         stp.new_process()
         x_t_array_KLE[i] = stp(t)
 
     autoCorr_KLE_conj, autoCorr_KLE_not_conj = sp.tools.auto_correlation(x_t_array_KLE)
 
-    ac_true = corr(t.reshape(487, 1) - t.reshape(1, 487))
+    ac_true = corr(t.reshape(N, 1) - t.reshape(1, N))
 
     max_diff_conj = np.max(np.abs(ac_true - autoCorr_KLE_conj))
     print("max diff <x(t) x^ast(s)>: {:.2e}".format(max_diff_conj))
@@ -63,32 +64,32 @@ def stocproc_metatest(stp, num_samples, tol, corr, plot):
         v_min_imag = np.floor(np.min(np.imag(ac_true)))
         v_max_imag = np.ceil(np.max(np.imag(ac_true)))
 
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(10, 14))
+        fig, ax = plt.subplots(nrows=2, ncols=4, figsize=(14, 10))
         ax[0, 0].set_title(r"exact $\mathrm{re}\left(\langle x(t) x^\ast(s) \rangle\right)$")
         ax[0, 0].imshow(np.real(ac_true), interpolation='none', vmin=v_min_real, vmax=v_max_real, cmap="seismic")
-        ax[0, 1].set_title(r"exact $\mathrm{im}\left(\langle x(t) x^\ast(s) \rangle\right)$")
-        ax[0, 1].imshow(np.imag(ac_true), interpolation='none', vmin=v_min_imag, vmax=v_max_imag, cmap="seismic")
+        ax[1, 0].set_title(r"exact $\mathrm{im}\left(\langle x(t) x^\ast(s) \rangle\right)$")
+        ax[1, 0].imshow(np.imag(ac_true), interpolation='none', vmin=v_min_imag, vmax=v_max_imag, cmap="seismic")
 
-        ax[1, 0].set_title(r"KLE $\mathrm{re}\left(\langle x(t) x^\ast(s) \rangle\right)$")
-        ax[1, 0].imshow(np.real(autoCorr_KLE_conj), interpolation='none', vmin=v_min_real, vmax=v_max_real,
+        ax[0, 1].set_title(r"$\mathrm{re}\left(\langle x(t) x^\ast(s) \rangle\right)$")
+        ax[0, 1].imshow(np.real(autoCorr_KLE_conj), interpolation='none', vmin=v_min_real, vmax=v_max_real,
                         cmap="seismic")
-        ax[1, 1].set_title(r"KLE $\mathrm{im}\left(\langle x(t) x^\ast(s) \rangle\right)$")
+        ax[1, 1].set_title(r"$\mathrm{im}\left(\langle x(t) x^\ast(s) \rangle\right)$")
         ax[1, 1].imshow(np.imag(autoCorr_KLE_conj), interpolation='none', vmin=v_min_imag, vmax=v_max_imag,
                         cmap="seismic")
 
-        ax[2, 0].set_title(r"KLE $\mathrm{re}\left(\langle x(t) x(s) \rangle\right)$")
-        ax[2, 0].imshow(np.real(autoCorr_KLE_not_conj), interpolation='none', vmin=v_min_real, vmax=v_max_real,
+        ax[0, 2].set_title(r"$\mathrm{re}\left(\langle x(t) x(s) \rangle\right)$")
+        ax[0, 2].imshow(np.real(autoCorr_KLE_not_conj), interpolation='none', vmin=v_min_real, vmax=v_max_real,
                         cmap="seismic")
-        ax[2, 1].set_title(r"KLE $\mathrm{im}\left(\langle x(t) x(s) \rangle\right)$")
-        ax[2, 1].imshow(np.imag(autoCorr_KLE_not_conj), interpolation='none', vmin=v_min_imag, vmax=v_max_imag,
+        ax[1, 2].set_title(r"$\mathrm{im}\left(\langle x(t) x(s) \rangle\right)$")
+        ax[1, 2].imshow(np.imag(autoCorr_KLE_not_conj), interpolation='none', vmin=v_min_imag, vmax=v_max_imag,
                         cmap="seismic")
 
-        ax[3, 0].set_title(r"abs diff $\langle x(t) x^\ast(s) \rangle$")
-        cax = ax[3, 0].imshow(np.log10(np.abs(autoCorr_KLE_conj - ac_true)), interpolation='none', cmap="inferno")
-        fig.colorbar(cax, ax=ax[3, 0])
-        ax[3, 1].set_title(r"abs diff $\langle x(t) x(s) \rangle$")
-        cax = ax[3, 1].imshow(np.log10(np.abs(autoCorr_KLE_not_conj)), interpolation='none', cmap="inferno")
-        fig.colorbar(cax, ax=ax[3, 1])
+        ax[0, 3].set_title(r"abs diff $\langle x(t) x^\ast(s) \rangle$")
+        cax = ax[0, 3].imshow(np.log10(np.abs(autoCorr_KLE_conj - ac_true)), interpolation='none', cmap="inferno")
+        fig.colorbar(cax, ax=ax[0, 3])
+        ax[1, 3].set_title(r"abs diff $\langle x(t) x(s) \rangle$")
+        cax = ax[1, 3].imshow(np.log10(np.abs(autoCorr_KLE_not_conj)), interpolation='none', cmap="inferno")
+        fig.colorbar(cax, ax=ax[1, 3])
 
         plt.tight_layout()
         plt.show()
@@ -238,126 +239,18 @@ def test_lorentz_SD(plot=False):
 
 
     t_max = 15
-    num_samples = 5000
+    num_samples = 15000
     tol = 3e-2
-    stp = sp.StocProc_KLE(r_tau=lac,
-                          t_max=t_max,
-                          ng_fredholm=1025,
-                          ng_fac=2,
-                          seed=0)
-    t = stp.t
-    stp.new_process()
-    plt.plot(t, np.abs(stp()))
 
+    #stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
+    #stocproc_metatest(stp, num_samples, tol, lac, plot)
 
-    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=1e-9)
-    t = stp.t
-    stp.new_process()
-    plt.plot(t, np.abs(stp()), ls='', marker='.')
-
-    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=1e-11)
-    t = stp.t
-    stp.new_process()
-    plt.plot(t, np.abs(stp()), ls='', marker='.')
-
-
-    plt.show()
-    return
-
-    print("generate samples")
-    t = np.linspace(0, stp.t_max, 487)
-    t_fine = np.linspace(0, stp.t_max, 4870)
-
-    t_ref_list = [0,1,7]
-
-
-
-    # for num_samples in [100, 1000]:
-    #     x_t0 = np.zeros(shape=(3), dtype=np.complex128)
-    #     for i in range(num_samples):
-    #         stp.new_process()
-    #         x_t = stp(t)
-    #         for j, ti in enumerate(t_ref_list):
-    #             x_t0[j] += np.conj(stp(ti)) * stp(ti)
-    #     x_t0 /= num_samples
-    #     print(np.abs(1-x_t0))
-
-    num_samples = 1000
-    x_t_array = np.zeros(shape=(487, 3), dtype=np.complex128)
-    for i in range(num_samples):
-        stp.new_process()
-        x_t = stp(t)
-        for j, ti in enumerate(t_ref_list):
-            x_t_array[:, j] += x_t * np.conj(stp(ti))
-
-    x_t_array /= num_samples
-    for j, ti in enumerate(t_ref_list):
-        p, = plt.plot(t, np.abs(x_t_array[:, j]))
-        plt.plot(t_fine, np.abs(lac(t_fine-ti)), color=p.get_color())
-
-    plt.show()
-
-
-
-
-    #num_samples = 1000
-    #stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=1e-2, intpl_tol=1e-2)
-    #stocproc_metatest(stp, num_samples, tol, lambda tau:lac(tau)/np.pi, plot)
-
-
-
-def test_subohmic_SD(plot=False):
-
-    def lsp(omega):
-        return omega ** _S_ * np.exp(-omega)
-
-    def lac(tau):
-        return (1 + 1j*(tau))**(-(_S_+1)) * _GAMMA_S_PLUS_1 / np.pi
-
-
-    t_max = 15
-    stp = sp.StocProc_KLE(r_tau=lac,
-                          t_max=t_max,
-                          ng_fredholm=1025,
-                          ng_fac=2,
-                          seed=0)
-    t = stp.t
-    stp.new_process()
-    plt.plot(t, np.abs(stp()))
-
-
-    stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=False, seed=0, intgr_tol=1e-3, intpl_tol=1e-3)
-    t = stp.t
-    stp.new_process()
-    plt.plot(t, np.abs(stp()))
-    plt.show()
-    return
-
-
-
-    print("generate samples")
-    t = np.linspace(0, stp.t_max, 487)
-    t_fine = np.linspace(0, stp.t_max, 4870)
-
-    t_ref_list = [0,1,7]
-
-    num_samples = 1000
-    x_t_array = np.zeros(shape=(487, 3), dtype=np.complex128)
-    for i in range(num_samples):
-        stp.new_process()
-        x_t = stp(t)
-        for j, ti in enumerate(t_ref_list):
-            x_t_array[:, j] += x_t * np.conj(stp(ti))
-
-    x_t_array /= num_samples
-    for j, ti in enumerate(t_ref_list):
-        p, = plt.plot(t, np.abs(x_t_array[:, j]))
-        plt.plot(t_fine, np.abs(lac(t_fine-ti)), color=p.get_color())
-
-    plt.show()
-
-
-
+    stp = sp.StocProc_KLE_tol(tol=1e-2,
+                              r_tau       = lac,
+                              t_max       = t_max,
+                              ng_fac      = 2,
+                              seed        = 0)
+    stocproc_metatest(stp, num_samples, tol, lac, plot)
 
 
 if __name__ == "__main__":

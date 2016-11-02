@@ -20,12 +20,21 @@ stocproc_key_type = namedtuple(typename    = 'stocproc_key_type',
 
 
 class ComplexInterpolatedUnivariateSpline(object):
-    def __init__(self, x, y, k=2):
+    def __init__(self, x, y, k=3):
         self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
         self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
 
     def __call__(self, t):
         return self.re_spline(t) + 1j * self.im_spline(t)
+
+
+def complex_quad(func, a, b, **kw_args):
+    func_re = lambda t: np.real(func(t))
+    func_im = lambda t: np.imag(func(t))
+    I_re = quad(func_re, a, b, **kw_args)[0]
+    I_im = quad(func_im, a, b, **kw_args)[0]
+
+    return I_re + 1j * I_im
 
 def auto_correlation_numpy(x, verbose=1):
     warn("use 'auto_correlation' instead", DeprecationWarning)

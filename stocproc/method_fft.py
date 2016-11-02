@@ -1,3 +1,9 @@
+"""
+    The method_fft module provides convenient function to
+    setup a stochastic process generator using fft method
+
+
+"""
 from __future__ import division, print_function
 
 from .tools import ComplexInterpolatedUnivariateSpline
@@ -10,8 +16,7 @@ from scipy.optimize import brentq
 from scipy.optimize import basinhopping
 import sys
 import warnings
-
-warnings.simplefilter('error')
+#warnings.simplefilter('error')
 MAX_FLOAT = sys.float_info.max
 log = logging.getLogger(__name__)
 
@@ -221,7 +226,7 @@ def opt_integral_boundaries(integrand, a, b, t_max, ft_ref, opt_b_only, N):
                          stepsize=0.1*(b-a))
         a, b = r.x[0], r.x[1]
     rd = 10 ** r.fun
-    log.info("optimization yields max rd {:.3e} and new boundaries [{:.2e},{:.2e}]".format(rd, a, b))
+    log.info("optimization with N {} yields max rd {:.3e} and new boundaries [{:.2e},{:.2e}]".format(N, rd, a, b))
 
     return rd, a, b
 
@@ -279,17 +284,19 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
                                                       ft_ref = ft_ref,
                                                       opt_b_only=opt_b_only,
                                                       N_max  = N_max)
-    dt = get_dt_for_accurate_interpolation(t_max  = t_max,
-                                           tol    = intpl_tol,
-                                           ft_ref = ft_ref)
+    dt_tol = get_dt_for_accurate_interpolation(t_max  = t_max,
+                                               tol    = intpl_tol,
+                                               ft_ref = ft_ref)
     
     dx = (b-a)/N
-    N_min = 2*np.pi/dx/dt
-    if N_min <= N:
+    dt = 2*np.pi/dx/N
+    if dt <= dt_tol:
         log.info("dt criterion fulfilled")
         return a, b, N, dx, dt
     else:
         log.info("down scale dx and dt to match new power of 2 N")
+
+    N_min = 2*np.pi/dx/dt_tol
     N = 2**int(np.ceil(np.log2(N_min)))
 
 

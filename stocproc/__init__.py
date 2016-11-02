@@ -1,31 +1,60 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """
 Stochastic Process Module
 =========================
 
 This module contains two different implementation for generating stochastic processes for a
-given auto correlation function. Both methods are based on a time discrete process, however cubic
+given auto correlation function (:doc:`Karhunen-Loève expansion </StocProc_KLE>`
+and :doc:`Fast-Fourier method </StocProc_FFT>`).
+Both methods are based on a time discrete process, however cubic
 spline interpolation is assured to be valid within a given tolerance.
 
-* simulate stochastic processes using Karhunen-Loève expansion :py:func:`stocproc.StocProc_KLE_tol`
+.. toctree::
+   :maxdepth: 2
 
-  Setting up the class involves solving an eigenvalue problem which grows with
-  the time interval the process is simulated on. Further generating a new process
-  involves a multiplication with that matrix, therefore it scales quadratically with the
-  time interval. Nonetheless it turns out that this method requires less random numbers
-  than the Fast-Fourier method.
+   stocproc
+   example
 
-* simulate stochastic processes using Fast-Fourier method method :py:func:`stocproc.StocProc_FFT_tol`
+Example
+-------
 
-  Setting up this class is quite efficient as it only calculates values of the
-  associated spectral density. The number scales linear with the time interval of interest. However to achieve
-  sufficient accuracy many of these values are required. As the generation of a new process is based on
-  a Fast-Fouried-Transform over these values, this part is comparably lengthy.
+The example will setup a process generator for an exponential auto correlation function
+and sample a single realization. ::
+
+    def lsd(w):
+        # Lorenzian spectral density
+        return 1/(1 + (w - _WC_)**2)
+
+    def lac(t):
+        # the corresponding Lorenzian correlation function
+        # note there is a factor of one over pi in the
+        # deficition of the correlation function:
+        # lac(t) = 1/pi int_{-infty}^infty d w  lsd(w) exp(-i w t)
+        return np.exp(- np.abs(t) - 1j*_WC_*t)
+
+    t_max = 10
+    print("setup process generator")
+    stp = sp.StocProc_FFT_tol(lsd, t_max, lac,
+                              negative_frequencies=True, seed=0,
+                              intgr_tol=1e-2, intpl_tol=1e-2)
+    print("generate single process")
+    stp.new_process()
+    zt = stp()    # get discrete process
+
+The full example can be found :doc:`here </example>`.
+
+.. image:: ../../examples/proc.*
+
+Averaging over 5000 samples yields the auto correlation function which is in good agreement
+with the exact auto correlation.
+
+.. image:: ../../examples/ac.*
 """
 
 version = '0.2.0'
+
+import sys
+if sys.version_info.major < 3:
+    raise SystemError("no support for Python 2")
 
 from .stocproc import StocProc_FFT_tol
 from .stocproc import StocProc_KLE

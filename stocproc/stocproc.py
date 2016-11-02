@@ -1,6 +1,29 @@
-# -*- coding: utf8 -*-
-from __future__ import print_function, division
+"""
+Stochastic Process Generators
+=============================
 
+Karhunen-Loève expansion
+------------------------
+
+This method samples stochastic processes using Karhunen-Loève expansion and
+is implemented in the class :doc:`StocProc_KLE_tol </StocProc_KLE>`.
+
+Setting up the class involves solving an eigenvalue problem which grows with
+the time interval the process is simulated on. Further generating a new process
+involves a multiplication with that matrix, therefore it scales quadratically with the
+time interval. Nonetheless it turns out that this method requires less random numbers
+than the Fast-Fourier method.
+
+
+Fast-Fourier method
+-------------------
+simulate stochastic processes using Fast-Fourier method method :py:func:`stocproc.StocProc_FFT_tol`
+
+Setting up this class is quite efficient as it only calculates values of the
+associated spectral density. The number scales linear with the time interval of interest. However to achieve
+sufficient accuracy many of these values are required. As the generation of a new process is based on
+a Fast-Fouried-Transform over these values, this part is comparably lengthy.
+"""
 import numpy as np
 import time
 
@@ -113,6 +136,8 @@ class _absStocProc(object):
         self._z = self._calc_z(y)
         log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
 
+METHOD = 'midp'
+
 class StocProc_KLE(_absStocProc):
     r"""
     class to simulate stochastic processes using KLE method
@@ -134,7 +159,11 @@ class StocProc_KLE(_absStocProc):
 
         # this lengthy part will be skipped when init class from dump, as _A and alpha_k will be stored
         t0 = time.time()
-        t, w = method_kle.get_simpson_weights_times(t_max, ng_fredholm)
+        if METHOD == 'midp':
+            t, w = method_kle.get_mid_point_weights_times(t_max, ng_fredholm)
+        elif METHOD == 'simp':
+            t, w = method_kle.get_simpson_weights_times(t_max, ng_fredholm)
+
         r = self._calc_corr_matrix(t, r_tau)
         _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w, sig_min ** 2)
         if align_eig_vec:
@@ -229,11 +258,49 @@ class StocProc_KLE(_absStocProc):
     
 class StocProc_KLE_tol(StocProc_KLE):
     r"""
+        A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
+        The idea is that any stochastic process can be expressed in terms of the KLE
+
+        .. math:: Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)
+
+        where :math:`Y_i` and independent complex valued Gaussian random variables with variance one
+        (:math:`\langle Y_i Y_j \rangle = \delta_{ij}`) and :math:`\lambda_i`, :math:`u_i(t)` are
+        eigenvalues / eigenfunctions of the following Fredholm equation
+
+        .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)
+
+        for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation
+        :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.
+
+        For the numeric implementation the integral equation has to be discretized
+
+
+        - Solve fredholm equation on grid with ``ng_fredholm nodes`` (trapezoidal_weights).
+          If case ``ng_fredholm`` is ``None`` set ``ng_fredholm = num_grid_points``. In general it should
+          hold ``ng_fredholm < num_grid_points`` and ``num_grid_points = 10*ng_fredholm`` might be a good ratio.
+        - Calculate discrete stochastic process (using interpolation solution of fredholm equation) with num_grid_points nodes
+        - invoke spline interpolator when calling
+
         same as StocProc_KLE except that ng_fredholm is determined from given tolerance
+
+        bla bla
+
     """
     
-    def __init__(self, tol=1e-2, **kwargs):
+    def __init__(self, r_tau, t_max, tol=1e-2, ng_fac=4, seed=None, k=3, align_eig_vec=False):
+        """this is init
+
+        :param r_tau:
+        :param t_max:
+        :param tol:
+        :param ng_fac:
+        :param seed:
+        :param k:
+        :param align_eig_vec:
+        """
         self.tol = tol
+        kwargs = {'r_tau': r_tau, 't_max': t_max, 'ng_fac': ng_fac, 'seed': seed,
+                  'sig_min': tol**2, 'k': k, 'align_eig_vec': align_eig_vec}
         self._auto_grid_points(**kwargs)
         # overwrite ng_fac in key from StocProc_KLE with value of tol
         # self.key = (r_tau, t_max, ng_fredholm, ng_fac, sig_min, align_eig_vec)
@@ -339,6 +406,7 @@ class StocProc_FFT_tol(_absStocProc):
                                                               N_max     = 2**24)
             log.info("required tol result in N {}".format(N))
 
+        assert abs(2*np.pi - N*dx*dt) < 1e-12
         num_grid_points = int(np.ceil(t_max/dt))+1
         t_max = (num_grid_points-1)*dt
         
