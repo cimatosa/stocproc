@@ -90,3 +90,5 @@ def auto_correlation_zero(x, s_0_idx = 0):
     num_samples = x.shape[0]
     x_s_0 = x[:,s_0_idx].reshape(num_samples,1)
     return np.mean(x * np.conj(x_s_0), axis = 0), np.mean(x * x_s_0, axis = 0)
+
+

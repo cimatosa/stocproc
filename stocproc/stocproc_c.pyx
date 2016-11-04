@@ -40,7 +40,7 @@ cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] eig_func_interp(unsigned int            
 
 
 
-cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] eig_func_all_interp(unsigned int                     delta_t_fac,
+cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=2] eig_func_all_interp(unsigned int                      delta_t_fac,
                                                             cnp.ndarray[DTYPE_DBL_t,  ndim=1] time_axis,
                                                             cnp.ndarray[DTYPE_CPLX_t, ndim=1] alpha_k, 
                                                             cnp.ndarray[DTYPE_DBL_t,  ndim=1] weights,
