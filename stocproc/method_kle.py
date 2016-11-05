@@ -64,6 +64,31 @@ def align_eig_vec(eig_vec):
         phase = np.exp(1j * np.arctan2(np.real(eig_vec[0,i]), np.imag(eig_vec[0,i])))
         eig_vec[:, i] /= phase
 
+
+def _calc_corr_min_t_plus_t(s, bcf):
+    bcf_n_plus = bcf(s - s[0])
+    #    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]
+    # == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]
+    return np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
+
+
+def _calc_corr_matrix(s, bcf):
+    """calculates the matrix alpha_ij = bcf(t_i-s_j)
+
+    calls bcf only for s-s_0 and reconstructs the rest
+    """
+    n_ = len(s)
+    bcf_n = _calc_corr_min_t_plus_t(s, bcf)
+    # we want
+    # r = bcf(0) bcf(-1), bcf(-2)
+    #     bcf(1) bcf( 0), bcf(-1)
+    #     bcf(2) bcf( 1), bcf( 0)
+    r = np.empty(shape=(n_, n_), dtype=np.complex128)
+    for i in range(n_):
+        idx = n_ - 1 - i
+        r[:, i] = bcf_n[idx:idx + n_]
+    return r
+
 def opt_fredholm(kernel, lam, t, u, meth, ntimes):
     def fopt(x, p, k):
         n = len(x)//2 + 1
@@ -225,3 +250,98 @@ def get_rel_diff(corr, t_max, ng, weights_times, ng_fac):
 
     rd = np.abs(recs_bcf - refc_bcf) / np.abs(refc_bcf)
     return tfine, rd
+
+def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, diff_method='full', dm_random_samples=10**4):
+
+    if diff_method == 'full':
+        pass
+    elif diff_method == 'random':
+        t_rand = np.random.rand(dm_random_samples) * t_max
+        s_rand = np.random.rand(dm_random_samples) * t_max
+        alpha_ref = corr(t_rand - s_rand)
+        diff = -alpha_ref
+    else:
+        raise ValueError("unknown diff_method '{}', use 'full' or 'random'".format(diff_method))
+    alpha_0 = np.abs(corr(0))
+    log.debug("diff_method: {}".format(diff_method))
+
+    time_fredholm = 0
+    time_calc_ac = 0
+    time_integr_intp = 0
+    time_spline = 0
+    time_calc_diff = 0
+
+
+    k = 4
+    while True:
+        k += 1
+        ng = 2 ** k + 1
+        log.debug("check {} grid points".format(ng))
+        t, w = meth(t_max, ng)
+        t0 = time.time()
+        r = _calc_corr_matrix(t, corr)
+        time_calc_ac += (time.time() - t0)
+
+        t0 = time.time()
+        _eig_val, _eig_vec = solve_hom_fredholm(r, w)
+        time_fredholm += (time.time() - t0)
+
+        tfine, dt = np.linspace(0, t_max, (ng - 1) * ngfac + 1, retstep=True)
+        tsfine = tfine[:-1] + dt/2
+
+        t0 = time.time()
+        alpha_k = _calc_corr_min_t_plus_t(tfine, corr)
+        time_calc_ac += (time.time() - t0)
+
+        if diff_method == 'full':
+            ng_sfine = len(tsfine)
+            alpha_ref = np.empty(shape=(ng_sfine, ng_sfine), dtype=np.complex128)
+            for i in range(ng_sfine):
+                idx = ng_sfine - 1 - i
+                alpha_ref[:, i] = alpha_k[idx:idx + ng_sfine]  # note we can use alpha_k as
+                                                               # alpha(ti+dt/2 - (tj+dt/2)) = alpha(ti - tj)
+        diff = -alpha_ref
+        old_md = np.inf
+        ui_fine_all = []
+        for i in range(ng):
+            evec = _eig_vec[:, i]
+            sqrt_eval = np.sqrt(_eig_val[i])
+            if ngfac != 1:
+                t0 = time.time()
+                ui_fine = stocproc_c.eig_func_interp(delta_t_fac=ngfac,
+                                                     time_axis=t,
+                                                     alpha_k=alpha_k,
+                                                     weights=w,
+                                                     eigen_val=sqrt_eval,
+                                                     eigen_vec=evec)
+                time_integr_intp += (time.time() - t0)
+            else:
+                ui_fine = evec
+            ui_fine_all.append(ui_fine)
+            t0 = time.time()
+            ui_spl = tools.ComplexInterpolatedUnivariateSpline(tfine, ui_fine)
+            time_spline += (time.time() - t0)
+
+            t0 = time.time()
+            if diff_method == 'random':
+                ui_t = ui_spl(t_rand)
+                ui_s = ui_spl(s_rand)
+                diff += ui_t * np.conj(ui_s)
+            elif diff_method == 'full':
+                ui_super_fine = ui_spl(tsfine)
+                diff += ui_super_fine.reshape(-1, 1) * np.conj(ui_super_fine.reshape(1, -1))
+            md = np.max(np.abs(diff)) / alpha_0
+            time_calc_diff += (time.time() - t0)
+
+            log.debug("num evec {} -> max diff {:.3e}".format(i+1, md))
+            if old_md < md:
+                log.debug("max diff increased -> break, use higher ng")
+                break
+            old_md = md
+            if md < tol:
+                time_total = time_calc_diff + time_spline + time_integr_intp + time_calc_ac + time_fredholm
+                log.debug("calc_ac {:.3%}, fredholm {:.3%}, integr_intp {:.3%}, spline {:.3%}, calc_diff {:.3%}".format(
+                          time_calc_ac/time_total, time_fredholm/time_total, time_integr_intp/time_total,
+                          time_spline/time_total, time_calc_diff/time_total))
+                log.debug("auto ng SUCCESSFUL max diff {:.3e} < tol {:.3e} ng {} num evec {}".format(md, tol, ng, i+1))
+                return np.asarray(ui_fine_all)

@@ -11,11 +11,11 @@ ctypedef cnp.complex128_t DTYPE_CPLX_t
 DTYPE_DBL = float64
 ctypedef cnp.float64_t DTYPE_DBL_t
 
-cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] eig_func_interp(unsigned int                     delta_t_fac,
+cpdef cnp.ndarray[DTYPE_CPLX_t, ndim=1] eig_func_interp(unsigned int                      delta_t_fac,
                                                         cnp.ndarray[DTYPE_DBL_t,  ndim=1] time_axis,
                                                         cnp.ndarray[DTYPE_CPLX_t, ndim=1] alpha_k, 
                                                         cnp.ndarray[DTYPE_DBL_t,  ndim=1] weights,
-                                                        double                           eigen_val,
+                                                        double                            eigen_val,
                                                         cnp.ndarray[DTYPE_CPLX_t, ndim=1] eigen_vec):
 
     cdef unsigned int N1

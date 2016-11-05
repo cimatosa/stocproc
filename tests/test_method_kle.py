@@ -443,38 +443,12 @@ def test_fredholm_eigvec_interpolation():
     plt.savefig("test_fredholm_eigvec_interpolation_{}_.pdf".format(corr.__name__))
     plt.show()
 
-def test_oac_interpolation():
+def test_cython_interpolation():
     """
     """
     t_max = 15
     corr = method_kle.oac
 
-    # ng_ref = 3501
-    # _meth_ref = method_kle.get_simpson_weights_times
-    # t, w = _meth_ref(t_max, ng_ref)
-    #
-    # try:
-    #     with open("test_fredholm_interpolation.dump", 'rb') as f:
-    #         ref_data = pickle.load(f)
-    # except FileNotFoundError:
-    #     ref_data = {}
-    # key = (tuple(t), tuple(w), corr.__name__)
-    # if key in ref_data:
-    #     eigval_ref, evec_ref = ref_data[key]
-    # else:
-    #     r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
-    #     eigval_ref, evec_ref = method_kle.solve_hom_fredholm(r, w)
-    #     ref_data[key] = eigval_ref, evec_ref
-    #     with open("test_fredholm_interpolation.dump", 'wb') as f:
-    #         pickle.dump(ref_data, f)
-    #
-    # method_kle.align_eig_vec(evec_ref)
-    # t_ref = t
-    #
-    # eigvec_ref = []
-    # for l in range(ng_ref):
-    #     eigvec_ref.append(tools.ComplexInterpolatedUnivariateSpline(t, evec_ref[:, l]))
-    #
     meth = method_kle.get_four_point_weights_times
     def my_intp(ti, corr, w, t, u, lam):
         return np.sum(u * corr(ti - t) * w) / lam
@@ -488,33 +462,33 @@ def test_oac_interpolation():
     method_kle.align_eig_vec(_eig_vec)
 
     ngfac = 4
-
     tfine = np.linspace(0, t_max, (ng-1)*ngfac+1)
-
-    #ui_fine = np.empty(shape=(ng//2, len(tfine)), dtype = np.complex128)
-
-    i = 40
-
-    ui_fine = np.asarray([my_intp(ti, corr, w, t, _eig_vec[:,i], _eig_val[i]) for ti in tfine])
 
     bcf_n_plus = corr(tfine - tfine[0])
     alpha_k = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
+    for i in range(ng//2):
+        evec = _eig_vec[:,i]
+        sqrt_eval = np.sqrt(_eig_val[i])
 
-    # ui_all_t = stocproc_c.eig_func_all_interp(delta_t_fac=ngfac,
-    #                                           time_axis=t,
-    #                                           alpha_k=alpha_k,
-    #                                           weights=w,
-    #                                           eigen_val=_eig_val[:ng//2],
-    #                                           eigen_vec=_eig_vec[:, :ng//2])
-    ui_fine2 = stocproc_c.eig_func_interp(delta_t_fac = ngfac,
-                                          time_axis   = t,
-                                          alpha_k     = alpha_k,
-                                          weights     = w,
-                                          eigen_val   = _eig_val[i],
-                                          eigen_vec   = _eig_vec[:,i])
-    plt.plot(tfine, np.abs(ui_fine - ui_fine2)*_eig_val[i])
-    plt.yscale('log')
-    plt.show()
+        ui_fine = np.asarray([my_intp(ti, corr, w, t, evec, sqrt_eval) for ti in tfine])
+
+        ui_fine2 = stocproc_c.eig_func_interp(delta_t_fac = ngfac,
+                                              time_axis   = t,
+                                              alpha_k     = alpha_k,
+                                              weights     = w,
+                                              eigen_val   = sqrt_eval,
+                                              eigen_vec   = evec)
+        assert np.max(np.abs(ui_fine - ui_fine2)) < 2e-11
+
+def test_reconstr_ac():
+    t_max = 15
+    method_kle.auto_ng(corr=method_kle.oac,
+                       t_max=t_max,
+                       ngfac=2,
+                       meth=method_kle.get_mid_point_weights_times,
+                       tol=1e-3,
+                       diff_method='random',
+                       dm_random_samples=10**4)
 
 
 
@@ -651,12 +625,14 @@ def test_solve_fredholm_interp_eigenfunc(plot=False):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     # test_weights(plot=True)
     # test_solve_fredholm()
     # test_compare_weights_in_solve_fredholm_oac()
     # test_compare_weights_in_solve_fredholm_lac()
     # test_fredholm_eigvec_interpolation()
-    test_oac_interpolation()
+    # test_cython_interpolation()
+    test_reconstr_ac()
     # test_opt_fredh()
     # test_solve_fredholm()
     # test_solve_fredholm_reconstr_ac()
