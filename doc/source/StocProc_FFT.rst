@@ -1,4 +1,4 @@
-StocProc_FFT_tol
-----------------
+StocProc_FFT
+------------
 
-.. autoclass:: stocproc.stocproc.StocProc_FFT_tol
+.. autoclass:: stocproc.stocproc.StocProc_FFT

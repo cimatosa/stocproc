@@ -20,11 +20,13 @@ import sys
 import os
 
 import pathlib
+
 p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
 
 import stocproc as sp
 import warnings
+
 warnings.simplefilter('default')
 
 _S_ = 0.6
@@ -33,10 +35,20 @@ _GAMMA_S_PLUS_1 = gamma(_S_ + 1)
 
 def corr(tau):
     """ohmic bath correlation function"""
-    return (1 + 1j*(tau))**(-(_S_+1)) * _GAMMA_S_PLUS_1 / np.pi
+    return (1 + 1j * (tau)) ** (-(_S_ + 1)) * _GAMMA_S_PLUS_1 / np.pi
+
 
 def spectral_density(omega):
-    return omega**_S_ * np.exp(-omega)
+    return omega ** _S_ * np.exp(-omega)
+
+_WC_ = 2
+def lac(t):
+    """lorenzian bath correlation function"""
+    return np.exp(- np.abs(t) - 1j * _WC_ * t)
+
+def lsd(w):
+    return 1 / (1 + (w - _WC_) ** 2)
+
 
 def stocproc_metatest(stp, num_samples, tol, corr, plot):
     print("generate samples")
@@ -100,26 +112,6 @@ def stocproc_metatest(stp, num_samples, tol, corr, plot):
 
 def test_stochastic_process_KLE_correlation_function(plot=False):
     """
-        generate samples using StocPrioc_KLE class
-
-        compare <X_t X_s> and <X_t X^ast_s> from samples with true ac functions
-
-        no interpolation at all
-    """
-    t_max = 15
-    num_grid_points = 101
-    num_samples = 1000
-    tol = 3e-2
-    stp = sp.StocProc_KLE(r_tau       = corr,
-                          t_max       = t_max,
-                          ng_fredholm = num_grid_points,
-                          ng_fac      = 4,
-                          seed        = 0)
-    stocproc_metatest(stp, num_samples, tol, corr, plot)
-
-
-def test_stochastic_process_KLE_tol_correlation_function(plot=False):
-    """
         generate samples using FFT method
 
         compare <X_t X_s> and <X_t X^ast_s> from samples with true ac functions
@@ -128,18 +120,13 @@ def test_stochastic_process_KLE_tol_correlation_function(plot=False):
     """
 
     t_max = 15
-    num_samples = 1000
+    num_samples = 2000
     tol = 3e-2
-    stp = sp.StocProc_KLE_tol(tol         = 1e-2,
-                              r_tau       = corr,
-                              t_max       = t_max,
-                              ng_fac      = 4,
-                              seed        = 0)
+    stp = sp.StocProc_KLE(tol=1e-2, r_tau=corr, t_max=t_max, ng_fac=4, seed=0)
     stocproc_metatest(stp, num_samples, tol, corr, plot)
 
 
-            
-def test_stochastic_process_FFT_correlation_function(plot = False):
+def test_stochastic_process_FFT_correlation_function(plot=False):
     """
         generate samples using FFT method
         
@@ -149,26 +136,20 @@ def test_stochastic_process_FFT_correlation_function(plot = False):
     """
 
     t_max = 15
-    num_samples = 1000
+    num_samples = 2000
     tol = 3e-2
-    stp = sp.StocProc_FFT_tol(spectral_density = spectral_density,
-                              t_max            = t_max,
-                              bcf_ref          = corr,
-                              intgr_tol        = 1e-2,
-                              intpl_tol        = 1e-2,
-                              seed             = 0)
+    stp = sp.StocProc_FFT(spectral_density=spectral_density, t_max=t_max, bcf_ref=corr, intgr_tol=1e-2, intpl_tol=1e-2,
+                          seed=0)
     stocproc_metatest(stp, num_samples, tol, corr, plot)
+
 
 def test_stocproc_dump_load():
     t_max = 15
-    num_grid_points = 101
 
+    ##  STOCPROC KLE  ##
+    ####################
     t0 = time.time()
-    stp = sp.StocProc_KLE(r_tau       = corr,
-                          t_max       = t_max,
-                          ng_fredholm = num_grid_points,
-                          ng_fac      = 4,
-                          seed        = 0)
+    stp = sp.StocProc_KLE(tol=1e-2, r_tau=corr, t_max=t_max, ng_fac=4, seed=0)
     t1 = time.time()
     dt1 = t1 - t0
     stp.new_process()
@@ -179,39 +160,18 @@ def test_stocproc_dump_load():
     stp2 = pickle.loads(bin_data)
     t1 = time.time()
     dt2 = t1 - t0
-    assert dt2 / dt1 < 0.1 # loading should be way faster
+    assert dt2 / dt1 < 0.1  # loading should be way faster
 
     stp2.new_process()
     x2 = stp2()
     assert np.all(x == x2)
 
+    ##  STOCPROC FFT  ##
+    ####################
     t0 = time.time()
-    stp = sp.StocProc_KLE_tol(r_tau=corr,
-                              t_max=t_max,
-                              tol=1e-2,
-                              ng_fac=4,
-                              seed=0)
+    stp = sp.StocProc_FFT(spectral_density, t_max, corr, seed=0)
     t1 = time.time()
     dt1 = t1 - t0
-    stp.new_process()
-    x = stp()
-
-    bin_data = pickle.dumps(stp)
-    t0=time.time()
-    stp2 = pickle.loads(bin_data)
-    t1 = time.time()
-    dt2 = t1 - t0
-    assert dt2 / dt1 < 0.1 # loading should be way faster
-
-    stp2.new_process()
-    x2 = stp2()
-
-    assert np.all(x == x2)
-
-    t0 = time.time()
-    stp = sp.StocProc_FFT_tol(spectral_density, t_max, corr, seed=0)
-    t1 = time.time()
-    dt1 = t1-t0
 
     stp.new_process()
     x = stp()
@@ -222,47 +182,68 @@ def test_stocproc_dump_load():
     t1 = time.time()
     dt2 = t1 - t0
 
-    assert dt2/dt1 < 0.1 # loading should be way faster
+    assert dt2 / dt1 < 0.1  # loading should be way faster
 
     stp2.new_process()
     x2 = stp2()
 
     assert np.all(x == x2)
 
-def test_lorentz_SD(plot=False):
-    _WC_ = 1
-    def lsp(w):
-        return 1/(1 + (w - _WC_)**2)# / np.pi
 
-    def lac(t):
-        return np.exp(- np.abs(t) - 1j*_WC_*t)
+def test_many(plot=False):
+    t_max = 15
+    num_samples = 5000
+    tol = 5e-2
+
+    sd = spectral_density
+    ac = corr
+
+    stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=False, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
 
 
     t_max = 15
-    num_samples = 15000
-    tol = 3e-2
+    num_samples = 12000
+    tol = 5e-2
 
-    #stp = sp.StocProc_FFT_tol(lsp, t_max, lac, negative_frequencies=True, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
-    #stocproc_metatest(stp, num_samples, tol, lac, plot)
+    sd = lsd
+    ac = lac
 
-    stp = sp.StocProc_KLE_tol(tol=1e-2,
-                              r_tau       = lac,
-                              t_max       = t_max,
-                              ng_fac      = 2,
-                              seed        = 0)
-    stocproc_metatest(stp, num_samples, tol, lac, plot)
+    stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=True, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
 
 
 if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO)
-    #logging.basicConfig(level=logging.INFO)
-    # test_stochastic_process_KLE_correlation_function(plot=True)
-    # test_stochastic_process_FFT_correlation_function(plot=True)
-    # test_stochastic_process_KLE_tol_correlation_function(plot=True)
+    # test_stochastic_process_KLE_correlation_function(plot=False)
+    # test_stochastic_process_FFT_correlation_function(plot=False)
     # test_stocproc_dump_load()
 
-
-    test_lorentz_SD(plot=True)
+    test_many(plot=False)
     # test_subohmic_SD()
     pass

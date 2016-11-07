@@ -482,13 +482,15 @@ def test_cython_interpolation():
 
 def test_reconstr_ac():
     t_max = 15
-    method_kle.auto_ng(corr=method_kle.oac,
-                       t_max=t_max,
-                       ngfac=2,
-                       meth=method_kle.get_mid_point_weights_times,
-                       tol=1e-3,
-                       diff_method='random',
-                       dm_random_samples=10**4)
+    res = method_kle.auto_ng(corr=method_kle.oac,
+                             t_max=t_max,
+                             ngfac=2,
+                             meth=method_kle.get_mid_point_weights_times,
+                             tol=1e-3,
+                             diff_method='full',
+                             dm_random_samples=10 ** 4)
+    print(type(res))
+    print(res.shape)
 
 
 
