@@ -292,6 +292,16 @@ def get_rel_diff(corr, t_max, ng, weights_times, ng_fac):
     rd = np.abs(recs_bcf - refc_bcf) / np.abs(refc_bcf)
     return tfine, rd
 
+def subdevide_axis(t, ngfac):
+    ng = len(t)
+    if not isinstance(t, np.ndarray):
+        t = np.asarray(t)
+    tfine = np.empty(shape=((ng - 1) * ngfac + 1))
+    tfine[::ngfac] = t
+    for l in range(1, ngfac):
+        tfine[l::ngfac] = (l * t[1:] + (ngfac - l) * t[:-1]) / ngfac
+    return tfine
+
 def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, diff_method='full', dm_random_samples=10**4):
     r"""increase the number of gridpoints until the desired accuracy is met
 
@@ -387,37 +397,27 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         _eig_val, _eig_vec = solve_hom_fredholm(r, w)         # using integration weights w
         time_fredholm += (time.time() - t0)
 
-        tfine, dt = np.linspace(0, t_max, (ng - 1) * ngfac + 1, retstep=True) # setup fine
-        tsfine = tfine[:-1] + dt/2                                            # and super fine time grid
-
-        t0 = time.time()                                      # efficient way to calculate the auto correlation
-        alpha_k = _calc_corr_min_t_plus_t(tfine, corr)        # from -tmax untill tmax on the fine grid
-        time_calc_ac += (time.time() - t0)                    # needed for integral interpolation
+        tfine = subdevide_axis(t, ngfac)                      # setup fine
+        tsfine = subdevide_axis(tfine, 2)                     # and super fine time grid
 
         if diff_method == 'full':
-            ng_sfine = len(tsfine)
-            alpha_ref = np.empty(shape=(ng_sfine, ng_sfine), dtype=np.complex128)
-            for i in range(ng_sfine):
-                idx = ng_sfine - i
-                alpha_ref[:, i] = alpha_k[idx:idx + ng_sfine]  # note we can use alpha_k as
-                                                               # alpha(ti+dt/2 - (tj+dt/2)) = alpha(ti - tj)
+            alpha_ref = corr(tsfine.reshape(-1,1) - tsfine.reshape(1,-1))
+
         diff = -alpha_ref
         old_md = np.inf
         sqrt_lambda_ui_fine_all = []
         for i in range(ng):
             evec = _eig_vec[:, i]
+            if _eig_val[i] < 0:
+                print(ng, i)
+                break
             sqrt_eval = np.sqrt(_eig_val[i])
             if ngfac != 1:
                 t0 = time.time()
                 # when using sqrt_lambda instead of lambda we get sqrt_lamda time u
                 # which is the quantity needed for the stochastic process
                 # generation
-                sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(delta_t_fac=ngfac,
-                                                                 time_axis=t,
-                                                                 alpha_k=alpha_k,
-                                                                 weights=w,
-                                                                 eigen_val=sqrt_eval,
-                                                                 eigen_vec=evec)
+                sqrt_lambda_ui_fine = np.asarray([np.sum(corr(ti - t) * w * evec) / sqrt_eval for ti in tfine])
                 time_integr_intp += (time.time() - t0)
             else:
                 sqrt_lambda_ui_fine = evec*sqrt_eval

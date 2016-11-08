@@ -52,7 +52,7 @@ def test_weights(plot=False):
             method_kle.get_simpson_weights_times,
             method_kle.get_four_point_weights_times,
             method_kle.get_gauss_legendre_weights_times,
-            method_kle.get_sinh_tanh_weights_times]
+            method_kle.get_tanh_sinh_weights_times]
     cols = ['r', 'b', 'g', 'm', 'c']
     errs = [2e-3, 2e-8, 7e-11, 5e-16, 8e-15]
     I_exact = np.log(tm**2 + 1)/2
@@ -370,6 +370,7 @@ def test_fredholm_eigvec_interpolation():
     ng_ref = 3501
 
     _meth_ref = method_kle.get_simpson_weights_times
+    _meth_ref = method_kle.get_mid_point_weights_times
     t, w = _meth_ref(t_max, ng_ref)
 
     try:
@@ -395,10 +396,12 @@ def test_fredholm_eigvec_interpolation():
         eigvec_ref.append(tools.ComplexInterpolatedUnivariateSpline(t, evec_ref[:, l]))
 
     meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
             method_kle.get_simpson_weights_times,
             method_kle.get_four_point_weights_times,
-            method_kle.get_gauss_legendre_weights_times]
-    cols = ['r', 'b', 'g', 'm', 'c']
+            method_kle.get_gauss_legendre_weights_times,
+            method_kle.get_tanh_sinh_weights_times]
+    cols = ['r', 'b', 'g', 'm', 'c', 'lime']
 
     def my_intp(ti, corr, w, t, u, lam):
         return np.sum(corr(ti - t) * w * u) / lam
@@ -406,7 +409,7 @@ def test_fredholm_eigvec_interpolation():
     fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(16,12))
     ax = ax.flatten()
 
-    ks = [20,40,80,160]
+    ks = [10,20,40,80]
 
     lns, lbs = [], []
 
@@ -451,6 +454,7 @@ def test_fredholm_eigvec_interpolation():
         axc.set_title("ng {}".format(ng))
         axc.set_xlim([0,100])
         axc.grid()
+        axc.legend()
 
 
     fig.legend(lines, labels, loc = "lower right", ncol=3)
@@ -496,6 +500,72 @@ def test_cython_interpolation():
                                               eigen_val   = sqrt_eval,
                                               eigen_vec   = evec)
         assert np.max(np.abs(ui_fine - ui_fine2)) < 2e-11
+
+def test_reconstr_ac_interp():
+    t_max = 25
+    corr = lac
+    #corr = oac
+
+    meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
+            method_kle.get_simpson_weights_times,
+            method_kle.get_four_point_weights_times,
+            method_kle.get_gauss_legendre_weights_times,
+            method_kle.get_tanh_sinh_weights_times]
+
+    cols = ['r', 'b', 'g', 'm', 'c']
+
+    def my_intp(ti, corr, w, t, u, lam):
+        return np.sum(corr(ti - t) * w * u) / lam
+
+    fig, ax = plt.subplots(figsize=(16, 12))
+
+    ks = [40]
+    for i, k in enumerate(ks):
+        axc = ax
+        ng = 4 * k + 1
+        for i, _meth in enumerate(meth):
+            t, w = _meth(t_max, ng)
+            r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+            _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+
+            tf = method_kle.subdevide_axis(t, ngfac=3)
+            tsf = method_kle.subdevide_axis(tf, ngfac=2)
+
+            diff1 = - corr(t.reshape(-1,1) - t.reshape(1,-1))
+            diff2 = - corr(tf.reshape(-1, 1) - tf.reshape(1, -1))
+            diff3 = - corr(tsf.reshape(-1, 1) - tsf.reshape(1, -1))
+
+            xdata = np.arange(ng)
+            ydata1 = np.ones(ng)
+            ydata2 = np.ones(ng)
+            ydata3 = np.ones(ng)
+
+            for idx in xdata:
+                evec = _eig_vec[:, idx]
+                if _eig_val[idx] < 0:
+                    break
+                sqrt_eval = np.sqrt(_eig_val[idx])
+
+                uip = np.asarray([my_intp(ti, corr, w, t, evec, sqrt_eval) for ti in tf])
+                uip_spl = tools.ComplexInterpolatedUnivariateSpline(tf, uip)
+                uip_sf = uip_spl(tsf)
+                diff1 += _eig_val[idx] * evec.reshape(-1, 1) * np.conj(evec.reshape(1, -1))
+                diff2 += uip.reshape(-1, 1) * np.conj(uip.reshape(1, -1))
+                diff3 += uip_sf.reshape(-1,1) * np.conj(uip_sf.reshape(1,-1))
+                ydata1[idx] = np.max(np.abs(diff1))
+                ydata2[idx] = np.max(np.abs(diff2))
+                ydata3[idx] = np.max(np.abs(diff3))
+
+            p, = axc.plot(xdata, ydata1, label=_meth.__name__, alpha = 0.5)
+            axc.plot(xdata, ydata2, color=p.get_color(), ls='--')
+            axc.plot(xdata, ydata3, color=p.get_color(), lw=2)
+
+        axc.set_yscale('log')
+        axc.set_title("ng: {}".format(ng))
+        axc.grid()
+        axc.legend()
+    plt.show()
 
 def test_reconstr_ac():
     t_max = 15
@@ -643,9 +713,38 @@ def test_solve_fredholm_interp_eigenfunc(plot=False):
         plt.show()
 
 
+def test_subdevide_axis():
+    t = [0, 1, 3]
+    tf1 = method_kle.subdevide_axis(t, ngfac=1)
+    assert np.max(np.abs(tf1 - np.asarray([0, 1, 3]))) < 1e-15
+    tf2 = method_kle.subdevide_axis(t, ngfac=2)
+    assert np.max(np.abs(tf2 - np.asarray([0, 0.5, 1, 2, 3]))) < 1e-15
+    tf3 = method_kle.subdevide_axis(t, ngfac=3)
+    assert np.max(np.abs(tf3 - np.asarray([0, 1 / 3, 2 / 3, 1, 1 + 2 / 3, 1 + 4 / 3, 3]))) < 1e-15
+    tf4 = method_kle.subdevide_axis(t, ngfac=4)
+    assert np.max(np.abs(tf4 - np.asarray([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3]))) < 1e-15
+
+def test_auto_ng():
+    corr = oac
+    t_max = 8
+    ng_fac = 1
+    meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
+            method_kle.get_simpson_weights_times,
+            method_kle.get_four_point_weights_times,
+            method_kle.get_gauss_legendre_weights_times]
+            #method_kle.get_tanh_sinh_weights_times]
+
+
+    for _meth in meth:
+        ui = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth = _meth)
+        print(_meth.__name__, ui.shape)
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     # test_weights(plot=True)
+    # test_subdevide_axis()
+
     # test_solve_fredholm()
     # test_compare_weights_in_solve_fredholm_oac()
     # test_compare_weights_in_solve_fredholm_lac()
@@ -656,4 +755,6 @@ if __name__ == "__main__":
     # test_solve_fredholm()
     # test_solve_fredholm_reconstr_ac()
     # test_solve_fredholm_interp_eigenfunc(plot=True)
+    # test_reconstr_ac_interp()
+    # test_auto_ng()
     pass
