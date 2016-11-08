@@ -9,7 +9,7 @@ Both methods are based on a time discrete process, however cubic
 spline interpolation is assured to be valid within a given tolerance.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    stocproc
    example

@@ -16,12 +16,29 @@ import pathlib
 p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
 
+from scipy.special import gamma
 import stocproc as sp
 from stocproc import tools
 from stocproc import method_kle
 from stocproc import stocproc_c
 import pickle
 import logging
+
+_S_ = 0.6
+_GAMMA_S_PLUS_1 = gamma(_S_ + 1)
+_WC_ = 2
+
+def oac(tau):
+    """ohmic bath correlation function"""
+    return (1 + 1j * (tau)) ** (-(_S_ + 1)) * _GAMMA_S_PLUS_1 / np.pi
+def osd(omega):
+    return omega ** _S_ * np.exp(-omega)
+
+def lac(t):
+    """lorenzian bath correlation function"""
+    return np.exp(- np.abs(t) - 1j * _WC_ * t)
+def lsd(w):
+    return 1 / (1 + (w - _WC_) ** 2)
 
 def test_weights(plot=False):
     """
@@ -73,7 +90,7 @@ def test_solve_fredholm():
         with a straigt forward non hermetian eigenvalue solver
     """
     t_max = 15
-    corr = method_kle.lac
+    corr = lac
     meth = [method_kle.get_mid_point_weights_times,
             method_kle.get_simpson_weights_times,
             method_kle.get_four_point_weights_times]
@@ -116,7 +133,7 @@ def test_compare_weights_in_solve_fredholm_oac():
         although simpson and gauss-legendre perform well
     """
     t_max = 15
-    corr = method_kle.oac
+    corr = oac
 
     ng_ref = 3501
 
@@ -231,7 +248,7 @@ def test_compare_weights_in_solve_fredholm_lac():
         although simpson and gauss-legendre perform well
     """
     t_max = 15
-    corr = method_kle.lac
+    corr = lac
 
     ng_ref = 3501
 
@@ -347,8 +364,8 @@ def test_fredholm_eigvec_interpolation():
         for lorentzian : use simpson and spline interpolation
     """
     t_max = 15
-    corr = method_kle.lac
-    #corr = method_kle.oac
+    corr = lac
+    #corr = oac
 
     ng_ref = 3501
 
@@ -447,7 +464,7 @@ def test_cython_interpolation():
     """
     """
     t_max = 15
-    corr = method_kle.oac
+    corr = oac
 
     meth = method_kle.get_four_point_weights_times
     def my_intp(ti, corr, w, t, u, lam):
@@ -482,7 +499,7 @@ def test_cython_interpolation():
 
 def test_reconstr_ac():
     t_max = 15
-    res = method_kle.auto_ng(corr=method_kle.oac,
+    res = method_kle.auto_ng(corr=oac,
                              t_max=t_max,
                              ngfac=2,
                              meth=method_kle.get_mid_point_weights_times,
@@ -497,7 +514,7 @@ def test_reconstr_ac():
 
 def test_opt_fredh():
     t_max = 15
-    corr = method_kle.lac
+    corr = lac
 
     ng = 1001
 
@@ -517,7 +534,7 @@ def test_solve_fredholm2():
     ng_fac = 1
     idx_ = 102
 
-    corr = method_kle.lac
+    corr = lac
 
     for ng in [51]:
         tfine, rd = method_kle.get_rel_diff(corr = corr, t_max=t_max, ng=ng,
@@ -632,9 +649,9 @@ if __name__ == "__main__":
     # test_solve_fredholm()
     # test_compare_weights_in_solve_fredholm_oac()
     # test_compare_weights_in_solve_fredholm_lac()
-    # test_fredholm_eigvec_interpolation()
+    test_fredholm_eigvec_interpolation()
     # test_cython_interpolation()
-    test_reconstr_ac()
+    # test_reconstr_ac()
     # test_opt_fredh()
     # test_solve_fredholm()
     # test_solve_fredholm_reconstr_ac()

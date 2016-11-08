@@ -303,6 +303,21 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
 
         \Delta(n) = \max_{t,s \in [0,t_\mathrm{max}]}\left( \Big | \alpha(t-s) - \sum_{i=1}^n \lambda_i u_i(t) u_i^\ast(s) \Big | \right )
 
+    :param corr: the auto correlation function
+    :param t_max: specifies the interval [0, t_max] for which the stochastic process can be evaluated
+    :param ngfac: specifies the fine grid to use for the spline interpolation, the intermediate points are
+        calculated using integral interpolation
+    :param meth: the method for calculation integration weights and times, a callable or one of the following strings
+        'midpoint' ('midp'), 'trapezoidal' ('trapz'), 'simpson' ('simp'), 'fourpoint' ('fp'),
+        'gauss_legendre' ('gl'), 'tanh_sinh' ('ts')
+    :param tol: defines the success criterion max(abs(corr_exact - corr_reconstr)) < tol
+    :param diff_method: either 'full' or 'random', determines the points where the above success criterion is evaluated,
+        'full': full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
+        'random': pick a fixed number of random times t and s within the interval [0, t_max]
+    :param dm_random_samples: the number of random times used for diff_method 'random'
+    :return: an array containing the necessary eigenfunctions of the Karhunen-Loève expansion for sampling the
+        stochastic processes (shape=(num_eigen_functions, num_grid_points)
+
     The procedure works as follows:
         1) Solve the discrete Fredholm equation on a grid with ng points.
            This gives ng eigenvalues/vectors where each ng-dimensional vector approximates the continuous eigenfunction.
@@ -327,23 +342,10 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
            the interpolation error is maximal when beeing in between the reference points.
         5) Now calculate the deviation :math:`\Delta(n)` for sequential n starting at n=0. Stop if
            :math:`\Delta(n) < tol`. If the deviation does not drop below tol for all :math:`0 \leq n < ng-1` increase
-           ng as follows :math:`ng = 2*ng-1 and start over at 1). (This update schema for ng asured that ng is odd
+           ng as follows :math:`ng = 2*ng-1` and start over at 1). (This update schema for ng asured that ng is odd
            which is needed for the 'simpson' and 'fourpoint' integration weights)
 
-    :param corr: the auto correlation function
-    :param t_max: specifies the interval [0, t_max] for which the stochastic process can be evaluated
-    :param ngfac: specifies the fine grid to use for the spline interpolation, the intermediate points are
-        calculated using integral interpolation
-    :param meth: the method for calculation integration weights and times, a callable or one of the following strings
-        'midpoint' ('midp'), 'trapezoidal' ('trapz'), 'simpson' ('simp'), 'fourpoint' ('fp'),
-        'gauss_legendre' ('gl'), 'tanh_sinh' ('ts')
-    :param tol: defines the success criterion max(abs(corr_exact - corr_reconstr)) < tol
-    :param diff_method: either 'full' or 'random', determines the points where the above success criterion is evaluated,
-        'full': full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
-        'random': pick a fixed number of random times t and s within the interval [0, t_max]
-    :param dm_random_samples: the number of random times used for diff_method 'random'
-    :return: an array containing the necessary eigenfunctions of the Karhunen-Loève expansion for sampling the
-        stochastic processes
+
 
     [1] Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P.,
     2007. Numerical Recipes 3rd Edition: The Art of Scientific Computing,

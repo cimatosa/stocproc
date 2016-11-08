@@ -2,11 +2,17 @@
 Stochastic Process Generators
 =============================
 
+
 Karhunen-Loève expansion
 ------------------------
 
+.. toctree::
+   :maxdepth: 2
+
+   StocProc_KLE
+
 This method samples stochastic processes using Karhunen-Loève expansion and
-is implemented in the class :doc:`StocProc_KLE_tol </StocProc_KLE>`.
+is implemented in the class :doc:`StocProc_KLE </StocProc_KLE>`.
 
 Setting up the class involves solving an eigenvalue problem which grows with
 the time interval the process is simulated on. Further generating a new process
@@ -17,7 +23,14 @@ than the Fast-Fourier method.
 
 Fast-Fourier method
 -------------------
-simulate stochastic processes using Fast-Fourier method method :py:func:`stocproc.StocProc_FFT_tol`
+
+.. toctree::
+   :maxdepth: 2
+
+   StocProc_FFT
+
+In the class :doc:`StocProc_FFT </StocProc_FFT>` a method based on Fast-Fourier transform is
+used to sample stochastic processes.
 
 Setting up this class is quite efficient as it only calculates values of the
 associated spectral density. The number scales linear with the time interval of interest. However to achieve
@@ -87,7 +100,7 @@ class _absStocProc(abc.ABC):
             return self._interpolator(t)
 
     @abc.abstractmethod
-    def _calc_z(self, y):
+    def calc_z(self, y):
         r"""
         maps the normal distributed complex valued random variables y to the stochastic process
         
@@ -117,12 +130,12 @@ class _absStocProc(abc.ABC):
     
     def new_process(self, y=None, seed=None):
         r"""
-        generate a new process by evaluating :py:func:`_calc_z'
+        generate a new process by evaluating :py:func:`calc_z`
         
-        When ``y`` is given use these random numbers as input for :py:func:`_calc_z`
+        When ``y`` is given use these random numbers as input for :py:func:`calc_z`
         otherwise generate a new set of random numbers.
         
-        :param y: independent normal distributed complex valued random variables with :math:`\sig_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}
+        :param y: independent normal distributed complex valued random variables with :math:`\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}`
         :param seed: if not ``None`` set seed to ``seed`` before generating samples 
         """
         t0 = time.time()
@@ -134,7 +147,7 @@ class _absStocProc(abc.ABC):
         if y is None:
             #random complex normal samples
             y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
-        self._z = self._calc_z(y)
+        self._z = self.calc_z(y)
         log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
 
 
@@ -147,40 +160,54 @@ class StocProc_KLE(_absStocProc):
 
         where :math:`Y_i` and independent complex valued Gaussian random variables with variance one
         (:math:`\langle Y_i Y_j \rangle = \delta_{ij}`) and :math:`\lambda_i`, :math:`u_i(t)` are
-        eigenvalues / eigenfunctions of the following Fredholm equation
+        eigenvalues / eigenfunctions of the following homogeneous Fredholm equation
 
         .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)
 
-        for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation
-        :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.
+        for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation of the
+        stocastic processes :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.
 
         For the numeric implementation the integral equation will be discretized
-        (see :py:func:`stocproc.method_kle.solve_hom_fredholm` for details).
+        (see :py:func:`stocproc.method_kle.solve_hom_fredholm` for details) which leads to a regular matrix
+        eigenvalue problem.
+        The accuracy of the generated  process in terms of its auto correlation function depends on
+        the quality of the eigenvalues and eigenfunction and thus of the number of discritization points.
+        Further for a given threshold there is only a finite number of eigenvalues above that threshold,
+        provided that the number of discritization points is large enough.
 
+        Now the property of representing the integral kernel in terms of the eigenfunction
 
-        - Solve fredholm equation on grid with ``ng_fredholm nodes`` (trapezoidal_weights).
-          If case ``ng_fredholm`` is ``None`` set ``ng_fredholm = num_grid_points``. In general it should
-          hold ``ng_fredholm < num_grid_points`` and ``num_grid_points = 10*ng_fredholm`` might be a good ratio.
-        - Calculate discrete stochastic process (using interpolation solution of fredholm equation) with num_grid_points nodes
-        - invoke spline interpolator when calling
+        .. math :: R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s)
 
-        same as StocProc_KLE except that ng_fredholm is determined from given tolerance
-
-        bla bla
-
+        is used to find the number of discritization points and the number of used eigenfunctions such that
+        the sum represents the kernel up to a given tolerance (see :py:func:`stocproc.method_kle.auto_ng`
+        for details).
     """
     
-    def __init__(self, r_tau, t_max, ng_fac=4, meth='fourpoint', tol=1e-2, diff_method='full', dm_random_samples=10**4,
+    def __init__(self, r_tau, t_max, tol=1e-2, ng_fac=4, meth='fourpoint', diff_method='full', dm_random_samples=10**4,
         seed=None, align_eig_vec=False):
-        """this is init
+        """
+        :param r_tau: the idesired auto correlation function of a single parameter tau
+        :param t_max: specifies the time interval [0, t_max] for which the processes in generated
+        :param tol: maximal deviation of the auto correlation function of the sampled processes from
+            the given auto correlation r_tau.
+        :param ngfac: specifies the fine grid to use for the spline interpolation, the intermediate points are
+            calculated using integral interpolation
+        :param meth: the method for calculation integration weights and times, a callable or one of the following strings
+            'midpoint' ('midp'), 'trapezoidal' ('trapz'), 'simpson' ('simp'), 'fourpoint' ('fp'),
+            'gauss_legendre' ('gl'), 'tanh_sinh' ('ts')
+        :param diff_method: either 'full' or 'random', determines the points where the above success criterion is evaluated,
+            'full': full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
+            'random': pick a fixed number of random times t and s within the interval [0, t_max]
+        :param dm_random_samples: the number of random times used for diff_method 'random'
+        :param seed: if not None seed the random number generator on init of this class with seed
+        :param align_eig_vec: assures that :math:`re(u_i(0)) \leq 0` and :math:`im(u_i(0)) = 0` for all i
 
-        :param r_tau:
-        :param t_max:
-        :param tol:
-        :param ng_fac:
-        :param seed:
-        :param k:
-        :param align_eig_vec:
+        .. seealso ::
+           Details on how to solve the homogeneous Fredholm equation: :py:func:`stocproc.method_kle.solve_hom_fredholm`
+
+           Details on the error estimation and further clarification of the parameters ng_fac, meth,
+           diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
         """
 
         sqrt_lambda_ui_fine = method_kle.auto_ng(corr=r_tau,
@@ -211,7 +238,8 @@ class StocProc_KLE(_absStocProc):
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
-    def _calc_z(self, y):
+    def calc_z(self, y):
+        r"""evaluate :math:`z_k = \sum_i \lambda_i Y_i u_{ik}`"""
         return np.tensordot(y, self.sqrt_lambda_ui_fine, axes=([0], [0])).flatten()
 
     def get_num_y(self):
@@ -292,7 +320,7 @@ class StocProc_FFT(_absStocProc):
                          num_grid_points = num_grid_points,
                          seed            = seed)
             
-    def _calc_z(self, y): 
+    def calc_z(self, y):
         z = np.fft.fft(self.yl * y)[0:self.num_grid_points] * self.omega_min_correction
         return z
 

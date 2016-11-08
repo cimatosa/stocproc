@@ -16,3 +16,4 @@ StocProc_KLE
 .. autofunction:: stocproc.method_kle.get_four_point_weights_times
 .. autofunction:: stocproc.method_kle.get_gauss_legendre_weights_times
 .. autofunction:: stocproc.method_kle.get_tanh_sinh_weights_times
+.. autofunction:: stocproc.method_kle.auto_ng
