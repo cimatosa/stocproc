@@ -17,6 +17,7 @@ p = pathlib.PosixPath(os.path.abspath(__file__))
 sys.path.insert(0, str(p.parent.parent))
 
 from scipy.special import gamma
+from scipy.integrate import quad
 import stocproc as sp
 from stocproc import tools
 from stocproc import method_kle
@@ -740,15 +741,37 @@ def test_auto_ng():
         ui = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth = _meth)
         print(_meth.__name__, ui.shape)
 
+def test_analytic_lorentzian_eigenfunctions():
+    tmax = 15
+    gamma = 2.3
+    w = 10.3
+    num = 10
+    corr = lambda x: np.exp(-gamma * np.abs(x) - 1j * w * x)
+    lef = tools.LorentzianEigenFunctions(tmax, gamma, w, num)
+    t = np.linspace(0, tmax, 55)
+    for idx in range(num):
+        u = lef.get_eigfunc(idx)
+
+        u_kernel_re = np.asarray([quad(lambda s: np.real(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t])
+        u_kernel_im = np.asarray([quad(lambda s: np.imag(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t])
+        u_kernel = u_kernel_re + 1j * u_kernel_im
+        c = 1 / lef.get_eigval(idx)
+        md = np.max(np.abs(u(t) - c * u_kernel))
+        assert md < 1e-6
+
+        norm = quad(lambda s: np.abs(u(s)) ** 2, 0, tmax)[0]
+        assert abs(1 - norm) < 1e-15
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # test_weights(plot=True)
     # test_subdevide_axis()
+    test_analytic_lorentzian_eigenfunctions()
 
     # test_solve_fredholm()
     # test_compare_weights_in_solve_fredholm_oac()
     # test_compare_weights_in_solve_fredholm_lac()
-    test_fredholm_eigvec_interpolation()
+    # test_fredholm_eigvec_interpolation()
     # test_cython_interpolation()
     # test_reconstr_ac()
     # test_opt_fredh()
