@@ -400,10 +400,23 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         time_fredholm += (time.time() - t0)
 
         tfine = subdevide_axis(t, ngfac)                      # setup fine
-        tsfine = subdevide_axis(tfine, 2)                     # and super fine time grid
+        tsfine = subdevide_axis(tfine, 2)[1::2]               # and super fine time grid
+
+        if is_equi:
+            t0 = time.time()                                  # efficient way to calculate the auto correlation
+            alpha_k = _calc_corr_min_t_plus_t(tfine, corr)    # from -tmax untill tmax on the fine grid
+            time_calc_ac += (time.time() - t0)                # needed for integral interpolation
 
         if diff_method == 'full':
-            alpha_ref = corr(tsfine.reshape(-1,1) - tsfine.reshape(1,-1))
+            if not is_equi:
+                alpha_ref = corr(tsfine.reshape(-1,1) - tsfine.reshape(1,-1))
+            else:
+                ng_sfine = len(tsfine)
+                alpha_ref = np.empty(shape=(ng_sfine, ng_sfine), dtype=np.complex128)
+                for i in range(ng_sfine):
+                    idx = ng_sfine - i
+                    alpha_ref[:, i] = alpha_k[idx:idx + ng_sfine]  # note we can use alpha_k as
+                                                                   # alpha(ti+dt/2 - (tj+dt/2)) = alpha(ti - tj)
 
         diff = -alpha_ref
         old_md = np.inf
@@ -417,12 +430,17 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
             if ngfac != 1:
                 t0 = time.time()
                 # when using sqrt_lambda instead of lambda we get sqrt_lamda time u
-                # which is the quantity needed for the stochastic process
-                # generation
+                # which is the quantity needed for the stochastic process generation
                 if not is_equi:
                     sqrt_lambda_ui_fine = np.asarray([np.sum(corr(ti - t) * w * evec) / sqrt_eval for ti in tfine])
                 else:
-                    raise NotImplementedError
+                    sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(delta_t_fac=ngfac,
+                                                                     time_axis=t,
+                                                                     alpha_k=alpha_k,
+                                                                     weights=w,
+                                                                     eigen_val=sqrt_eval,
+                                                                     eigen_vec=evec)
+
                 time_integr_intp += (time.time() - t0)
             else:
                 sqrt_lambda_ui_fine = evec*sqrt_eval

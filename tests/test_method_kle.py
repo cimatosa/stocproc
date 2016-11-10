@@ -278,14 +278,52 @@ def test_auto_ng():
     meth = [method_kle.get_mid_point_weights_times,
             method_kle.get_trapezoidal_weights_times,
             method_kle.get_simpson_weights_times,
-            method_kle.get_four_point_weights_times,
-            method_kle.get_gauss_legendre_weights_times]
+            method_kle.get_four_point_weights_times]
+            #method_kle.get_gauss_legendre_weights_times]
             #method_kle.get_tanh_sinh_weights_times]
 
 
     for _meth in meth:
         ui = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth = _meth)
         print(_meth.__name__, ui.shape)
+
+def show_auto_ng():
+    corr = lac
+    t_max = 15
+    meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
+            method_kle.get_simpson_weights_times,
+            method_kle.get_four_point_weights_times]
+            #method_kle.get_gauss_legendre_weights_times]
+            #method_kle.get_tanh_sinh_weights_times]
+
+    ng_fac = 1
+    tols = np.logspace(-2,-1, 10)
+    for _meth in meth:
+        d = []
+        for tol in tols:
+            ui = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth = _meth, tol=tol)
+            d.append(ui.shape[0])
+        plt.plot(tols, d, label=_meth.__name__)
+
+    t = np.linspace(0, t_max, 500)
+
+    d = []
+    for tol in tols:
+        lef = tools.LorentzianEigenFunctions(t_max=t_max, gamma=1, w=_WC_, num=800)
+        diff = -corr(t.reshape(-1,1) - t.reshape(1,-1))
+        for i in range(800):
+            u = lef.get_eigfunc(i)(t)
+            diff += lef.get_eigval(i)*u.reshape(-1,1)*np.conj(u.reshape(1,-1))
+            if np.max(np.abs(diff)) < tol:
+                d.append(i+1)
+                break
+    plt.plot(tols, d, label='exact')
+    plt.legend()
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.grid()
+    plt.show()
 
 def show_compare_weights_in_solve_fredholm_oac():
     """
@@ -1056,7 +1094,7 @@ def show_lac_simp_scaling():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # test_weights(plot=True)
-    test_is_axis_equidistant()
+    # test_is_axis_equidistant()
     # test_subdevide_axis()
     # test_analytic_lorentzian_eigenfunctions()
     # test_solve_fredholm()
@@ -1066,7 +1104,7 @@ if __name__ == "__main__":
     # test_solve_fredholm_reconstr_ac()
     # test_auto_ng()
 
-
+    show_auto_ng()
     # show_compare_weights_in_solve_fredholm_oac()
     # show_compare_weights_in_solve_fredholm_lac()
     # show_solve_fredholm_error_scaling_oac()
