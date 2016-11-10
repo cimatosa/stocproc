@@ -41,6 +41,10 @@ def lac(t):
 def lsd(w):
     return 1 / (1 + (w - _WC_) ** 2)
 
+
+def my_intp(ti, corr, w, t, u, lam):
+    return np.sum(corr(ti - t) * w * u) / lam
+
 def test_weights(plot=False):
     """
         here we check for the correct scaling of the various integration schemas
@@ -50,12 +54,13 @@ def test_weights(plot=False):
 
     tm = 10
     meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
             method_kle.get_simpson_weights_times,
             method_kle.get_four_point_weights_times,
             method_kle.get_gauss_legendre_weights_times,
             method_kle.get_tanh_sinh_weights_times]
-    cols = ['r', 'b', 'g', 'm', 'c']
-    errs = [2e-3, 2e-8, 7e-11, 5e-16, 8e-15]
+    cols = ['r', 'b', 'g', 'm', 'c', 'lime']
+    errs = [2e-3, 6e-5, 2e-8, 7e-11, 5e-16, 8e-15]
     I_exact = np.log(tm**2 + 1)/2
 
     ng = 401
@@ -69,7 +74,7 @@ def test_weights(plot=False):
         for i, _meth in enumerate(meth):
             xdata = []
             ydata = []
-            for k in np.logspace(0, 2, 50):
+            for k in np.logspace(0, 2.5, 30):
                 ng = 4 * int(k) + 1
                 t, w = _meth(t_max=tm, num_grid_points=ng)
                 I = np.sum(w*f(t))
@@ -77,12 +82,72 @@ def test_weights(plot=False):
                 ydata.append(abs(I - I_exact))
             plt.plot(xdata, ydata, marker='o', color=cols[i], label=_meth.__name__)
 
+        x = np.logspace(1, 3, 50)
+        plt.plot(x, 0.3 / x, color='0.5')
+        plt.plot(x, 6 / x ** 2, color='0.5')
+        plt.plot(x, 200 / x ** 4, color='0.5')
+        plt.plot(x, 200000 / x ** 6, color='0.5')
+
         plt.legend(loc = 'lower left')
         plt.xscale('log')
         plt.yscale('log')
         plt.grid()
         plt.tight_layout()
         plt.show()
+
+def test_is_axis_equidistant():
+    t, w = method_kle.get_mid_point_weights_times(1, 51)
+    assert method_kle.is_axis_equidistant(t)
+
+    t, w = method_kle.get_trapezoidal_weights_times(1, 51)
+    assert method_kle.is_axis_equidistant(t)
+
+    t, w = method_kle.get_simpson_weights_times(1, 51)
+    assert method_kle.is_axis_equidistant(t)
+
+    t, w = method_kle.get_four_point_weights_times(1, 53)
+    assert method_kle.is_axis_equidistant(t)
+
+    t, w = method_kle.get_gauss_legendre_weights_times(1, 51)
+    assert not method_kle.is_axis_equidistant(t)
+
+    t, w = method_kle.get_tanh_sinh_weights_times(1, 51)
+    assert not method_kle.is_axis_equidistant(t)
+
+
+
+def test_subdevide_axis():
+    t = [0, 1, 3]
+    tf1 = method_kle.subdevide_axis(t, ngfac=1)
+    assert np.max(np.abs(tf1 - np.asarray([0, 1, 3]))) < 1e-15
+    tf2 = method_kle.subdevide_axis(t, ngfac=2)
+    assert np.max(np.abs(tf2 - np.asarray([0, 0.5, 1, 2, 3]))) < 1e-15
+    tf3 = method_kle.subdevide_axis(t, ngfac=3)
+    assert np.max(np.abs(tf3 - np.asarray([0, 1 / 3, 2 / 3, 1, 1 + 2 / 3, 1 + 4 / 3, 3]))) < 1e-15
+    tf4 = method_kle.subdevide_axis(t, ngfac=4)
+    assert np.max(np.abs(tf4 - np.asarray([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3]))) < 1e-15
+
+
+def test_analytic_lorentzian_eigenfunctions():
+    tmax = 15
+    gamma = 2.3
+    w = 10.3
+    num = 10
+    corr = lambda x: np.exp(-gamma * np.abs(x) - 1j * w * x)
+    lef = tools.LorentzianEigenFunctions(tmax, gamma, w, num)
+    t = np.linspace(0, tmax, 55)
+    for idx in range(num):
+        u = lef.get_eigfunc(idx)
+
+        u_kernel_re = np.asarray([quad(lambda s: np.real(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t])
+        u_kernel_im = np.asarray([quad(lambda s: np.imag(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t])
+        u_kernel = u_kernel_re + 1j * u_kernel_im
+        c = 1 / lef.get_eigval(idx)
+        md = np.max(np.abs(u(t) - c * u_kernel))
+        assert md < 1e-6
+
+        norm = quad(lambda s: np.abs(u(s)) ** 2, 0, tmax)[0]
+        assert abs(1 - norm) < 1e-15
 
 def test_solve_fredholm():
     """
@@ -125,8 +190,104 @@ def test_solve_fredholm():
             diff_evec = np.max(np.abs(_eig_vec[:,i] - evec[:,i]))
             assert diff_evec < 1e-10, "diff_evec {} = {} {}".format(i, diff_evec, _meth.__name__)
 
+def test_cython_interpolation():
+    """
+    """
+    t_max = 15
+    corr = oac
 
-def test_compare_weights_in_solve_fredholm_oac():
+    meth = method_kle.get_four_point_weights_times
+    def my_intp(ti, corr, w, t, u, lam):
+        return np.sum(u * corr(ti - t) * w) / lam
+
+    k = 40
+    ng = 4*k+1
+
+    t, w = meth(t_max, ng)
+    r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+    _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+    method_kle.align_eig_vec(_eig_vec)
+
+    ngfac = 4
+    tfine = np.linspace(0, t_max, (ng-1)*ngfac+1)
+
+    bcf_n_plus = corr(tfine - tfine[0])
+    alpha_k = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
+    for i in range(ng//2):
+        evec = _eig_vec[:,i]
+        sqrt_eval = np.sqrt(_eig_val[i])
+
+        ui_fine = np.asarray([my_intp(ti, corr, w, t, evec, sqrt_eval) for ti in tfine])
+
+        ui_fine2 = stocproc_c.eig_func_interp(delta_t_fac = ngfac,
+                                              time_axis   = t,
+                                              alpha_k     = alpha_k,
+                                              weights     = w,
+                                              eigen_val   = sqrt_eval,
+                                              eigen_vec   = evec)
+        assert np.max(np.abs(ui_fine - ui_fine2)) < 2e-11
+
+def test_reconstr_ac():
+    t_max = 15
+    res = method_kle.auto_ng(corr=oac,
+                             t_max=t_max,
+                             ngfac=2,
+                             meth=method_kle.get_mid_point_weights_times,
+                             tol=1e-3,
+                             diff_method='full',
+                             dm_random_samples=10 ** 4)
+    print(type(res))
+    print(res.shape)
+
+def test_solve_fredholm_reconstr_ac():
+    """
+        here we see that the reconstruction quality is independent of the integration weights
+
+        differences occur when checking validity of the interpolated time continuous Fredholm equation
+    """
+    _WC_ = 2
+    def lac(t):
+        return np.exp(- np.abs(t) - 1j*_WC_*t)
+    t_max = 10
+    for ng in range(11,500,30):
+        print(ng)
+        t, w = sp.method_kle.get_mid_point_weights_times(t_max, ng)
+        r = lac(t.reshape(-1,1)-t.reshape(1,-1))
+        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
+        _eig_vec_ast = np.conj(_eig_vec)  # (N_gp, N_ev)
+        tmp = _eig_val.reshape(1, -1) * _eig_vec  # (N_gp, N_ev)
+        recs_bcf = np.tensordot(tmp, _eig_vec_ast, axes=([1], [1]))
+        rd = np.max(np.abs(recs_bcf - r) / np.abs(r))
+        assert rd < 1e-10
+
+
+        t, w = sp.method_kle.get_simpson_weights_times(t_max, ng)
+        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
+        _eig_vec_ast = np.conj(_eig_vec)  # (N_gp, N_ev)
+        tmp = _eig_val.reshape(1, -1) * _eig_vec  # (N_gp, N_ev)
+        recs_bcf = np.tensordot(tmp, _eig_vec_ast, axes=([1], [1]))
+        rd = np.max(np.abs(recs_bcf - r) / np.abs(r))
+        assert rd < 1e-10
+
+
+def test_auto_ng():
+    corr = oac
+    t_max = 8
+    ng_fac = 1
+    meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
+            method_kle.get_simpson_weights_times,
+            method_kle.get_four_point_weights_times,
+            method_kle.get_gauss_legendre_weights_times]
+            #method_kle.get_tanh_sinh_weights_times]
+
+
+    for _meth in meth:
+        ui = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth = _meth)
+        print(_meth.__name__, ui.shape)
+
+def show_compare_weights_in_solve_fredholm_oac():
     """
         here we try to examine which integration weights perform best in order to
         calculate the eigenfunctions -> well it seems to depend on the situation
@@ -172,11 +333,12 @@ def test_compare_weights_in_solve_fredholm_oac():
         eigvec_ref.append(tools.ComplexInterpolatedUnivariateSpline(t, evec_ref[:, i]))
 
     meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
             method_kle.get_simpson_weights_times,
             method_kle.get_four_point_weights_times,
             method_kle.get_gauss_legendre_weights_times,
-            method_kle.get_sinh_tanh_weights_times]
-    cols = ['r', 'b', 'g', 'm', 'c']
+            method_kle.get_tanh_sinh_weights_times]
+    cols = ['r', 'b', 'g', 'm', 'c', 'lime']
     for j, k in enumerate(ks):
         axc = ax[j]
         ng = 4 * k + 1
@@ -184,7 +346,7 @@ def test_compare_weights_in_solve_fredholm_oac():
         for i, _meth in enumerate(meth):
             t, w = _meth(t_max, ng)
             r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
-            _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
+            _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
             method_kle.align_eig_vec(_eig_vec)
 
             dx = []
@@ -206,7 +368,7 @@ def test_compare_weights_in_solve_fredholm_oac():
 
         t, w = method_kle.get_simpson_weights_times(t_max, ng)
         r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
-        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
         method_kle.align_eig_vec(_eig_vec)
         _eig_vec = _eig_vec[1::2, :]
         t = t[1::2]
@@ -222,7 +384,7 @@ def test_compare_weights_in_solve_fredholm_oac():
             dy.append(np.max(diff))
             dy2.append(abs(_eig_val[l] - eigval_ref[l]))
 
-        p, = axc.plot(dx, dy, color='lime')
+        p, = axc.plot(dx, dy, color='orange')
         p_lam, = axc.plot(list(range(ng)), eigval_ref[:ng], color='k')
         if j == 0:
             lines.append(p)
@@ -241,7 +403,90 @@ def test_compare_weights_in_solve_fredholm_oac():
     fig.subplots_adjust(bottom=0.15)
     plt.show()
 
-def test_compare_weights_in_solve_fredholm_lac():
+def show_solve_fredholm_error_scaling_oac():
+    """
+    """
+    t_max = 15
+    corr = oac
+
+    ng_ref = 3501
+
+    _meth_ref = method_kle.get_simpson_weights_times
+    t, w = _meth_ref(t_max, ng_ref)
+
+    t_3501 = t
+
+    try:
+        with open("test_fredholm_interpolation.dump", 'rb') as f:
+            ref_data = pickle.load(f)
+    except FileNotFoundError:
+        ref_data = {}
+    key = (tuple(t), tuple(w), corr.__name__)
+    if key in ref_data:
+        eigval_ref, evec_ref = ref_data[key]
+    else:
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        eigval_ref, evec_ref = method_kle.solve_hom_fredholm(r, w)
+        ref_data[key] = eigval_ref, evec_ref
+        with open("test_fredholm_interpolation.dump", 'wb') as f:
+            pickle.dump(ref_data, f)
+
+    method_kle.align_eig_vec(evec_ref)
+
+    ks = np.logspace(0.7, 2.3, 15, dtype=np.int)
+
+    meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
+            method_kle.get_simpson_weights_times,
+            method_kle.get_four_point_weights_times,
+            method_kle.get_gauss_legendre_weights_times,
+            method_kle.get_tanh_sinh_weights_times]
+
+    names = ['midp', 'trapz', 'simp', 'fp', 'gl', 'ts']
+    idxs = [0,10,20]
+
+    eigvec_ref = []
+    for idx in idxs:
+        eigvec_ref.append(tools.ComplexInterpolatedUnivariateSpline(t, evec_ref[:, idx]))
+
+    data = np.empty(shape= (len(meth), len(ks), len(idxs)))
+    data_spline = np.empty(shape=(len(meth), len(ks), len(idxs)))
+    data_int = np.empty(shape=(len(meth), len(ks), len(idxs)))
+    for j, k in enumerate(ks):
+        print(j, len(ks))
+        ng = 4 * k + 1
+        for i, _meth in enumerate(meth):
+            t, w = _meth(t_max, ng)
+            r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+            _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+            method_kle.align_eig_vec(_eig_vec)
+            for k, idx in enumerate(idxs):
+                d = np.max(np.abs(_eig_vec[:,idx]-eigvec_ref[k](t)))
+                data[i, j, k] = d
+
+                uip = tools.ComplexInterpolatedUnivariateSpline(t, _eig_vec[:,idx])
+                d = np.max(np.abs(uip(t_3501) - evec_ref[:, idx]))
+                data_spline[i, j, k] = d
+
+                uip = np.asarray([my_intp(ti, corr, w, t, _eig_vec[:, idx], _eig_val[idx]) for ti in t_3501])
+                d = np.max(np.abs(uip - evec_ref[:, idx]))
+                data_int[i, j, k] = d
+
+    ng = 4*ks + 1
+    for i in range(len(meth)):
+        p, = plt.plot(ng, data[i, :, 0], marker='o', label="no intp {}".format(names[i]))
+        c = p.get_color()
+        plt.plot(ng, data_spline[i, :, 0], marker='.', color=c, label="spline {}".format(names[i]))
+        plt.plot(ng, data_int[i, :, 0], marker='^', color=c, label="intp {}".format(names[i]))
+
+    plt.yscale('log')
+    plt.xscale('log')
+    plt.legend()
+    plt.grid()
+
+    plt.show()
+
+def show_compare_weights_in_solve_fredholm_lac():
     """
         here we try to examine which integration weights perform best in order to
         calculate the eigenfunctions -> well it seems to depend on the situation
@@ -288,11 +533,12 @@ def test_compare_weights_in_solve_fredholm_lac():
         eigvec_ref.append(tools.ComplexInterpolatedUnivariateSpline(t, evec_ref[:, i]))
 
     meth = [method_kle.get_mid_point_weights_times,
+            method_kle.get_trapezoidal_weights_times,
             method_kle.get_simpson_weights_times,
             method_kle.get_four_point_weights_times,
             method_kle.get_gauss_legendre_weights_times,
             method_kle.get_sinh_tanh_weights_times]
-    cols = ['r', 'b', 'g', 'm', 'c']
+    cols = ['r', 'b', 'g', 'm', 'c', 'lime']
     for j, k in enumerate(ks):
         axc = ax[j]
         ng = 4*k+1
@@ -359,19 +605,86 @@ def test_compare_weights_in_solve_fredholm_lac():
     fig.subplots_adjust(bottom=0.15)
     plt.show()
 
-def test_fredholm_eigvec_interpolation():
+def show_solve_fredholm_interp_eigenfunc():
+    """
+        here we take the discrete eigenfunctions of the Fredholm problem
+        and use qubic interpolation to check the integral equality.
+
+        the difference between the midpoint weights and simpson weights become
+        visible. Although the simpson integration yields on average a better performance
+        there are high fluctuation in the error.
+    """
+    _WC_ = 2
+    def lac(t):
+        return np.exp(- np.abs(t) - 1j*_WC_*t)
+
+    t_max = 10
+    ng = 81
+    ngfac = 2
+    tfine = np.linspace(0, t_max, (ng-1)*ngfac+1)
+
+    lef = tools.LorentzianEigenFunctions(t_max=t_max, gamma=1, w=_WC_, num=5)
+
+
+    fig, ax = plt.subplots(nrows=2, ncols=2, sharey=True, sharex=True)
+    ax = ax.flatten()
+
+    for idx in range(4):
+        u_exact = lef.get_eigfunc(idx)(tfine)
+        method_kle.align_eig_vec(u_exact.reshape(-1,1))
+
+        t, w = sp.method_kle.get_mid_point_weights_times(t_max, ng)
+        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        u0 = tools.ComplexInterpolatedUnivariateSpline(t, _eig_vec[:,idx])
+
+        err = np.abs(u0(tfine) - u_exact)
+        axc = ax[idx]
+        axc.plot(tfine, err, color='r', label='midp')
+
+        t, w = sp.method_kle.get_trapezoidal_weights_times(t_max, ng)
+        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        u0 = tools.ComplexInterpolatedUnivariateSpline(t, _eig_vec[:, idx])
+        err = np.abs(u0(tfine) - u_exact)
+        axc.plot(tfine, err, color='b', label='trapz')
+        axc.plot(tfine[::ngfac], err[::ngfac], ls='', marker='x', color='b')
+
+        t, w = sp.method_kle.get_simpson_weights_times(t_max, ng)
+        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        u0 = tools.ComplexInterpolatedUnivariateSpline(t, _eig_vec[:, idx])
+        err = np.abs(u0(tfine) - u_exact)
+        axc.plot(tfine, err, color='k', label='simp')
+        axc.plot(tfine[::ngfac], err[::ngfac], ls='', marker='x', color='k')
+
+        axc.set_yscale('log')
+        axc.set_title("eigen function # {}".format(idx))
+        axc.grid()
+
+
+    axc.set_yscale('log')
+    fig.suptitle("np.abs(int R(t-s)u_i(s) - lam_i * u_i(t))")
+    plt.show()
+
+def show_fredholm_eigvec_interpolation():
     """
         for ohmic sd   : use 4 point and integral interpolation
         for lorentzian : use simpson and spline interpolation
     """
     t_max = 15
     corr = lac
-    #corr = oac
+    corr = oac
 
     ng_ref = 3501
 
     _meth_ref = method_kle.get_simpson_weights_times
-    _meth_ref = method_kle.get_mid_point_weights_times
+    _meth_ref = method_kle.get_trapezoidal_weights_times
+    _meth_ref = method_kle.get_four_point_weights_times
+
     t, w = _meth_ref(t_max, ng_ref)
 
     try:
@@ -404,13 +717,12 @@ def test_fredholm_eigvec_interpolation():
             method_kle.get_tanh_sinh_weights_times]
     cols = ['r', 'b', 'g', 'm', 'c', 'lime']
 
-    def my_intp(ti, corr, w, t, u, lam):
-        return np.sum(corr(ti - t) * w * u) / lam
+
 
     fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(16,12))
     ax = ax.flatten()
 
-    ks = [10,20,40,80]
+    ks = [10,14,18,26]
 
     lns, lbs = [], []
 
@@ -465,44 +777,9 @@ def test_fredholm_eigvec_interpolation():
     plt.savefig("test_fredholm_eigvec_interpolation_{}_.pdf".format(corr.__name__))
     plt.show()
 
-def test_cython_interpolation():
-    """
-    """
-    t_max = 15
-    corr = oac
 
-    meth = method_kle.get_four_point_weights_times
-    def my_intp(ti, corr, w, t, u, lam):
-        return np.sum(u * corr(ti - t) * w) / lam
 
-    k = 40
-    ng = 4*k+1
-
-    t, w = meth(t_max, ng)
-    r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
-    _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
-    method_kle.align_eig_vec(_eig_vec)
-
-    ngfac = 4
-    tfine = np.linspace(0, t_max, (ng-1)*ngfac+1)
-
-    bcf_n_plus = corr(tfine - tfine[0])
-    alpha_k = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
-    for i in range(ng//2):
-        evec = _eig_vec[:,i]
-        sqrt_eval = np.sqrt(_eig_val[i])
-
-        ui_fine = np.asarray([my_intp(ti, corr, w, t, evec, sqrt_eval) for ti in tfine])
-
-        ui_fine2 = stocproc_c.eig_func_interp(delta_t_fac = ngfac,
-                                              time_axis   = t,
-                                              alpha_k     = alpha_k,
-                                              weights     = w,
-                                              eigen_val   = sqrt_eval,
-                                              eigen_vec   = evec)
-        assert np.max(np.abs(ui_fine - ui_fine2)) < 2e-11
-
-def test_reconstr_ac_interp():
+def show_reconstr_ac_interp():
     t_max = 25
     corr = lac
     #corr = oac
@@ -568,216 +845,234 @@ def test_reconstr_ac_interp():
         axc.legend()
     plt.show()
 
-def test_reconstr_ac():
-    t_max = 15
-    res = method_kle.auto_ng(corr=oac,
-                             t_max=t_max,
-                             ngfac=2,
-                             meth=method_kle.get_mid_point_weights_times,
-                             tol=1e-3,
-                             diff_method='full',
-                             dm_random_samples=10 ** 4)
-    print(type(res))
-    print(res.shape)
 
 
 
 
-def test_opt_fredh():
+
+
+def show_lac_error_scaling():
+    """
+    """
     t_max = 15
     corr = lac
 
-    ng = 1001
-
-    t, w = method_kle.get_simpson_weights_times(t_max, ng)
-    r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
-    eigval, eigvec = method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
     idx = 0
-    method_kle.opt_fredholm(corr, eigval[idx], t, eigvec[:,idx], method_kle.get_simpson_weights_times, ntimes=3)
+    lef = tools.LorentzianEigenFunctions(t_max=t_max, gamma=1, w=_WC_, num=10)
+    u = lef.get_eigfunc(idx)
+
+    ngs = np.logspace(1, 2.5, 60, dtype=np.int)
+
+    _meth = method_kle.get_mid_point_weights_times
+    d = []
+    for ng in ngs:
+        t, w = _meth(t_max, ng)
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        ut = u(t)
+        method_kle.align_eig_vec(ut.reshape(-1,1))
+        _d = np.abs(_eig_vec[:, idx]-ut)
+        d.append(np.max(_d))
+    plt.plot(ngs, d, label='midp', marker='o', ls='')
 
 
-def test_solve_fredholm2():
-    _WC_ = 2
-    def lac(t):
-        return np.exp(- np.abs(t) - 1j*_WC_*t)
-
-    t_max = 10
-    ng_fac = 1
-    idx_ = 102
-
-    corr = lac
-
-    for ng in [51]:
-        tfine, rd = method_kle.get_rel_diff(corr = corr, t_max=t_max, ng=ng,
-                                     weights_times=method_kle.get_mid_point_weights_times, ng_fac=ng_fac)
-        print(np.max(rd))
-        plt.imshow(np.log(rd))
-        #plt.plot(tfine, rd[:, idx_])
-
-        #tfine, rd = method_kle.get_rel_diff(corr=corr, t_max=t_max, ng=ng,
-        #                                    weights_times=method_kle.get_simpson_weights_times, ng_fac=ng_fac)
-        #plt.plot(tfine, rd[:, idx_])
+    _meth = method_kle.get_trapezoidal_weights_times
+    d = []
+    for ng in ngs:
+        t, w = _meth(t_max, ng)
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        ut = u(t)
+        method_kle.align_eig_vec(ut.reshape(-1, 1))
+        _d = np.abs(_eig_vec[:, idx] - ut)
+        d.append(np.max(_d))
+    plt.plot(ngs, d, label='trapz', marker='o', ls='')
 
 
+    _meth = method_kle.get_simpson_weights_times
+    d = []
+    ng_used = []
+    for ng in ngs:
+        ng = 2*(ng//2)+1
+        if ng in ng_used:
+            continue
+        ng_used.append(ng)
+        t, w = _meth(t_max, ng)
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        ut = u(t)
+        method_kle.align_eig_vec(ut.reshape(-1, 1))
+        _d = np.abs(_eig_vec[:, idx] - ut)
+        d.append(np.max(_d))
+    plt.plot(ng_used, d, label='simp', marker='o', ls='')
+
+    x = np.logspace(1, 3, 50)
+    plt.plot(x, 0.16 / x, color='0.5')
+    plt.plot(x, 1 / x ** 2, color='0.5')
+    plt.plot(x, 200 / x ** 4, color='0.5')
+    plt.plot(x, 200000 / x ** 6, color='0.5')
 
 
-    #plt.yscale('log')
-    #plt.grid()
+
+
+
+    plt.yscale('log')
+    plt.xscale('log')
+
+    plt.legend()
+    plt.grid()
     plt.show()
 
-def test_solve_fredholm_reconstr_ac():
+def show_oac_error_scaling():
     """
-        here we see that the reconstruction quality is independent of the integration weights
-
-        differences occur when checking validity of the interpolated time continuous Fredholm equation
     """
-    _WC_ = 2
-    def lac(t):
-        return np.exp(- np.abs(t) - 1j*_WC_*t)
-    t_max = 10
-    for ng in range(11,500,30):
-        print(ng)
-        t, w = sp.method_kle.get_mid_point_weights_times(t_max, ng)
-        r = lac(t.reshape(-1,1)-t.reshape(1,-1))
-        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
-        _eig_vec_ast = np.conj(_eig_vec)  # (N_gp, N_ev)
-        tmp = _eig_val.reshape(1, -1) * _eig_vec  # (N_gp, N_ev)
-        recs_bcf = np.tensordot(tmp, _eig_vec_ast, axes=([1], [1]))
-        rd = np.max(np.abs(recs_bcf - r) / np.abs(r))
-        assert rd < 1e-10
+    t_max = 15
+    corr = lac
+
+    idx = 0
+    lef = tools.LorentzianEigenFunctions(t_max=t_max, gamma=1, w=_WC_, num=10)
+    u = lef.get_eigfunc(idx)
+
+    ngs = np.logspace(1, 2.5, 60, dtype=np.int)
+
+    _meth = method_kle.get_mid_point_weights_times
+    d = []
+    for ng in ngs:
+        t, w = _meth(t_max, ng)
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        ut = u(t)
+        method_kle.align_eig_vec(ut.reshape(-1,1))
+        _d = np.abs(_eig_vec[:, idx]-ut)
+        d.append(np.max(_d))
+    plt.plot(ngs, d, label='midp', marker='o', ls='')
 
 
-        t, w = sp.method_kle.get_simpson_weights_times(t_max, ng)
-        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
-        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
-        _eig_vec_ast = np.conj(_eig_vec)  # (N_gp, N_ev)
-        tmp = _eig_val.reshape(1, -1) * _eig_vec  # (N_gp, N_ev)
-        recs_bcf = np.tensordot(tmp, _eig_vec_ast, axes=([1], [1]))
-        rd = np.max(np.abs(recs_bcf - r) / np.abs(r))
-        assert rd < 1e-10
+    _meth = method_kle.get_trapezoidal_weights_times
+    d = []
+    for ng in ngs:
+        t, w = _meth(t_max, ng)
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        ut = u(t)
+        method_kle.align_eig_vec(ut.reshape(-1, 1))
+        _d = np.abs(_eig_vec[:, idx] - ut)
+        d.append(np.max(_d))
+    plt.plot(ngs, d, label='trapz', marker='o', ls='')
 
-def test_solve_fredholm_interp_eigenfunc(plot=False):
+
+    _meth = method_kle.get_simpson_weights_times
+    d = []
+    ng_used = []
+    for ng in ngs:
+        ng = 2*(ng//2)+1
+        if ng in ng_used:
+            continue
+        ng_used.append(ng)
+        t, w = _meth(t_max, ng)
+        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
+        method_kle.align_eig_vec(_eig_vec)
+        ut = u(t)
+        method_kle.align_eig_vec(ut.reshape(-1, 1))
+        _d = np.abs(_eig_vec[:, idx] - ut)
+        d.append(np.max(_d))
+    plt.plot(ng_used, d, label='simp', marker='o', ls='')
+
+    x = np.logspace(1, 3, 50)
+    plt.plot(x, 0.16 / x, color='0.5')
+    plt.plot(x, 1 / x ** 2, color='0.5')
+    plt.plot(x, 200 / x ** 4, color='0.5')
+    plt.plot(x, 200000 / x ** 6, color='0.5')
+
+
+
+
+
+    plt.yscale('log')
+    plt.xscale('log')
+
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+def show_lac_simp_scaling():
     """
-        here we take the discrete eigenfunctions of the Fredholm problem
-        and use qubic interpolation to check the integral equality.
+        even using the exact eigen functions yields bad error scaling due to the
+        non smoothness of the correlation function at tau=0
 
-        the difference between the midpoint weights and simpson weights become
-        visible. Although the simpson integration yields on average a better performance
-        there are high fluctuation in the error.
+        the problem is cured if the integral over s runs from 0 to t and then from
+        t to t_max, this is only ensured for midpoint and trapezoidal weights.
     """
-    _WC_ = 2
-    def lac(t):
-        return np.exp(- np.abs(t) - 1j*_WC_*t)
+    t_max = 15
+    corr = lac
 
-    t_max = 10
-    ng = 81
-    ngfac = 2
-    tfine = np.linspace(0, t_max, (ng-1)*ngfac+1)
+    idx = 0
+    lef = tools.LorentzianEigenFunctions(t_max=t_max, gamma=1, w=_WC_, num=10)
+    u = lef.get_eigfunc(idx)
+    c = 1/lef.get_eigval(idx)
 
-    if plot:
-        fig, ax = plt.subplots(nrows=2, ncols=2, sharey=True, sharex=True)
-        ax = ax.flatten()
+    ngs = np.logspace(1, 2.5, 60, dtype=np.int)
 
-    for idx in range(4):
-        t, w = sp.method_kle.get_mid_point_weights_times(t_max, ng)
-        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
-        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
-        u0 = tools.ComplexInterpolatedUnivariateSpline(t, _eig_vec[:,idx])
-        lam0 = _eig_val[idx]
-        err_mp = []
-        for ti in tfine:
-            I = tools.complex_quad(lambda s: lac(ti-s)*u0(s), 0, t_max, limit=500)
-            err_mp.append(np.abs(I - lam0*u0(ti)))
-        if plot:
-            axc = ax[idx]
-            axc.plot(tfine, err_mp, color='r', label='midp')
+    _meth = method_kle.get_simpson_weights_times
+    d0 = []
+    d1 = []
+    ng_used = []
+    for ng in ngs:
+        ng = 2*(ng//2)+1
+        if ng in ng_used:
+            continue
+        ng_used.append(ng)
+        t, w = _meth(t_max, ng)
+        ti = 0
+        di = abs(u(ti) - c*np.sum(w*corr(ti-t)*u(t)))
+        d0.append(di)
+        ti = 1
+        di = abs(u(ti) - c * np.sum(w * corr(ti - t) * u(t)))
+        d1.append(di)
 
-        t, w = sp.method_kle.get_simpson_weights_times(t_max, ng)
-        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
-        _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w, eig_val_min=0)
-        u0 = tools.ComplexInterpolatedUnivariateSpline(t, _eig_vec[:, idx])
-        lam0 = _eig_val[idx]
-        err_sp = []
-        for ti in tfine:
-            I = tools.complex_quad(lambda s: lac(ti - s) * u0(s), 0, t_max, limit=500)
-            err_sp.append(np.abs(I - lam0 * u0(ti)))
-        if plot:
-            axc.plot(tfine, err_sp, color='k', label='simp')
-            axc.set_yscale('log')
-            axc.plot(tfine[::ngfac], err_sp[::ngfac], ls='', marker='x', color='k')
-            axc.set_title("eigen function # {}".format(idx))
+    plt.plot(ng_used, d0, marker='o', color='k', label="simps int corr(0-s) u(s)")
+    plt.plot(ng_used, d1, marker='o', color='r', label="simps int corr(1-s) u(s)")
 
-        assert max(err_mp) > max(err_sp)
+    ng_used = np.asanyarray(ng_used)
+    plt.plot(ng_used, 1 / ng_used ** 2, label='1/ng**2')
+    plt.plot(ng_used, 1 / ng_used ** 4, label='1/ng**4')
 
-    if plot:
-        fig.suptitle("np.abs(int R(t-s)u_i(s) - lam_i * u_i(t))")
-        plt.show()
+    plt.yscale('log')
+    plt.xscale('log')
 
 
-def test_subdevide_axis():
-    t = [0, 1, 3]
-    tf1 = method_kle.subdevide_axis(t, ngfac=1)
-    assert np.max(np.abs(tf1 - np.asarray([0, 1, 3]))) < 1e-15
-    tf2 = method_kle.subdevide_axis(t, ngfac=2)
-    assert np.max(np.abs(tf2 - np.asarray([0, 0.5, 1, 2, 3]))) < 1e-15
-    tf3 = method_kle.subdevide_axis(t, ngfac=3)
-    assert np.max(np.abs(tf3 - np.asarray([0, 1 / 3, 2 / 3, 1, 1 + 2 / 3, 1 + 4 / 3, 3]))) < 1e-15
-    tf4 = method_kle.subdevide_axis(t, ngfac=4)
-    assert np.max(np.abs(tf4 - np.asarray([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3]))) < 1e-15
-
-def test_auto_ng():
-    corr = oac
-    t_max = 8
-    ng_fac = 1
-    meth = [method_kle.get_mid_point_weights_times,
-            method_kle.get_trapezoidal_weights_times,
-            method_kle.get_simpson_weights_times,
-            method_kle.get_four_point_weights_times,
-            method_kle.get_gauss_legendre_weights_times]
-            #method_kle.get_tanh_sinh_weights_times]
+    plt.legend()
+    plt.grid()
+    plt.show()
 
 
-    for _meth in meth:
-        ui = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth = _meth)
-        print(_meth.__name__, ui.shape)
-
-def test_analytic_lorentzian_eigenfunctions():
-    tmax = 15
-    gamma = 2.3
-    w = 10.3
-    num = 10
-    corr = lambda x: np.exp(-gamma * np.abs(x) - 1j * w * x)
-    lef = tools.LorentzianEigenFunctions(tmax, gamma, w, num)
-    t = np.linspace(0, tmax, 55)
-    for idx in range(num):
-        u = lef.get_eigfunc(idx)
-
-        u_kernel_re = np.asarray([quad(lambda s: np.real(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t])
-        u_kernel_im = np.asarray([quad(lambda s: np.imag(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t])
-        u_kernel = u_kernel_re + 1j * u_kernel_im
-        c = 1 / lef.get_eigval(idx)
-        md = np.max(np.abs(u(t) - c * u_kernel))
-        assert md < 1e-6
-
-        norm = quad(lambda s: np.abs(u(s)) ** 2, 0, tmax)[0]
-        assert abs(1 - norm) < 1e-15
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # test_weights(plot=True)
+    test_is_axis_equidistant()
     # test_subdevide_axis()
-    test_analytic_lorentzian_eigenfunctions()
-
+    # test_analytic_lorentzian_eigenfunctions()
     # test_solve_fredholm()
-    # test_compare_weights_in_solve_fredholm_oac()
-    # test_compare_weights_in_solve_fredholm_lac()
-    # test_fredholm_eigvec_interpolation()
     # test_cython_interpolation()
     # test_reconstr_ac()
-    # test_opt_fredh()
     # test_solve_fredholm()
     # test_solve_fredholm_reconstr_ac()
-    # test_solve_fredholm_interp_eigenfunc(plot=True)
-    # test_reconstr_ac_interp()
     # test_auto_ng()
+
+
+    # show_compare_weights_in_solve_fredholm_oac()
+    # show_compare_weights_in_solve_fredholm_lac()
+    # show_solve_fredholm_error_scaling_oac()
+    # show_fredholm_eigvec_interpolation()
+    # show_solve_fredholm_interp_eigenfunc()
+    # show_reconstr_ac_interp()
+    # show_lac_error_scaling()
+    # show_lac_simp_scaling()
     pass

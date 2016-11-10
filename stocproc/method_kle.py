@@ -389,6 +389,8 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         log.info("check {} grid points".format(ng))
         t, w = meth(t_max, ng)
 
+        is_equi = is_axis_equidistant(t)
+
         t0 = time.time()                                      # efficient way to construct the
         r = _calc_corr_matrix(t, corr)                        # auto correlation matrix r
         time_calc_ac += (time.time() - t0)
@@ -417,7 +419,10 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
                 # when using sqrt_lambda instead of lambda we get sqrt_lamda time u
                 # which is the quantity needed for the stochastic process
                 # generation
-                sqrt_lambda_ui_fine = np.asarray([np.sum(corr(ti - t) * w * evec) / sqrt_eval for ti in tfine])
+                if not is_equi:
+                    sqrt_lambda_ui_fine = np.asarray([np.sum(corr(ti - t) * w * evec) / sqrt_eval for ti in tfine])
+                else:
+                    raise NotImplementedError
                 time_integr_intp += (time.time() - t0)
             else:
                 sqrt_lambda_ui_fine = evec*sqrt_eval
@@ -457,6 +462,12 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
                 log.info("auto ng SUCCESSFUL max diff {:.3e} < tol {:.3e} ng {} num evec {}".format(md, tol, ng, i+1))
                 return np.asarray(sqrt_lambda_ui_fine_all)
         log.info("ng {} yields md {:.3e}".format(ng, md))
+
+def is_axis_equidistant(ax):
+    ax = np.asarray(ax)
+    d = ax[1:]-ax[:-1]
+    return np.max(np.abs(d - d[0])) < 1e-15
+
 
 def str_meth_to_meth(meth):
     if (meth == 'midpoint') or (meth == 'midp'):
