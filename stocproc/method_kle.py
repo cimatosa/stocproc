@@ -429,12 +429,7 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
             if not is_equi:
                 alpha_ref = corr(tsfine.reshape(-1,1) - tsfine.reshape(1,-1))
             else:
-                ng_sfine = len(tsfine)
-                alpha_ref = np.empty(shape=(ng_sfine, ng_sfine), dtype=np.complex128)
-                for i in range(ng_sfine):
-                    idx = ng_sfine - i
-                    alpha_ref[:, i] = alpha_k[idx:idx + ng_sfine]  # note we can use alpha_k as
-                                                                   # alpha(ti+dt/2 - (tj+dt/2)) = alpha(ti - tj)
+                alpha_ref = _calc_corr_matrix(tsfine, corr, is_equi=True)
 
         diff = -alpha_ref
         if relative_difference:

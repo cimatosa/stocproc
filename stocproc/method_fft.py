@@ -66,7 +66,7 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
                 raise RuntimeError("iteration limit reached")
 
         log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol I(rev_val)".format(x, I))
-        a = brentq(lambda x: integrand(x)-tol, x+ref_val, x0+ref_val)
+        a = brentq(lambda x: integrand(x)/I_at_ref-tol, x+ref_val, x0+ref_val)
         log.debug("found I(a={:.3e}) = {:.3e} = tol".format(a, integrand(a)))
 
     elif I/I_at_ref < tol:
@@ -85,7 +85,7 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
 
         log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol I(rev_val)".format(x, I))
         log.debug("search for root in interval [{:.3e},{:.3e}]".format(x0+ref_val, x+ref_val))
-        a = brentq(lambda x_: integrand(x_)-tol, x+ref_val, x0+ref_val)
+        a = brentq(lambda x_: integrand(x_)/I_at_ref-tol, x+ref_val, x0+ref_val)
         log.debug("found I(a={:.3e}) = {:.3e} = tol I(rev_val)".format(a, integrand(a)))
     else:
         a = x0
@@ -250,8 +250,12 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref,
     i = 10
     while True:
         N = 2**i
-        rd, a, b = opt_integral_boundaries(integrand=integrand, a=a, b=b, t_max=t_max, ft_ref=ft_ref,
-                                           opt_b_only=opt_b_only, N=N)
+        rd, a_new, b_new = opt_integral_boundaries(integrand=integrand, a=a, b=b, t_max=t_max, ft_ref=ft_ref,
+                                                   opt_b_only=opt_b_only, N=N)
+        if rd < 1:
+            log.info("! discard new boundary because rd >= 1")
+            a = a_new
+            b = b_new
         if rd < tol:
             log.info("reached rd ({:.3e}) < tol ({:.3e}), return N={}".format(rd, tol, N))
             return N, a, b

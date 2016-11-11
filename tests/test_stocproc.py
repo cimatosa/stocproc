@@ -198,20 +198,20 @@ def test_many(plot=False):
     sd = spectral_density
     ac = corr
 
-    stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=False, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
-    stocproc_metatest(stp, num_samples, tol, ac, plot)
-
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
-    stocproc_metatest(stp, num_samples, tol, ac, plot)
-
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
-    stocproc_metatest(stp, num_samples, tol, ac, plot)
-
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
-    stocproc_metatest(stp, num_samples, tol, ac, plot)
-
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
-    stocproc_metatest(stp, num_samples, tol, ac, plot)
+    # stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=False, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
+    # stocproc_metatest(stp, num_samples, tol, ac, plot)
+    #
+    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
+    # stocproc_metatest(stp, num_samples, tol, ac, plot)
+    #
+    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
+    # stocproc_metatest(stp, num_samples, tol, ac, plot)
+    #
+    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
+    # stocproc_metatest(stp, num_samples, tol, ac, plot)
+    #
+    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
+    # stocproc_metatest(stp, num_samples, tol, ac, plot)
 
 
     t_max = 15
@@ -245,5 +245,4 @@ if __name__ == "__main__":
     # test_stocproc_dump_load()
 
     test_many(plot=False)
-    # test_subohmic_SD()
     pass

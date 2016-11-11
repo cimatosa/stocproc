@@ -63,16 +63,22 @@ class _absStocProc(abc.ABC):
         
       
     """
-    def __init__(self, t_max, num_grid_points, seed=None):
+    def __init__(self, t_max=None, num_grid_points=None, seed=None, t_axis=None):
         r"""
-            :param t_max: specify time axis as [0, t_max]
+            :param t_max: specify time axis as [0, t_max], if None, the times must be explicitly
+                given by t_axis
             :param num_grid_points: number of equidistant times on that axis
             :param seed: if not ``None`` set seed to ``seed``
-            :param verbose: 0: no output, 1: informational output, 2: (eventually some) debug info
+            :param t_axis: an explicit definition of times t_k (may be non equidistant)
         """
-        self.t_max = t_max
-        self.num_grid_points = num_grid_points
-        self.t = np.linspace(0, t_max, num_grid_points)
+        if t_max is not None:
+            self.t = np.linspace(0, t_max, num_grid_points)
+        else:
+            self.t = t_axis
+
+        self.t_max = self.t[-1]
+        self.num_grid_points = len(self.t)
+
         self._z = None
         self._interpolator = None
         self._seed = seed
@@ -204,6 +210,11 @@ class StocProc_KLE(_absStocProc):
         :param seed: if not None seed the random number generator on init of this class with seed
         :param align_eig_vec: assures that :math:`re(u_i(0)) \leq 0` and :math:`im(u_i(0)) = 0` for all i
 
+        .. note ::
+           To circumvent the time consuming initializing the StocProc class can be saved and loaded using
+           the standard python pickle module. The :py:func:`get_key` method may be used identify the
+           Process class by its parameters (r_tau, t_max, tol).
+
         .. seealso ::
            Details on how to solve the homogeneous Fredholm equation: :py:func:`stocproc.method_kle.solve_hom_fredholm`
 
@@ -211,31 +222,35 @@ class StocProc_KLE(_absStocProc):
            diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
         """
 
-        sqrt_lambda_ui_fine = method_kle.auto_ng(corr=r_tau,
-                                                 t_max=t_max,
-                                                 ngfac=ng_fac,
-                                                 meth=meth,
-                                                 tol=tol,
-                                                 diff_method=diff_method,
-                                                 dm_random_samples=dm_random_samples)
+        sqrt_lambda_ui_fine, t = method_kle.auto_ng(corr=r_tau,
+                                                    t_max=t_max,
+                                                    ngfac=ng_fac,
+                                                    meth=meth,
+                                                    tol=tol,
+                                                    diff_method=diff_method,
+                                                    dm_random_samples=dm_random_samples)
 
         # inplace alignment such that re(ui(0)) >= 0 and im(ui(0)) = 0
         if align_eig_vec:
             method_kle.align_eig_vec(sqrt_lambda_ui_fine)
 
-        state = sqrt_lambda_ui_fine, t_max, seed
+        state = sqrt_lambda_ui_fine, t, seed
         self.__setstate__(state)
         self.key = r_tau, t_max, tol
 
+    def get_key(self):
+        """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
+        the StocProc class.
+        """
+        return self.key
+
     def __getstate__(self):
-        return self.sqrt_lambda_ui_fine, self.t_max, self._seed
+        return self.sqrt_lambda_ui_fine, self.t, self._seed
 
     def __setstate__(self, state):
-        sqrt_lambda_ui_fine, t_max, seed = state
+        sqrt_lambda_ui_fine, t, seed = state
         num_ev, ng = sqrt_lambda_ui_fine.shape
-        super().__init__(t_max           = t_max,
-                         num_grid_points = ng,
-                         seed            = seed)
+        super().__init__(t_axis=t, seed=seed)
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
@@ -251,8 +266,62 @@ class StocProc_KLE(_absStocProc):
 
 
 class StocProc_FFT(_absStocProc):
-    r"""
-        Simulate Stochastic Process using FFT method 
+    r"""Simulate Stochastic Process using FFT method
+
+    This method works only for auto correlations functions of the form
+
+    .. math:: \alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+
+    where :math:`J(\omega)` is a real non negative function, usually called spectral density.
+    Then the integral can be approximated by a discrete integration schema:
+
+    .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}
+
+    where the :math:`\omega_k` depend on the integration schema.
+
+    For a process defined by
+
+    .. math:: Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}
+
+    with independent complex random variables :math:`Y_k` such that :math:`\langle Y_k \rangle = 0`,
+    :math:`\langle Y_k Y_{k'}\rangle = 0` and :math:`\langle Y_k Y^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}`
+    it is easy to see that its auto correlation function will be exactly the approximated auto correlation function.
+
+    .. math::
+        \begin{align}
+            \langle Z(t) Z^\ast(s) \rangle = & \sum_{k,k'} \frac{1}{\pi} \sqrt{w_k w_{k'} J(\omega_k)J(\omega_{k'})} \langle Y_k Y_{k'}\rangle \exp(-\mathrm{i}(\omega_k t - \omega_k' s)) \\
+                                           = & \sum_{k}    \frac{w_k}{\pi} J(\omega_k) e^{-\mathrm{i}\omega_k (t-s)} \\
+                                           \approx & \alpha(t-s)
+        \end{align}
+
+    To calculate :math:`Z(t)` the schema of the Discrete Fourier Transform (DFT) can be applied as follows:
+
+    .. math:: Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k  e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
+
+    Here :math:`\omega_k` has to take the form :math:`\omega_k = \omega_\mathrm{min} + k \Delta \omega` and
+    :math:`\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / N-1` which limits
+    the itegration schemas to those with equidistant weights.
+    For the DFT schema to be applicable :math:`\Delta t` has to be chosen such that
+
+    .. math:: 1 = \frac{\Delta \omega \Delta t}{2 \pi} N
+
+    holds. Since :math:`J(\omega)` is real it follows that :math:`X(t_l) = X^\ast(t_{N-l})`.
+    For that reason the stochastic process has only :math:`(N+1)/2` (odd :math:`N`) and
+    :math:`(N/2 + 1)` (even :math:`N`) independent time grid points.
+
+    .. math:: Z_l = e^{-\mathrm{i}\omega_\mathrm{min} t_l} DFT\left(\sqrt{w_k J(\omega_k) / \pi} \; Y_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
+
+    :param spectral_density: the spectral density :math:`J(\omega)` as callable function object
+    :param t_max: :math:`[0,t_\mathrm{max}]` is the interval for which the process will be calculated
+    :param num_grid_points: number :math:`n` of euqally distributed times :math:`t_k` on the intervall :math:`[0,t_\mathrm{max}]`
+        for which the process will be evaluated
+    :param num_samples: number of independent processes to be returned
+    :param seed: seed passed to the random number generator used
+
+    :return: returns the tuple (2D array of the set of stochastic processes,
+        1D array of time grid points). Each row of the stochastic process
+        array contains one sample of the stochastic process.
+
     """
     def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
                  seed=None, negative_frequencies=False):
