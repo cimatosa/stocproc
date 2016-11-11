@@ -83,9 +83,13 @@ class _absStocProc(abc.ABC):
         log.debug("init StocProc with t_max {} and {} grid points".format(t_max, num_grid_points))
 
     def __call__(self, t=None):
-        r"""
-        :param t: time to evaluate the stochastic process as, float of array of floats
-        evaluates the stochastic process via spline interpolation between the discrete process 
+        r"""evaluates the stochastic process via spline interpolation of the discrete process :math:`z_k`
+
+        :param t: time to evaluate the stochastic process at, float of array of floats, if t is None
+            return the discrete process :math:`z_k` which corresponds to the times :math:`t_k` given by the
+            integration weights method
+        :return: a single complex value or a complex array of the shape of t that holds the values of
+            stochastic process at times t
         """
         if self._z is None:
             raise RuntimeError("StocProc_FFT has NO random data, call 'new_process' to generate a new random process")
@@ -116,27 +120,24 @@ class _absStocProc(abc.ABC):
         pass        
     
     def get_time(self):
-        r"""
-        :return: time axis
+        r"""Returns the time :math:`t_k` corresponding to the values :math:`z_k`
+
+        These times are determined by the integration weights method.
         """
         return self.t
     
     def get_z(self):
-        r"""
-        use :py:func:`new_process` to generate a new process
-        :return: the current process 
-        """
+        r"""Returns the discrete process :math:`z_k`."""
         return self._z
     
     def new_process(self, y=None, seed=None):
-        r"""
-        generate a new process by evaluating :py:func:`calc_z`
-        
-        When ``y`` is given use these random numbers as input for :py:func:`calc_z`
-        otherwise generate a new set of random numbers.
-        
+        r"""generate a new process by evaluating :py:func:`calc_z` with new random variables :math:`Y_i`
+
         :param y: independent normal distributed complex valued random variables with :math:`\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}`
-        :param seed: if not ``None`` set seed to ``seed`` before generating samples 
+        :param seed: if not None set seed to seed before generating samples
+        
+        When y is given use these random numbers as input for :py:func:`calc_z`
+        otherwise generate a new set of random numbers.
         """
         t0 = time.time()
         self._interpolator = None
@@ -243,6 +244,9 @@ class StocProc_KLE(_absStocProc):
         return np.tensordot(y, self.sqrt_lambda_ui_fine, axes=([0], [0])).flatten()
 
     def get_num_y(self):
+        """The number of independent random variables Y is given by the number of used eigenfunction
+        to approximate the auto correlation kernel.
+        """
         return self.num_ev
 
 

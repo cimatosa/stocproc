@@ -8,6 +8,8 @@ StocProc_KLE
     :inherited-members:
     :undoc-members:
 
+    .. automethod:: __call__
+
 .. py:currentmodule:: stocproc.method_kle
 .. autofunction:: stocproc.method_kle.solve_hom_fredholm
 .. autofunction:: stocproc.method_kle.get_mid_point_weights_times

@@ -48,7 +48,7 @@ def solve_hom_fredholm(r, w):
 
     .. note::
         It has been noticed that the performance of the various weights depends on the auto correlation
-        function. As default one should use the simpson weights. 'four point', 'gauss legendre' and 'tanh sinh'
+        function. As default one should use the 'simpson weights'. 'four point', 'gauss legendre' and 'tanh sinh'
         might perform better for auto correlation function that decay slowly. Their advantage becomes evident
         for a large numbers of grid points only. So if one cares about relative differences below 1e-4
         the more sophisticated weights are suitable.
@@ -79,21 +79,27 @@ def _calc_corr_min_t_plus_t(s, bcf):
     return np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
 
 
-def _calc_corr_matrix(s, bcf):
+def _calc_corr_matrix(s, bcf, is_equi=None):
     """calculates the matrix alpha_ij = bcf(t_i-s_j)
 
-    calls bcf only for s-s_0 and reconstructs the rest
+    for equidistant s: call bcf only for s-s_0 and reconstructs the rest
     """
-    n_ = len(s)
-    bcf_n = _calc_corr_min_t_plus_t(s, bcf)
-    # we want
-    # r = bcf(0) bcf(-1), bcf(-2)
-    #     bcf(1) bcf( 0), bcf(-1)
-    #     bcf(2) bcf( 1), bcf( 0)
-    r = np.empty(shape=(n_, n_), dtype=np.complex128)
-    for i in range(n_):
-        idx = n_ - 1 - i
-        r[:, i] = bcf_n[idx:idx + n_]
+    if is_equi is None:
+        is_equi = is_axis_equidistant(s)
+
+    if is_equi:
+        n_ = len(s)
+        bcf_n = _calc_corr_min_t_plus_t(s, bcf)
+        # we want
+        # r = bcf(0) bcf(-1), bcf(-2)
+        #     bcf(1) bcf( 0), bcf(-1)
+        #     bcf(2) bcf( 1), bcf( 0)
+        r = np.empty(shape=(n_, n_), dtype=np.complex128)
+        for i in range(n_):
+            idx = n_ - 1 - i
+            r[:, i] = bcf_n[idx:idx + n_]
+    else:
+        return bcf(s.reshape(-1,1) - s.reshape(1,-1))
     return r
 
 
@@ -105,9 +111,9 @@ def get_mid_point_weights_times(t_max, num_grid_points):
     :return: location of the grid points, corresponding weights
 
     Because this function is intended to provide the weights to be used in :py:func:`solve_hom_fredholm`
-    is stretches the homogeneous weights over the grid points starting from 0 up to t_max, so the
+    it stretches the homogeneous weights over the grid points starting from 0 up to t_max, so the
     term min_point is somewhat miss leading. This is possible because we want to simulate
-    stationary stochastic processes which allows :math:`\alpha(t_i+\Delta - (s_j+\Delta)) = \alpha(t_i-s_j)`.
+    stationary stochastic processes which allows :math:`\alpha(t_i+\Delta/2 - (s_j+\Delta/2)) = \alpha(t_i-s_j)`.
         
     The N grid points are located at
     
@@ -115,9 +121,10 @@ def get_mid_point_weights_times(t_max, num_grid_points):
 
     and the corresponding weights are
     
-    .. math:: w_i = \Delta t = \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1
+    .. math:: w_i = \Delta t = \frac{t_\mathrm{max}}{N} \qquad i = 0,1, ... N - 1
     """
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
+    t = np.linspace(0, t_max, num_grid_points)
+    delta_t = t_max/num_grid_points
     w = np.ones(num_grid_points)*delta_t
     return t, w
 
@@ -302,7 +309,8 @@ def subdevide_axis(t, ngfac):
         tfine[l::ngfac] = (l * t[1:] + (ngfac - l) * t[:-1]) / ngfac
     return tfine
 
-def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, diff_method='full', dm_random_samples=10**4):
+def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, diff_method='full',
+            dm_random_samples=10**4, ret_eigvals=False, relative_difference=False):
     r"""increase the number of gridpoints until the desired accuracy is met
 
     This function increases the number of grid points of the discrete Fredholm equation exponentially until
@@ -325,6 +333,9 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         'full': full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
         'random': pick a fixed number of random times t and s within the interval [0, t_max]
     :param dm_random_samples: the number of random times used for diff_method 'random'
+    :param ret_eigvals: if True, return also the eigen values
+    :param relative_difference: if True, use relative difference instead of absolute
+
     :return: an array containing the necessary eigenfunctions of the Karhunen-Loève expansion for sampling the
         stochastic processes (shape=(num_eigen_functions, num_grid_points)
 
@@ -332,7 +343,9 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         1) Solve the discrete Fredholm equation on a grid with ng points.
            This gives ng eigenvalues/vectors where each ng-dimensional vector approximates the continuous eigenfunction.
            (:math:`t, u_i(t) \leftrightarrow t_k, u_{ik}` where the :math:`t_k` depend on the integration weights
-           method)
+           method) For performance reasons, especially when the auto correlation function evaluates slowly it
+           is advisable to use a method which uses equally distributed times :math;`t_k`.
+
         2) Approximate the eigenfunction on a finer, equidistant grid
            (:math:`ng_\mathrm{fine} = ng_\mathrm{fac}(ng-1)+1`) using
 
@@ -355,7 +368,12 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
            ng as follows :math:`ng = 2*ng-1` and start over at 1). (This update schema for ng asured that ng is odd
            which is needed for the 'simpson' and 'fourpoint' integration weights)
 
+    .. note::
 
+        The scaling of the error of the various integration methods does not correspond to the scaling of
+        the number of eigenfunctions to use in order to reconstruct the auto correlation function within
+        a given tolerance. Surprisingly it turns out that in general the most trivial **mid-point method** performs
+        quite well. If other methods suite bettern needs to be check in every case.
 
     [1] Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P.,
     2007. Numerical Recipes 3rd Edition: The Art of Scientific Computing,
@@ -388,11 +406,11 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         ng = 2 ** k + 1
         log.info("check {} grid points".format(ng))
         t, w = meth(t_max, ng)
-
         is_equi = is_axis_equidistant(t)
+        log.debug("equidistant axis: {}".format(is_equi))
 
         t0 = time.time()                                      # efficient way to construct the
-        r = _calc_corr_matrix(t, corr)                        # auto correlation matrix r
+        r = _calc_corr_matrix(t, corr, is_equi)               # auto correlation matrix r
         time_calc_ac += (time.time() - t0)
 
         t0 = time.time()                                      # solve the dicrete fredholm equation
@@ -400,7 +418,7 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
         time_fredholm += (time.time() - t0)
 
         tfine = subdevide_axis(t, ngfac)                      # setup fine
-        tsfine = subdevide_axis(tfine, 2)[1::2]               # and super fine time grid
+        tsfine = subdevide_axis(tfine, 2)                     # and super fine time grid
 
         if is_equi:
             t0 = time.time()                                  # efficient way to calculate the auto correlation
@@ -419,7 +437,11 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
                                                                    # alpha(ti+dt/2 - (tj+dt/2)) = alpha(ti - tj)
 
         diff = -alpha_ref
-        old_md = np.inf
+        if relative_difference:
+            abs_alpha_res = np.abs(alpha_ref)
+        else:
+            abs_alpha_res = 1
+
         sqrt_lambda_ui_fine_all = []
         for i in range(ng):
             evec = _eig_vec[:, i]
@@ -461,14 +483,11 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
             elif diff_method == 'full':
                 ui_super_fine = sqrt_lambda_ui_spl(tsfine)
                 diff += ui_super_fine.reshape(-1, 1) * np.conj(ui_super_fine.reshape(1, -1))
-            md = np.max(np.abs(diff)) / alpha_0
+            md = np.max(np.abs(diff) / abs_alpha_res)
             time_calc_diff += (time.time() - t0)
 
             log.debug("num evec {} -> max diff {:.3e}".format(i+1, md))
-            #if old_md < md:
-            #    log.info("max diff increased -> break, use higher ng")
-            #    break
-            #old_md = md
+
             if md < tol:
                 time_total = time_calc_diff + time_spline + time_integr_intp + time_calc_ac + time_fredholm
                 time_overall = time.time() - time_start
@@ -478,7 +497,11 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
                           time_calc_ac/time_overall, time_fredholm/time_overall, time_integr_intp/time_overall,
                           time_spline/time_overall, time_calc_diff/time_overall, time_rest/time_overall))
                 log.info("auto ng SUCCESSFUL max diff {:.3e} < tol {:.3e} ng {} num evec {}".format(md, tol, ng, i+1))
-                return np.asarray(sqrt_lambda_ui_fine_all)
+                if ret_eigvals:
+                    return np.asarray(sqrt_lambda_ui_fine_all), tfine, _eig_val[:len(sqrt_lambda_ui_fine_all)]
+                else:
+                    return np.asarray(sqrt_lambda_ui_fine_all), tfine
+
         log.info("ng {} yields md {:.3e}".format(ng, md))
 
 def is_axis_equidistant(ax):
