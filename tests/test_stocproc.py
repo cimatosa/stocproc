@@ -36,8 +36,6 @@ _GAMMA_S_PLUS_1 = gamma(_S_ + 1)
 def corr(tau):
     """ohmic bath correlation function"""
     return (1 + 1j * (tau)) ** (-(_S_ + 1)) * _GAMMA_S_PLUS_1 / np.pi
-
-
 def spectral_density(omega):
     return omega ** _S_ * np.exp(-omega)
 
@@ -191,6 +189,8 @@ def test_stocproc_dump_load():
 
 
 def test_many(plot=False):
+    import logging
+    logging.basicConfig(level=logging.INFO)
     t_max = 15
     num_samples = 5000
     tol = 5e-2
@@ -198,20 +198,20 @@ def test_many(plot=False):
     sd = spectral_density
     ac = corr
 
-    # stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=False, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
-    # stocproc_metatest(stp, num_samples, tol, ac, plot)
-    #
-    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
-    # stocproc_metatest(stp, num_samples, tol, ac, plot)
-    #
-    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
-    # stocproc_metatest(stp, num_samples, tol, ac, plot)
-    #
-    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
-    # stocproc_metatest(stp, num_samples, tol, ac, plot)
-    #
-    # stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
-    # stocproc_metatest(stp, num_samples, tol, ac, plot)
+    stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=False, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
+
+    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
+    stocproc_metatest(stp, num_samples, tol, ac, plot)
 
 
     t_max = 15
@@ -239,7 +239,7 @@ def test_many(plot=False):
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     # test_stochastic_process_KLE_correlation_function(plot=False)
     # test_stochastic_process_FFT_correlation_function(plot=False)
     # test_stocproc_dump_load()

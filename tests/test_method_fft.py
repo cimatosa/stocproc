@@ -263,15 +263,35 @@ def test_fourier_integral_infinite_boundary(plot=False):
         plt.grid()
         plt.yscale('log')
         plt.show()
-    
+
+
 def test_get_N_a_b_for_accurate_fourier_integral():
+    _WC_ = 2
+    intg = lambda w: 1 / (1 + (w - _WC_) ** 2) / np.pi
+    bcf_ref = lambda t: np.exp(- np.abs(t) - 1j * _WC_ * t)
+    a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=_WC_)
+    N, a, b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg, a, b,
+                                                                    t_max=50,
+                                                                    tol=1e-2,
+                                                                    ft_ref=bcf_ref,
+                                                                    opt_b_only=False,
+                                                                    N_max=2 ** 20)
+    print(N, a, b)
+    
+def test_get_N_a_b_for_accurate_fourier_integral_b_only():
     s = 0.5
     wc = 4
     intg = lambda x: osd(x, s, wc)
     bcf_ref = lambda t:  gamma_func(s + 1) * wc**(s+1) * (1 + 1j*wc * t)**(-(s+1))
     
-    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
-    N,a,b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg, a, b, t_max=40, tol=1e-3, ft_ref=bcf_ref, opt_b_only=True, N_max = 2**20, )
+    a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
+    a = 0
+    N, a, b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg, a, b,
+                                                                    t_max=15,
+                                                                    tol=1e-5,
+                                                                    ft_ref=bcf_ref,
+                                                                    opt_b_only=True,
+                                                                    N_max = 2 ** 20)
     print(N,a,b)
 
 def test_get_dt_for_accurate_interpolation():
@@ -336,11 +356,12 @@ def test_calc_abN():
     
     
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     test_find_integral_boundary()
-    test_fourier_integral_finite_boundary()
-    test_fourier_integral_infinite_boundary(plot=True)
-    test_get_N_a_b_for_accurate_fourier_integral()
-    test_get_dt_for_accurate_interpolation()
-    test_sclicing()
-    test_calc_abN()
+    # test_fourier_integral_finite_boundary()
+    # test_fourier_integral_infinite_boundary(plot=True)
+    # test_get_N_a_b_for_accurate_fourier_integral()
+    # test_get_N_a_b_for_accurate_fourier_integral_b_only()
+    # test_get_dt_for_accurate_interpolation()
+    # test_sclicing()
+    # test_calc_abN()

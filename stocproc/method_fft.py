@@ -7,13 +7,14 @@
 from __future__ import division, print_function
 
 from .tools import ComplexInterpolatedUnivariateSpline
-
+from functools import lru_cache
 import logging
 import numpy as np
 from numpy.fft import rfft as np_rfft
 from scipy.integrate import quad
 from scipy.optimize import brentq
 from scipy.optimize import basinhopping
+from scipy.optimize import minimize
 import sys
 import warnings
 #warnings.simplefilter('error')
@@ -42,57 +43,22 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     """
     _max_num_iteration = 100
     _i = 0
-    assert x0 != 0
-    I_at_ref = integrand(ref_val)
-    if I_at_ref <= tol:
-        raise ValueError("the integrand at ref_val needs to be greater that tol")
-
-    log.info("ref_value for search: {} tol: {}".format(ref_val, tol))
-
-
-    I = integrand(x0+ref_val)
-    if I/I_at_ref > tol:
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol I(rev_val) -> veer x away from ref_value".format(x0, I))
-        x = 2*x0
-        I = integrand(x + ref_val)
-        while I/I_at_ref > tol:
-            log.debug("x={:.3e} I(x+ref_val) = {:.3e}".format(x, I))
-            if abs(x) > max_val:
-                raise RuntimeError("|x-ref_val| > max_val was reached")
-            x *= 2
-            I = integrand(x + ref_val)
-            _i += 1
-            if _i > _max_num_iteration:
-                raise RuntimeError("iteration limit reached")
-
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol I(rev_val)".format(x, I))
-        a = brentq(lambda x: integrand(x)/I_at_ref-tol, x+ref_val, x0+ref_val)
-        log.debug("found I(a={:.3e}) = {:.3e} = tol".format(a, integrand(a)))
-
-    elif I/I_at_ref < tol:
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} < tol I(rev_val) -> approach x towards ref_value".format(x0, I))
-        x = x0/2
-        I = integrand(x + ref_val)
-        while I/I_at_ref < tol:
-            log.debug("x={:.3e} I(x+ref_val) = {:.3e}".format(x, I))
-            if (1/abs(x)) > max_val:
-                raise RuntimeError("1/|x-ref_val| > max_val was reached")
-            x /= 2
-            I = integrand(x+ref_val)
-            _i += 1
-            if _i > _max_num_iteration:
-                raise RuntimeError("iteration limit reached")
-
-        log.debug("x={:.3e} I(x+ref_val) = {:.3e} > tol I(rev_val)".format(x, I))
-        log.debug("search for root in interval [{:.3e},{:.3e}]".format(x0+ref_val, x+ref_val))
-        a = brentq(lambda x_: integrand(x_)/I_at_ref-tol, x+ref_val, x0+ref_val)
-        log.debug("found I(a={:.3e}) = {:.3e} = tol I(rev_val)".format(a, integrand(a)))
-    else:
-        a = x0
-        log.debug("I(ref_val) = tol -> no search necessary")
-
-    log.info("return {:.5g}".format(a))
-    return a
+    I_ref = integrand(ref_val)
+    if I_ref < tol:
+        pass
+    elif I_ref > tol:
+        x_old = ref_val
+        while True:
+            x = ref_val + x0
+            I_x = integrand(x)
+            if I_x < tol:
+                break
+            x0 *= 2
+            x_old = x
+        a = brentq(lambda x: integrand(x) - tol, x_old, x)
+        return a
+    else:   # I_ref == tol
+        return ref_val
 
 def find_integral_boundary_auto(integrand, tol, ref_val=0, max_val=1e6, 
                                 ref_val_left=None, ref_val_right=None, 
@@ -103,9 +69,9 @@ def find_integral_boundary_auto(integrand, tol, ref_val=0, max_val=1e6,
     max_val_left  = max_val if max_val_left  is None else max_val_left
     max_val_right = max_val if max_val_right is None else max_val_right
 
-    log.info("trigger left search")
+    log.debug("trigger left search")
     a = find_integral_boundary(integrand, tol, ref_val=ref_val_left,  max_val=max_val_left,  x0=-1)
-    log.info("trigger right search")
+    log.debug("trigger right search")
     b = find_integral_boundary(integrand, tol, ref_val=ref_val_right, max_val=max_val_right, x0=+1)
     return a,b
 
@@ -164,73 +130,64 @@ def _relDiff(xRef, x):
     res[idx0] = MAX_FLOAT
     return res
 
+def _absDiff(xRef, x):
+    return np.max(np.abs(xRef - x))
 
-def _f_opt_b_only(x, a, integrand, N, t_max, ft_ref):
-    b = x[0]
-    if np.isnan(b):
-        return 300
-    tau, ft_tau = fourier_integral_midpoint(integrand, a, b, N)
+
+def _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_only):
+    key = float(x[0])
+    if  key in _f_opt_cache:
+        d, a_, b_ = _f_opt_cache[key]
+        return np.log10(d)
+    tol = 10**x
+
+    try:
+        if b_only:
+            a_ = a
+            b_ = find_integral_boundary(integrand, tol=tol, ref_val=b, max_val=1e6, x0=1)
+        else:
+            a_ = find_integral_boundary(integrand, tol=tol, ref_val=a, max_val=1e6, x0=-1)
+            b_ = find_integral_boundary(integrand, tol=tol, ref_val=b, max_val=1e6, x0=1)
+    except ValueError:
+        a_ = -1
+        b_ = 1
+
+    tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
     idx = np.where(tau <= t_max)
     ft_ref_tau = ft_ref(tau[idx])
-    rd = np.max(_relDiff(ft_ref_tau, ft_tau[idx]))
-    return np.log10(rd)
+    d = diff_method(ft_ref_tau, ft_tau[idx])
+    _f_opt_cache[key] = d, a_, b_
+    return np.log10(d)
+
+def _lower_contrs(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_only):
+    _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_only)
+    tol = 10**x
+    d, a_, b_ = _f_opt_cache[float(x[0])]
+    v = N * np.pi / (b_ - a_) - t_max
+    log.debug("lower constr value {} for x {} (tol {})".format(v, x, tol))
+    return v
 
 
-def _f_opt(x, integrand, N, t_max, ft_ref):
-    a, b = x[0], x[1]
-    if np.isnan(a) or np.isnan(b):
-        return 300
-    tau, ft_tau = fourier_integral_midpoint(integrand, a, b, N)
-    idx = np.where(tau <= t_max)
-    ft_ref_tau = ft_ref(tau[idx])
-    rd = np.max(_relDiff(ft_ref_tau, ft_tau[idx]))
-    return np.log10(rd)
+def _upper_contrs(x):
+    log.debug("upper constr value {}".format(-x))
+    return -x
 
-class _AcceptTest(object):
-    def __init__(self, N, tmax):
-        self.tmax = tmax
-        self._tmp = np.pi * N
 
-    def __call__(self, x):
-        a, b = x[0], x[1]
-        tmax_new = self._tmp / (b - a)
-        return tmax_new - self.tmax
-
-class _AcceptTest_b_onbly(object):
-    def __init__(self, N, a, tmax):
-        self.tmax = tmax
-        self.a = a
-        self._tmp = np.pi * N
-
-    def __call__(self, x):
-        b = x[0]
-        tmax_new = self._tmp / (b - self.a)
-        return tmax_new - self.tmax
-
-def opt_integral_boundaries(integrand, a, b, t_max, ft_ref, opt_b_only, N):
+def opt_integral_boundaries(integrand, a, b, t_max, ft_ref, opt_b_only, N, diff_method):
     log.debug("optimize integral boundary N:{} [{:.3e},{:.3e}]".format(N, a, b))
-    if opt_b_only:
-        act = _AcceptTest_b_onbly(N, a, t_max)
-        r = basinhopping(_f_opt_b_only, [b], niter=150,
-                         minimizer_kwargs={"method": "slsqp",
-                                           "args": (a, integrand, N, t_max, ft_ref),
-                                           "constraints": {"type": "ineq", "fun": act}},
-                         stepsize=0.1 * (b - a))
-        b = r.x[0]
-    else:
-        act = _AcceptTest(N, t_max)
-        r = basinhopping(_f_opt, [a, b], niter=150,
-                         minimizer_kwargs={"method"     : "slsqp",
-                                           "args"       : (integrand, N, t_max, ft_ref),
-                                           "constraints": {"type": "ineq", "fun": act}},
-                         stepsize=0.1*(b-a))
-        a, b = r.x[0], r.x[1]
-    rd = 10 ** r.fun
-    log.info("optimization with N {} yields max rd {:.3e} and new boundaries [{:.2e},{:.2e}]".format(N, rd, a, b))
 
-    return rd, a, b
+    _f_opt_cache = dict()
+    args = (integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, opt_b_only)
+    r = minimize(_f_opt, x0 = [-0.1], args = args,
+                 method='SLSQP',
+                 constraints=[{"type": "ineq", "fun": _lower_contrs, "args": args},
+                              {"type": "ineq", "fun": _upper_contrs}])
+    d, a_, b_ = _f_opt_cache[float(r.x)]
+    log.info("optimization with N {} yields max rd {:.3e} and new boundaries [{:.2e},{:.2e}]".format(N, d, a_, b_))
+    return d, a_, b_
 
-def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, opt_b_only, N_max = 2**20):
+def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref, opt_b_only, N_max = 2**20,
+                                            diff_method=_absDiff):
     """
         chooses N such that the approximated Fourier integral 
         meets the exact solution within a given tolerance of the
@@ -251,11 +208,10 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref,
     while True:
         N = 2**i
         rd, a_new, b_new = opt_integral_boundaries(integrand=integrand, a=a, b=b, t_max=t_max, ft_ref=ft_ref,
-                                                   opt_b_only=opt_b_only, N=N)
-        if rd < 1:
-            log.info("! discard new boundary because rd >= 1")
-            a = a_new
-            b = b_new
+                                                   opt_b_only=opt_b_only, N=N, diff_method=diff_method)
+        a = a_new
+        b = b_new
+
         if rd < tol:
             log.info("reached rd ({:.3e}) < tol ({:.3e}), return N={}".format(rd, tol, N))
             return N, a, b
