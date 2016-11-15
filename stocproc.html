@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Python Module Index &mdash; StocProc 0.2.0 documentation</title>
+  <title>Stochastic Process Generators &mdash; StocProc 0.2.0 documentation</title>
   
 
   
@@ -34,9 +34,8 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="StocProc 0.2.0 documentation" href="index.html"/>
- 
-
-
+        <link rel="next" title="StocProc_KLE" href="StocProc_KLE.html"/>
+        <link rel="prev" title="Stochastic Process Module" href="index.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -85,8 +84,18 @@
           
             
             
-                <ul>
-<li class="toctree-l1"><a class="reference internal" href="stocproc.html">Stochastic Process Generators</a></li>
+                <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Stochastic Process Generators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#karhunen-loeve-expansion">Karhunen-Loève expansion</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="StocProc_KLE.html">StocProc_KLE</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#fast-fourier-method">Fast-Fourier method</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="StocProc_FFT.html">StocProc_FFT</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="example.html">Example</a></li>
 </ul>
 
@@ -110,7 +119,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -118,9 +127,11 @@
   <ul class="wy-breadcrumbs">
     <li><a href="index.html">Docs</a> &raquo;</li>
       
-    <li></li>
+    <li>Stochastic Process Generators</li>
       <li class="wy-breadcrumbs-aside">
         
+          
+            <a href="_sources/stocproc.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -130,34 +141,52 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-
-   <h1>Python Module Index</h1>
-
-   <div class="modindex-jumpbox">
-   <a href="#cap-s"><strong>s</strong></a>
-   </div>
-
-   <table class="indextable modindextable" cellspacing="0" cellpadding="2">
-     <tr class="pcap"><td></td><td>&#160;</td><td></td></tr>
-     <tr class="cap" id="cap-s"><td></td><td>
-       <strong>s</strong></td><td></td></tr>
-     <tr>
-       <td><img src="_static/minus.png" class="toggler"
-              id="toggle-1" style="display: none" alt="-" /></td>
-       <td>
-       <a href="index.html#module-stocproc"><code class="xref">stocproc</code></a></td><td>
-       <em></em></td></tr>
-     <tr class="cg-1">
-       <td></td>
-       <td>&#160;&#160;&#160;
-       <a href="stocproc.html#module-stocproc.stocproc"><code class="xref">stocproc.stocproc</code></a></td><td>
-       <em></em></td></tr>
-   </table>
+  <span class="target" id="module-stocproc.stocproc"></span><div class="section" id="stochastic-process-generators">
+<h1>Stochastic Process Generators<a class="headerlink" href="#stochastic-process-generators" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="karhunen-loeve-expansion">
+<h2>Karhunen-Loève expansion<a class="headerlink" href="#karhunen-loeve-expansion" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="StocProc_KLE.html">StocProc_KLE</a></li>
+</ul>
+</div>
+<p>This method samples stochastic processes using Karhunen-Loève expansion and
+is implemented in the class <a class="reference internal" href="StocProc_KLE.html"><span class="doc">StocProc_KLE</span></a>.</p>
+<p>Setting up the class involves solving an eigenvalue problem which grows with
+the time interval the process is simulated on. Further generating a new process
+involves a multiplication with that matrix, therefore it scales quadratically with the
+time interval. Nonetheless it turns out that this method requires less random numbers
+than the Fast-Fourier method.</p>
+</div>
+<div class="section" id="fast-fourier-method">
+<h2>Fast-Fourier method<a class="headerlink" href="#fast-fourier-method" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="StocProc_FFT.html">StocProc_FFT</a></li>
+</ul>
+</div>
+<p>In the class <a class="reference internal" href="StocProc_FFT.html"><span class="doc">StocProc_FFT</span></a> a method based on Fast-Fourier transform is
+used to sample stochastic processes.</p>
+<p>Setting up this class is quite efficient as it only calculates values of the
+associated spectral density. The number scales linear with the time interval of interest. However to achieve
+sufficient accuracy many of these values are required. As the generation of a new process is based on
+a Fast-Fouried-Transform over these values, this part is comparably lengthy.</p>
+</div>
+</div>
 
 
            </div>
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="StocProc_KLE.html" class="btn btn-neutral float-right" title="StocProc_KLE" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="Stochastic Process Module" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

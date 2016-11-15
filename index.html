@@ -1,116 +1,256 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
-    <title>Stochastic Process Module &#8212; StocProc 0.2.0 documentation</title>
-    
-    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    './',
-        VERSION:     '0.2.0',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
-      };
-    </script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="top" title="StocProc 0.2.0 documentation" href="#" />
-   
-  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
   
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
-
-  </head>
-  <body role="document">
+  <title>Stochastic Process Module &mdash; StocProc 0.2.0 documentation</title>
   
 
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body" role="main">
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="StocProc 0.2.0 documentation" href="#"/>
+        <link rel="next" title="Stochastic Process Generators" href="stocproc.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="#" class="icon icon-home"> StocProc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="stocproc.html">Stochastic Process Generators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Example</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="#">StocProc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="#">Docs</a> &raquo;</li>
+      
+    <li>Stochastic Process Module</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/index.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
             
   <span class="target" id="module-stocproc"></span><div class="section" id="stochastic-process-module">
 <h1>Stochastic Process Module<a class="headerlink" href="#stochastic-process-module" title="Permalink to this headline">¶</a></h1>
 <p>This module contains two different implementation for generating stochastic processes for a
-given auto correlation function. Both methods are based on a time discrete process, however cubic
+given auto correlation function (<a class="reference internal" href="StocProc_KLE.html"><span class="doc">Karhunen-Loève expansion</span></a>
+and <a class="reference internal" href="StocProc_FFT.html"><span class="doc">Fast-Fourier method</span></a>).
+Both methods are based on a time discrete process, however cubic
 spline interpolation is assured to be valid within a given tolerance.</p>
+<div class="toctree-wrapper compound">
 <ul>
-<li><p class="first">simulate stochastic processes using Karhunen-Loève expansion <code class="xref py py-func docutils literal"><span class="pre">stocproc.StocProc_KLE_tol()</span></code></p>
-<p>Setting up the class involves solving an eigenvalue problem which grows with
-the time interval the process is simulated on. Further generating a new process
-involves a multiplication with that matrix, therefore it scales quadratically with the
-time interval. Nonetheless it turns out that this method requires less random numbers
-than the Fast-Fourier method.</p>
+<li class="toctree-l1"><a class="reference internal" href="stocproc.html">Stochastic Process Generators</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="stocproc.html#karhunen-loeve-expansion">Karhunen-Loève expansion</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="StocProc_KLE.html">StocProc_KLE</a></li>
+</ul>
 </li>
-<li><p class="first">simulate stochastic processes using Fast-Fourier method method <code class="xref py py-func docutils literal"><span class="pre">stocproc.StocProc_FFT_tol()</span></code></p>
-<p>Setting up this class is quite efficient as it only calculates values of the
-associated spectral density. The number scales linear with the time interval of interest. However to achieve
-sufficient accuracy many of these values are required. As the generation of a new process is based on
-a Fast-Fouried-Transform over these values, this part is comparably lengthy.</p>
+<li class="toctree-l2"><a class="reference internal" href="stocproc.html#fast-fourier-method">Fast-Fourier method</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="StocProc_FFT.html">StocProc_FFT</a></li>
+</ul>
 </li>
 </ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Example</a></li>
+</ul>
+</div>
+<div class="section" id="example">
+<h2>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h2>
+<p>The example will setup a process generator for an exponential auto correlation function
+and sample a single realization.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">lsd</span><span class="p">(</span><span class="n">w</span><span class="p">):</span>
+    <span class="c1"># Lorenzian spectral density</span>
+    <span class="k">return</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">w</span> <span class="o">-</span> <span class="n">_WC_</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">lac</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="c1"># the corresponding Lorenzian correlation function</span>
+    <span class="c1"># note there is a factor of one over pi in the</span>
+    <span class="c1"># deficition of the correlation function:</span>
+    <span class="c1"># lac(t) = 1/pi int_{-infty}^infty d w  lsd(w) exp(-i w t)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="n">_WC_</span><span class="o">*</span><span class="n">t</span><span class="p">)</span>
+
+<span class="n">t_max</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;setup process generator&quot;</span><span class="p">)</span>
+<span class="n">stp</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">StocProc_FFT_tol</span><span class="p">(</span><span class="n">lsd</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">lac</span><span class="p">,</span>
+                          <span class="n">negative_frequencies</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                          <span class="n">intgr_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">intpl_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;generate single process&quot;</span><span class="p">)</span>
+<span class="n">stp</span><span class="o">.</span><span class="n">new_process</span><span class="p">()</span>
+<span class="n">zt</span> <span class="o">=</span> <span class="n">stp</span><span class="p">()</span>    <span class="c1"># get discrete process</span>
+</pre></div>
+</div>
+<p>The full example can be found <a class="reference internal" href="example.html"><span class="doc">here</span></a>.</p>
+<img alt="_images/proc.png" src="_images/proc.png" />
+<p>Averaging over 5000 samples yields the auto correlation function which is in good agreement
+with the exact auto correlation.</p>
+<img alt="_images/ac.png" src="_images/ac.png" />
+</div>
 </div>
 
 
+           </div>
           </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="stocproc.html" class="btn btn-neutral float-right" title="Stochastic Process Generators" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Richard Hartmann.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper"><div class="relations">
-<h3>Related Topics</h3>
-<ul>
-  <li><a href="#">Documentation overview</a><ul>
-  </ul></li>
-</ul>
-</div>
-  <div role="note" aria-label="source link">
-    <h3>This Page</h3>
-    <ul class="this-page-menu">
-      <li><a href="_sources/index.txt"
-            rel="nofollow">Show Source</a></li>
-    </ul>
-   </div>
-<div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
-    <form class="search" action="search.html" method="get">
-      <div><input type="text" name="q" /></div>
-      <div><input type="submit" value="Go" /></div>
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
-    </form>
-</div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
-        </div>
-      </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="footer">
-      &copy;2016, Richard Hartmann.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.8</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
-      
-      |
-      <a href="_sources/index.txt"
-          rel="nofollow">Page source</a>
-    </div>
 
-    
+    </section>
 
-    
-  </body>
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
 </html>

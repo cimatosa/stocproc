@@ -1,0 +1,596 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>stocproc.stocproc &mdash; StocProc 0.2.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="StocProc 0.2.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> StocProc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../stocproc.html">Stochastic Process Generators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../example.html">Example</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">StocProc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>stocproc.stocproc</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for stocproc.stocproc</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Stochastic Process Generators</span>
+<span class="sd">=============================</span>
+
+
+<span class="sd">Karhunen-Loève expansion</span>
+<span class="sd">------------------------</span>
+
+<span class="sd">.. toctree::</span>
+<span class="sd">   :maxdepth: 2</span>
+
+<span class="sd">   StocProc_KLE</span>
+
+<span class="sd">This method samples stochastic processes using Karhunen-Loève expansion and</span>
+<span class="sd">is implemented in the class :doc:`StocProc_KLE &lt;/StocProc_KLE&gt;`.</span>
+
+<span class="sd">Setting up the class involves solving an eigenvalue problem which grows with</span>
+<span class="sd">the time interval the process is simulated on. Further generating a new process</span>
+<span class="sd">involves a multiplication with that matrix, therefore it scales quadratically with the</span>
+<span class="sd">time interval. Nonetheless it turns out that this method requires less random numbers</span>
+<span class="sd">than the Fast-Fourier method.</span>
+
+
+<span class="sd">Fast-Fourier method</span>
+<span class="sd">-------------------</span>
+
+<span class="sd">.. toctree::</span>
+<span class="sd">   :maxdepth: 2</span>
+
+<span class="sd">   StocProc_FFT</span>
+
+<span class="sd">In the class :doc:`StocProc_FFT &lt;/StocProc_FFT&gt;` a method based on Fast-Fourier transform is</span>
+<span class="sd">used to sample stochastic processes.</span>
+
+<span class="sd">Setting up this class is quite efficient as it only calculates values of the</span>
+<span class="sd">associated spectral density. The number scales linear with the time interval of interest. However to achieve</span>
+<span class="sd">sufficient accuracy many of these values are required. As the generation of a new process is based on</span>
+<span class="sd">a Fast-Fouried-Transform over these values, this part is comparably lengthy.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">method_kle</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">method_fft</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">stocproc_c</span>
+<span class="kn">from</span> <span class="nn">.tools</span> <span class="k">import</span> <span class="n">ComplexInterpolatedUnivariateSpline</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">_absStocProc</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;</span>
+<span class="sd">    Abstract base class to stochastic process interface</span>
+<span class="sd">    </span>
+<span class="sd">    general work flow:</span>
+<span class="sd">        - Specify the time axis of interest [0, t_max] and it resolution (number of grid points), :math:`t_i = i \frac{t_max}{N_t-1}.  </span>
+<span class="sd">        - To evaluate the stochastic process at these points, a mapping from :math:`N_z` normal distributed </span>
+<span class="sd">          random complex numbers with :math:`\langle y_i y_j^\ast \rangle = 2 \delta_{ij}`</span>
+<span class="sd">          to the stochastic process :math:`z_{t_i}` is needed and depends on the implemented method (:py:func:`_calc_z&#39;).</span>
+<span class="sd">        - A new process should be generated by calling :py:func:`new_process&#39;.</span>
+<span class="sd">        - When the __call__ method is invoked the results will be interpolated between the :math:`z_t_i`.</span>
+<span class="sd">        </span>
+<span class="sd">      </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">t_axis</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;</span>
+<span class="sd">            :param t_max: specify time axis as [0, t_max], if None, the times must be explicitly</span>
+<span class="sd">                given by t_axis</span>
+<span class="sd">            :param num_grid_points: number of equidistant times on that axis</span>
+<span class="sd">            :param seed: if not ``None`` set seed to ``seed``</span>
+<span class="sd">            :param t_axis: an explicit definition of times t_k (may be non equidistant)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">t_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">t_axis</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">t_max</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_z</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_interpolator</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_one_over_sqrt_2</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc_cnt</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;init StocProc with t_max </span><span class="si">{}</span><span class="s2"> and </span><span class="si">{}</span><span class="s2"> grid points&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;evaluates the stochastic process via spline interpolation of the discrete process :math:`z_k`</span>
+
+<span class="sd">        :param t: time to evaluate the stochastic process at, float of array of floats, if t is None</span>
+<span class="sd">            return the discrete process :math:`z_k` which corresponds to the times :math:`t_k` given by the</span>
+<span class="sd">            integration weights method</span>
+<span class="sd">        :return: a single complex value or a complex array of the shape of t that holds the values of</span>
+<span class="sd">            stochastic process at times t</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;StocProc_FFT has NO random data, call &#39;new_process&#39; to generate a new random process&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interpolator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_interpolator</span> <span class="o">=</span> <span class="n">ComplexInterpolatedUnivariateSpline</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;created interpolator [</span><span class="si">{:.2e}</span><span class="s2">s]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">))</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interpolator</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">calc_z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;</span>
+<span class="sd">        maps the normal distributed complex valued random variables y to the stochastic process</span>
+<span class="sd">        </span>
+<span class="sd">        :return: the stochastic process, array of complex numbers </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">get_num_y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;</span>
+<span class="sd">        :return: number of complex random variables needed to calculate the stochastic process </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>        
+    
+    <span class="k">def</span> <span class="nf">get_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;Returns the time :math:`t_k` corresponding to the values :math:`z_k`</span>
+
+<span class="sd">        These times are determined by the integration weights method.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span>
+    
+    <span class="k">def</span> <span class="nf">get_z</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;Returns the discrete process :math:`z_k`.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span>
+    
+    <span class="k">def</span> <span class="nf">new_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;generate a new process by evaluating :py:func:`calc_z` with new random variables :math:`Y_i`</span>
+
+<span class="sd">        :param y: independent normal distributed complex valued random variables with :math:`\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}`</span>
+<span class="sd">        :param seed: if not None set seed to seed before generating samples</span>
+<span class="sd">        </span>
+<span class="sd">        When y is given use these random numbers as input for :py:func:`calc_z`</span>
+<span class="sd">        otherwise generate a new set of random numbers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_interpolator</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc_cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">seed</span> <span class="o">!=</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;use fixed seed (</span><span class="si">{}</span><span class="s2">)for new process&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">seed</span><span class="p">))</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1">#random complex normal samples</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_one_over_sqrt_2</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">get_num_y</span><span class="p">())</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">complex</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calc_z</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;proc_cnt:</span><span class="si">{}</span><span class="s2"> new process generated [</span><span class="si">{:.2e}</span><span class="s2">s]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_proc_cnt</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="StocProc_KLE"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.stocproc.StocProc_KLE">[docs]</a><span class="k">class</span> <span class="nc">StocProc_KLE</span><span class="p">(</span><span class="n">_absStocProc</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;</span>
+<span class="sd">        A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.</span>
+<span class="sd">        The idea is that any stochastic process can be expressed in terms of the KLE</span>
+
+<span class="sd">        .. math:: Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)</span>
+
+<span class="sd">        where :math:`Y_i` and independent complex valued Gaussian random variables with variance one</span>
+<span class="sd">        (:math:`\langle Y_i Y_j \rangle = \delta_{ij}`) and :math:`\lambda_i`, :math:`u_i(t)` are</span>
+<span class="sd">        eigenvalues / eigenfunctions of the following homogeneous Fredholm equation</span>
+
+<span class="sd">        .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)</span>
+
+<span class="sd">        for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation of the</span>
+<span class="sd">        stocastic processes :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.</span>
+
+<span class="sd">        For the numeric implementation the integral equation will be discretized</span>
+<span class="sd">        (see :py:func:`stocproc.method_kle.solve_hom_fredholm` for details) which leads to a regular matrix</span>
+<span class="sd">        eigenvalue problem.</span>
+<span class="sd">        The accuracy of the generated  process in terms of its auto correlation function depends on</span>
+<span class="sd">        the quality of the eigenvalues and eigenfunction and thus of the number of discritization points.</span>
+<span class="sd">        Further for a given threshold there is only a finite number of eigenvalues above that threshold,</span>
+<span class="sd">        provided that the number of discritization points is large enough.</span>
+
+<span class="sd">        Now the property of representing the integral kernel in terms of the eigenfunction</span>
+
+<span class="sd">        .. math :: R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s)</span>
+
+<span class="sd">        is used to find the number of discritization points and the number of used eigenfunctions such that</span>
+<span class="sd">        the sum represents the kernel up to a given tolerance (see :py:func:`stocproc.method_kle.auto_ng`</span>
+<span class="sd">        for details).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r_tau</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">ng_fac</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">meth</span><span class="o">=</span><span class="s1">&#39;fourpoint&#39;</span><span class="p">,</span> <span class="n">diff_method</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="n">dm_random_samples</span><span class="o">=</span><span class="mi">10</span><span class="o">**</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">align_eig_vec</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param r_tau: the idesired auto correlation function of a single parameter tau</span>
+<span class="sd">        :param t_max: specifies the time interval [0, t_max] for which the processes in generated</span>
+<span class="sd">        :param tol: maximal deviation of the auto correlation function of the sampled processes from</span>
+<span class="sd">            the given auto correlation r_tau.</span>
+<span class="sd">        :param ngfac: specifies the fine grid to use for the spline interpolation, the intermediate points are</span>
+<span class="sd">            calculated using integral interpolation</span>
+<span class="sd">        :param meth: the method for calculation integration weights and times, a callable or one of the following strings</span>
+<span class="sd">            &#39;midpoint&#39; (&#39;midp&#39;), &#39;trapezoidal&#39; (&#39;trapz&#39;), &#39;simpson&#39; (&#39;simp&#39;), &#39;fourpoint&#39; (&#39;fp&#39;),</span>
+<span class="sd">            &#39;gauss_legendre&#39; (&#39;gl&#39;), &#39;tanh_sinh&#39; (&#39;ts&#39;)</span>
+<span class="sd">        :param diff_method: either &#39;full&#39; or &#39;random&#39;, determines the points where the above success criterion is evaluated,</span>
+<span class="sd">            &#39;full&#39;: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal</span>
+<span class="sd">            &#39;random&#39;: pick a fixed number of random times t and s within the interval [0, t_max]</span>
+<span class="sd">        :param dm_random_samples: the number of random times used for diff_method &#39;random&#39;</span>
+<span class="sd">        :param seed: if not None seed the random number generator on init of this class with seed</span>
+<span class="sd">        :param align_eig_vec: assures that :math:`re(u_i(0)) \leq 0` and :math:`im(u_i(0)) = 0` for all i</span>
+
+<span class="sd">        .. note ::</span>
+<span class="sd">           To circumvent the time consuming initializing the StocProc class can be saved and loaded using</span>
+<span class="sd">           the standard python pickle module. The :py:func:`get_key` method may be used identify the</span>
+<span class="sd">           Process class by its parameters (r_tau, t_max, tol).</span>
+
+<span class="sd">        .. seealso ::</span>
+<span class="sd">           Details on how to solve the homogeneous Fredholm equation: :py:func:`stocproc.method_kle.solve_hom_fredholm`</span>
+
+<span class="sd">           Details on the error estimation and further clarification of the parameters ng_fac, meth,</span>
+<span class="sd">           diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="n">method_kle</span><span class="o">.</span><span class="n">auto_ng</span><span class="p">(</span><span class="n">corr</span><span class="o">=</span><span class="n">r_tau</span><span class="p">,</span>
+                                                    <span class="n">t_max</span><span class="o">=</span><span class="n">t_max</span><span class="p">,</span>
+                                                    <span class="n">ngfac</span><span class="o">=</span><span class="n">ng_fac</span><span class="p">,</span>
+                                                    <span class="n">meth</span><span class="o">=</span><span class="n">meth</span><span class="p">,</span>
+                                                    <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
+                                                    <span class="n">diff_method</span><span class="o">=</span><span class="n">diff_method</span><span class="p">,</span>
+                                                    <span class="n">dm_random_samples</span><span class="o">=</span><span class="n">dm_random_samples</span><span class="p">)</span>
+
+        <span class="c1"># inplace alignment such that re(ui(0)) &gt;= 0 and im(ui(0)) = 0</span>
+        <span class="k">if</span> <span class="n">align_eig_vec</span><span class="p">:</span>
+            <span class="n">method_kle</span><span class="o">.</span><span class="n">align_eig_vec</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">)</span>
+
+        <span class="n">state</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__setstate__</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">r_tau</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">tol</span>
+
+<div class="viewcode-block" id="StocProc_KLE.get_key"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.stocproc.StocProc_KLE.get_key">[docs]</a>    <span class="k">def</span> <span class="nf">get_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump</span>
+<span class="sd">        the StocProc class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span></div>
+
+    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span>
+
+    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">num_ev</span><span class="p">,</span> <span class="n">ng</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="o">.</span><span class="n">shape</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_axis</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_ev</span> <span class="o">=</span> <span class="n">num_ev</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span>
+
+<div class="viewcode-block" id="StocProc_KLE.calc_z"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.stocproc.StocProc_KLE.calc_z">[docs]</a>    <span class="k">def</span> <span class="nf">calc_z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;evaluate :math:`z_k = \sum_i \lambda_i Y_i u_{ik}`&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">]))</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="StocProc_KLE.get_num_y"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.stocproc.StocProc_KLE.get_num_y">[docs]</a>    <span class="k">def</span> <span class="nf">get_num_y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;The number of independent random variables Y is given by the number of used eigenfunction</span>
+<span class="sd">        to approximate the auto correlation kernel.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_ev</span></div></div>
+
+
+<div class="viewcode-block" id="StocProc_FFT"><a class="viewcode-back" href="../../StocProc_FFT.html#stocproc.stocproc.StocProc_FFT">[docs]</a><span class="k">class</span> <span class="nc">StocProc_FFT</span><span class="p">(</span><span class="n">_absStocProc</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Simulate Stochastic Process using FFT method</span>
+
+<span class="sd">    This method uses the relation of the auto correlation to the spectral density</span>
+
+<span class="sd">    .. math:: \alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}</span>
+
+<span class="sd">    where :math:`J(\omega)` is a real non negative function, usually called spectral density.</span>
+<span class="sd">    Then the integral can be approximated by a discrete integration scheme:</span>
+
+<span class="sd">    .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}</span>
+
+<span class="sd">    where the :math:`\omega_k` depend on the integration scheme.</span>
+
+<span class="sd">    For a process defined by</span>
+
+<span class="sd">    .. math:: Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}</span>
+
+<span class="sd">    with independent complex random variables :math:`Y_k` such that :math:`\langle Y_k \rangle = 0`,</span>
+<span class="sd">    :math:`\langle Y_k Y_{k&#39;}\rangle = 0` and :math:`\langle Y_k Y^\ast_{k&#39;}\rangle = \Delta \omega \delta_{k,k&#39;}`</span>
+<span class="sd">    it is easy to see that its auto correlation function will be exactly the approximated auto correlation function.</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \begin{align}</span>
+<span class="sd">            \langle Z(t) Z^\ast(s) \rangle = &amp; \sum_{k,k&#39;} \frac{1}{\pi} \sqrt{w_k w_{k&#39;} J(\omega_k)J(\omega_{k&#39;})} \langle Y_k Y_{k&#39;}\rangle \exp(-\mathrm{i}(\omega_k t - \omega_k&#39; s)) \\</span>
+<span class="sd">                                           = &amp; \sum_{k}    \frac{w_k}{\pi} J(\omega_k) e^{-\mathrm{i}\omega_k (t-s)} \\</span>
+<span class="sd">                                           \approx &amp; \alpha(t-s)</span>
+<span class="sd">        \end{align}</span>
+
+<span class="sd">    To calculate :math:`Z(t)` the Discrete Fourier Transform (DFT) can be applied as follows:</span>
+
+<span class="sd">    .. math:: Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k  e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}</span>
+
+<span class="sd">    Here :math:`\omega_k` has to take the form :math:`\omega_k = \omega_\mathrm{min} + k \Delta \omega` and</span>
+<span class="sd">    :math:`\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / N-1` which limits</span>
+<span class="sd">    the itegration schemes to those with equidistant weights.</span>
+<span class="sd">    For the DFT scheme to be applicable :math:`\Delta t` has to be chosen such that</span>
+
+<span class="sd">    .. math:: 1 = \frac{\Delta \omega \Delta t}{2 \pi} N</span>
+
+<span class="sd">    holds. Since :math:`J(\omega)` is real it follows that :math:`X(t_l) = X^\ast(t_{N-l})`.</span>
+<span class="sd">    For that reason the stochastic process has only :math:`(N+1)/2` (odd :math:`N`) and</span>
+<span class="sd">    :math:`(N/2 + 1)` (even :math:`N`) independent time grid points.</span>
+
+<span class="sd">    .. math:: Z_l = e^{-\mathrm{i}\omega_\mathrm{min} t_l} DFT\left(\sqrt{w_k J(\omega_k) / \pi} \; Y_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n</span>
+
+<span class="sd">    :param spectral_density: the spectral density :math:`J(\omega)` as callable function object</span>
+<span class="sd">    :param t_max: :math:`[0,t_\mathrm{max}]` is the interval for which the process will be calculated</span>
+<span class="sd">    :param num_grid_points: number :math:`n` of euqally distributed times :math:`t_k` on the intervall :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">        for which the process will be evaluated</span>
+<span class="sd">    :param num_samples: number of independent processes to be returned</span>
+<span class="sd">    :param seed: seed passed to the random number generator used</span>
+
+<span class="sd">    :return: returns the tuple (2D array of the set of stochastic processes,</span>
+<span class="sd">        1D array of time grid points). Each row of the stochastic process</span>
+<span class="sd">        array contains one sample of the stochastic process.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spectral_density</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">bcf_ref</span><span class="p">,</span> <span class="n">intgr_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">intpl_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span>
+                 <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">negative_frequencies</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">negative_frequencies</span><span class="p">:</span> 
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;non neg freq only&quot;</span><span class="p">)</span>
+            <span class="c1"># assume the spectral_density is 0 for w&lt;0 </span>
+            <span class="c1"># and decays fast for large w</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">find_integral_boundary</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span> 
+                                                  <span class="n">tol</span>       <span class="o">=</span> <span class="n">intgr_tol</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                                                  <span class="n">ref_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
+                                                  <span class="n">max_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="n">e6</span><span class="p">,</span> 
+                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;upper int bound b </span><span class="si">{:.3e}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b</span><span class="p">))</span>
+            <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dt</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">calc_ab_N_dx_dt</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span>
+                                                         <span class="n">intgr_tol</span> <span class="o">=</span> <span class="n">intgr_tol</span><span class="p">,</span>
+                                                         <span class="n">intpl_tol</span> <span class="o">=</span> <span class="n">intpl_tol</span><span class="p">,</span>
+                                                         <span class="n">t_max</span>     <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span>
+                                                         <span class="n">a</span>         <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+                                                         <span class="n">b</span>         <span class="o">=</span> <span class="n">b</span><span class="p">,</span>
+                                                         <span class="n">ft_ref</span>    <span class="o">=</span> <span class="k">lambda</span> <span class="n">tau</span><span class="p">:</span><span class="n">bcf_ref</span><span class="p">(</span><span class="n">tau</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+                                                         <span class="n">opt_b_only</span><span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                                                         <span class="n">N_max</span>     <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">24</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;required tol results in N </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">N</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;use neg freq&quot;</span><span class="p">)</span>
+            <span class="c1"># assume the spectral_density is non zero also for w&lt;0 </span>
+            <span class="c1"># but decays fast for large |w|</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">find_integral_boundary</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span> 
+                                                  <span class="n">tol</span>       <span class="o">=</span> <span class="n">intgr_tol</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                                                  <span class="n">ref_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
+                                                  <span class="n">max_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="n">e6</span><span class="p">,</span> 
+                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">find_integral_boundary</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span> 
+                                                  <span class="n">tol</span>       <span class="o">=</span> <span class="n">intgr_tol</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                                                  <span class="n">ref_val</span>   <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> 
+                                                  <span class="n">max_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="n">e6</span><span class="p">,</span> 
+                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>            
+            <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dt</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">calc_ab_N_dx_dt</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span>
+                                                              <span class="n">intgr_tol</span> <span class="o">=</span> <span class="n">intgr_tol</span><span class="p">,</span> 
+                                                              <span class="n">intpl_tol</span> <span class="o">=</span> <span class="n">intpl_tol</span><span class="p">,</span> 
+                                                              <span class="n">t_max</span>     <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span>
+                                                              <span class="n">a</span>         <span class="o">=</span> <span class="n">a</span><span class="p">,</span>
+                                                              <span class="n">b</span>         <span class="o">=</span> <span class="n">b</span><span class="p">,</span>
+                                                              <span class="n">ft_ref</span>    <span class="o">=</span> <span class="k">lambda</span> <span class="n">tau</span><span class="p">:</span><span class="n">bcf_ref</span><span class="p">(</span><span class="n">tau</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+                                                              <span class="n">opt_b_only</span><span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+                                                              <span class="n">N_max</span>     <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">24</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;required tol result in N </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">N</span><span class="p">))</span>
+
+        <span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="n">N</span><span class="o">*</span><span class="n">dx</span><span class="o">*</span><span class="n">dt</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">12</span>
+        <span class="n">num_grid_points</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">t_max</span><span class="o">/</span><span class="n">dt</span><span class="p">))</span><span class="o">+</span><span class="mi">1</span>
+        <span class="n">t_max</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_grid_points</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">dt</span>
+        
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_max</span>           <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span> 
+                         <span class="n">num_grid_points</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span> 
+                         <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">)</span>
+        
+        <span class="n">omega</span> <span class="o">=</span> <span class="n">dx</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">(</span><span class="n">omega</span> <span class="o">+</span> <span class="n">a</span> <span class="o">+</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="p">(</span><span class="n">a</span><span class="o">+</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>   <span class="c1">#self.t is from the parent class</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">bcf_ref</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">intgr_tol</span><span class="p">,</span> <span class="n">intpl_tol</span>
+
+    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span>
+
+    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">seed</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_max</span>           <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span>
+                         <span class="n">num_grid_points</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span>
+                         <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">)</span>
+            
+    <span class="k">def</span> <span class="nf">calc_z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">*</span> <span class="n">y</span><span class="p">)[</span><span class="mi">0</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span>
+        <span class="k">return</span> <span class="n">z</span>
+
+    <span class="k">def</span> <span class="nf">get_num_y</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Richard Hartmann.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.2.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

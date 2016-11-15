@@ -1,0 +1,717 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>stocproc.method_kle &mdash; StocProc 0.2.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="StocProc 0.2.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> StocProc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../stocproc.html">Stochastic Process Generators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../example.html">Example</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">StocProc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>stocproc.method_kle</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for stocproc.method_kle</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.linalg</span> <span class="k">import</span> <span class="n">eigh</span> <span class="k">as</span> <span class="n">scipy_eigh</span>
+<span class="kn">from</span> <span class="nn">scipy.special</span> <span class="k">import</span> <span class="n">gamma</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="k">import</span> <span class="n">minimize</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">stocproc_c</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">gquad</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">tools</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<div class="viewcode-block" id="solve_hom_fredholm"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.solve_hom_fredholm">[docs]</a><span class="k">def</span> <span class="nf">solve_hom_fredholm</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">w</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Solves the discrete homogeneous Fredholm equation of the second kind</span>
+<span class="sd">    </span>
+<span class="sd">    .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)</span>
+<span class="sd">    </span>
+<span class="sd">    Quadrature approximation of the integral gives a discrete representation</span>
+<span class="sd">    which leads to a regular eigenvalue problem.</span>
+<span class="sd">    </span>
+<span class="sd">    .. math:: \sum_i w_i R(t_j-s_i) u(s_i) = \lambda u(t_j) \equiv \mathrm{diag(w_i)} \cdot R \cdot u = \lambda u </span>
+<span class="sd">    </span>
+<span class="sd">    Note: If :math:`t_i = s_i \forall i` the matrix :math:`R(t_j-s_i)` is </span>
+<span class="sd">    a hermitian matrix. In order to preserve hermiticity for arbitrary :math:`w_i` </span>
+<span class="sd">    one defines the diagonal matrix :math:`D = \mathrm{diag(\sqrt{w_i})}` </span>
+<span class="sd">    with leads to the equivalent expression:</span>
+<span class="sd">    </span>
+<span class="sd">    .. math:: D \cdot R \cdot D \cdot D \cdot u = \lambda D \cdot u \equiv \tilde R \tilde u = \lambda \tilde u</span>
+<span class="sd">    </span>
+<span class="sd">    where :math:`\tilde R` is hermitian and :math:`u = D^{-1}\tilde u`.</span>
+<span class="sd">    </span>
+<span class="sd">    :param r: correlation matrix :math:`R(t_j-s_i)`</span>
+<span class="sd">    :param w: integrations weights :math:`w_i` </span>
+<span class="sd">        (they have to correspond to the discrete time :math:`t_i`)</span>
+
+<span class="sd">    :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, ordered in decreasing order)</span>
+
+<span class="sd">    .. seealso::</span>
+<span class="sd">        There are various convenient functions to calculate the integration weights and times</span>
+<span class="sd">        to approximate the integral over the interval [0, t_max] using ng points.</span>
+
+<span class="sd">        :py:func:`get_mid_point_weights_times`,</span>
+<span class="sd">        :py:func:`get_trapezoidal_weights_times`,</span>
+<span class="sd">        :py:func:`get_simpson_weights_times`,</span>
+<span class="sd">        :py:func:`get_four_point_weights_times`,</span>
+<span class="sd">        :py:func:`get_gauss_legendre_weights_times`,</span>
+<span class="sd">        :py:func:`get_tanh_sinh_weights_times`</span>
+
+<span class="sd">    .. note::</span>
+<span class="sd">        It has been noticed that the performance of the various weights depends on the auto correlation</span>
+<span class="sd">        function. As default one should use the &#39;simpson weights&#39;. &#39;four point&#39;, &#39;gauss legendre&#39; and &#39;tanh sinh&#39;</span>
+<span class="sd">        might perform better for auto correlation function that decay slowly. Their advantage becomes evident</span>
+<span class="sd">        for a large numbers of grid points only. So if one cares about relative differences below 1e-4</span>
+<span class="sd">        the more sophisticated weights are suitable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="c1"># weighted matrix r due to quadrature weights</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="n">w_sqrt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">w_sqrt</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">w_sqrt</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">n</span><span class="p">)</span>
+    <span class="n">eig_val</span><span class="p">,</span> <span class="n">eig_vec</span> <span class="o">=</span> <span class="n">scipy_eigh</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">overwrite_a</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># eig_vals in ascending</span>
+
+    <span class="n">eig_val</span> <span class="o">=</span> <span class="n">eig_val</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">eig_vec</span> <span class="o">=</span> <span class="n">eig_vec</span><span class="p">[:,</span> <span class="p">::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">eig_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">w_sqrt</span><span class="p">,</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="n">eig_vec</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;discrete fredholm equation of size </span><span class="si">{}</span><span class="s2"> solved [</span><span class="si">{:.2e}</span><span class="s2">s]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">eig_val</span><span class="p">,</span> <span class="n">eig_vec</span></div>
+
+<span class="k">def</span> <span class="nf">align_eig_vec</span><span class="p">(</span><span class="n">eig_vec</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">eig_vec</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="n">phase</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">eig_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">imag</span><span class="p">(</span><span class="n">eig_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">])))</span>
+        <span class="n">eig_vec</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">/=</span> <span class="n">phase</span>
+
+
+<span class="k">def</span> <span class="nf">_calc_corr_min_t_plus_t</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">bcf</span><span class="p">):</span>
+    <span class="n">bcf_n_plus</span> <span class="o">=</span> <span class="n">bcf</span><span class="p">(</span><span class="n">s</span> <span class="o">-</span> <span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="c1">#    [bcf(-3)    , bcf(-2)    , bcf(-1)    , bcf(0), bcf(1), bcf(2), bcf(3)]</span>
+    <span class="c1"># == [bcf(3)^\ast, bcf(2)^\ast, bcf(1)^\ast, bcf(0), bcf(1), bcf(2), bcf(3)]</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">bcf_n_plus</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">bcf_n_plus</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_calc_corr_matrix</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">bcf</span><span class="p">,</span> <span class="n">is_equi</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;calculates the matrix alpha_ij = bcf(t_i-s_j)</span>
+
+<span class="sd">    for equidistant s: call bcf only for s-s_0 and reconstructs the rest</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_equi</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">is_equi</span> <span class="o">=</span> <span class="n">is_axis_equidistant</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">is_equi</span><span class="p">:</span>
+        <span class="n">n_</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="n">bcf_n</span> <span class="o">=</span> <span class="n">_calc_corr_min_t_plus_t</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">bcf</span><span class="p">)</span>
+        <span class="c1"># we want</span>
+        <span class="c1"># r = bcf(0) bcf(-1), bcf(-2)</span>
+        <span class="c1">#     bcf(1) bcf( 0), bcf(-1)</span>
+        <span class="c1">#     bcf(2) bcf( 1), bcf( 0)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_</span><span class="p">,</span> <span class="n">n_</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_</span><span class="p">):</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">n_</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">i</span>
+            <span class="n">r</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">bcf_n</span><span class="p">[</span><span class="n">idx</span><span class="p">:</span><span class="n">idx</span> <span class="o">+</span> <span class="n">n_</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">bcf</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">s</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">r</span>
+
+
+<div class="viewcode-block" id="get_mid_point_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_mid_point_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_mid_point_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **mid point rule**.</span>
+
+<span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">    :param num_grid_points: number of grid points N</span>
+<span class="sd">    :return: location of the grid points, corresponding weights</span>
+
+<span class="sd">    Because this function is intended to provide the weights to be used in :py:func:`solve_hom_fredholm`</span>
+<span class="sd">    it stretches the homogeneous weights over the grid points starting from 0 up to t_max, so the</span>
+<span class="sd">    term min_point is somewhat miss leading. This is possible because we want to simulate</span>
+<span class="sd">    stationary stochastic processes which allows :math:`\alpha(t_i+\Delta/2 - (s_j+\Delta/2)) = \alpha(t_i-s_j)`.</span>
+<span class="sd">        </span>
+<span class="sd">    The N grid points are located at</span>
+<span class="sd">    </span>
+<span class="sd">    .. math:: t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1</span>
+
+<span class="sd">    and the corresponding weights are</span>
+<span class="sd">    </span>
+<span class="sd">    .. math:: w_i = \Delta t = \frac{t_\mathrm{max}}{N} \qquad i = 0,1, ... N - 1</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">)</span>
+    <span class="n">delta_t</span> <span class="o">=</span> <span class="n">t_max</span><span class="o">/</span><span class="n">num_grid_points</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">)</span><span class="o">*</span><span class="n">delta_t</span>
+    <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
+
+<div class="viewcode-block" id="get_trapezoidal_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_trapezoidal_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_trapezoidal_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **trapezoidal rule**.</span>
+
+<span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">    :param num_grid_points: number of grid points N</span>
+<span class="sd">    :return: location of the grid points, corresponding weights</span>
+
+<span class="sd">    The N grid points are located at</span>
+
+<span class="sd">    .. math:: t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1</span>
+
+<span class="sd">    and the corresponding weights are</span>
+
+<span class="sd">    .. math:: w_0 = w_{N-1} = \Delta t /2 \qquad w_i = \Delta t \quad  0 &lt; i &lt; N - 1</span>
+<span class="sd">              \qquad \Delta t = \frac{t_\mathrm{max}}{N-1}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">t</span><span class="p">,</span> <span class="n">delta_t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="n">retstep</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">)</span><span class="o">*</span><span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/=</span> <span class="mi">2</span>
+    <span class="n">w</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/=</span> <span class="mi">2</span>
+    <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
+
+<div class="viewcode-block" id="get_simpson_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_simpson_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_simpson_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **simpson rule**.</span>
+
+<span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">    :param num_grid_points: number of grid points N (needs to be odd)</span>
+<span class="sd">    :return: location of the grid points, corresponding weights</span>
+
+<span class="sd">    The N grid points are located at</span>
+
+<span class="sd">    .. math:: t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1</span>
+
+<span class="sd">    and the corresponding weights are</span>
+
+<span class="sd">    .. math:: w_0 = w_{N-1} = 1/3 \Delta t \qquad w_{2i} = 2/3 \Delta t \quad 0 &lt; i &lt; (N - 1)/2</span>
+<span class="sd">    .. math:: \qquad w_{2i+1} = 4/3 \Delta t \quad  0 \leq i &lt; (N - 1)/2 \qquad \Delta t = \frac{t_\mathrm{max}}{N-1}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">num_grid_points</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;simpson weights needs grid points ng such that ng = 2*k+1, but git ng=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">))</span>
+    <span class="n">t</span><span class="p">,</span> <span class="n">delta_t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="n">retstep</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">::</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span><span class="o">/</span><span class="mi">3</span><span class="o">*</span><span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">1</span><span class="p">::</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span><span class="o">/</span><span class="mi">3</span><span class="o">*</span><span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>    <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="mi">3</span><span class="o">*</span><span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>   <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="mi">3</span><span class="o">*</span><span class="n">delta_t</span>
+    <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
+
+<div class="viewcode-block" id="get_four_point_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_four_point_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_four_point_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **four-point Newton-Cotes rule**.</span>
+
+<span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">    :param num_grid_points: number of grid points N (needs to be (4k+1) where k is an integer greater 0)</span>
+<span class="sd">    :return: location of the grid points, corresponding weights</span>
+
+<span class="sd">    The N grid points are located at</span>
+
+<span class="sd">    .. math:: t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1</span>
+
+<span class="sd">    and the corresponding weights are</span>
+
+<span class="sd">    .. math:: w_0 = w_{N-1} = 28/90 \Delta t</span>
+<span class="sd">    .. math:: w_{4i+1} = w_{4i+3} = 128/90 \Delta t \quad 0 \leq i &lt; (N - 1)/4</span>
+<span class="sd">    .. math:: w_{4i+2} = 48/90 \Delta t \quad 0 \leq i &lt; (N - 1)/4</span>
+<span class="sd">    .. math:: w_{4i}   = 56/90 \Delta t \quad 0 &lt; i &lt; (N - 1)/4</span>
+<span class="sd">    .. math:: \Delta t = \frac{t_\mathrm{max}}{N-1}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">num_grid_points</span> <span class="o">%</span> <span class="mi">4</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;four point weights needs grid points ng such that ng = 4*k+1, but git ng=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">))</span>
+    <span class="n">t</span><span class="p">,</span> <span class="n">delta_t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="n">retstep</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">::</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mi">56</span>  <span class="o">/</span> <span class="mi">90</span> <span class="o">*</span> <span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">1</span><span class="p">::</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mi">128</span> <span class="o">/</span> <span class="mi">90</span> <span class="o">*</span> <span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">2</span><span class="p">::</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mi">48</span>  <span class="o">/</span> <span class="mi">90</span> <span class="o">*</span> <span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">::</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mi">128</span> <span class="o">/</span> <span class="mi">90</span> <span class="o">*</span> <span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>    <span class="o">=</span> <span class="mi">28</span>  <span class="o">/</span> <span class="mi">90</span> <span class="o">*</span> <span class="n">delta_t</span>
+    <span class="n">w</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>   <span class="o">=</span> <span class="mi">28</span>  <span class="o">/</span> <span class="mi">90</span> <span class="o">*</span> <span class="n">delta_t</span>
+    <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
+
+<div class="viewcode-block" id="get_gauss_legendre_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_gauss_legendre_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_gauss_legendre_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **Gauss integration**</span>
+<span class="sd">    by expanding the function in terms of Legendre Polynomials.</span>
+
+<span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">    :param num_grid_points: number of grid points N</span>
+<span class="sd">    :return: location of the grid points, corresponding weights</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">gquad</span><span class="o">.</span><span class="n">gauss_nodes_weights_legendre</span><span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">t_max</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="get_tanh_sinh_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_tanh_sinh_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_tanh_sinh_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **Tanh-Sinh integration**. The idea is to</span>
+<span class="sd">    transform the integral over a finite interval :math:`x \in [-1, 1]` via the variable transformation</span>
+
+<span class="sd">    .. math :: x = \tanh(\pi/2 \sinh(t))</span>
+
+<span class="sd">    to a integral over the entire real axis :math:`t \in [-\infty,\infty]` but where the new</span>
+<span class="sd">    transformed integrand decay rapidly such that a simply midpoint rule performs very well.</span>
+
+<span class="sd">    inspired by &#39;Tanh-Sinh High-Precision Quadrature - David H. Bailey&#39;</span>
+
+<span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
+<span class="sd">    :param num_grid_points: number of grid points N (needs to be odd)</span>
+<span class="sd">    :return: location of the grid points, corresponding weights</span>
+
+<span class="sd">    For a fixed small parameter h the location of the grid points read</span>
+
+<span class="sd">    .. math :: x_i = \tanh(\pi/2 \sinh(ih)</span>
+
+<span class="sd">    with corresponding weights</span>
+
+<span class="sd">    .. math :: w_i = \frac{\pi/2 \cosh(ih)}{\cosh^2(\pi/2 \sinh(ih))}</span>
+
+<span class="sd">    where i can be any integer. For a given number of grid points N, h is chosen such that</span>
+<span class="sd">    :math:`w_{(N-1)/2} &lt; 10^{-14}` which implies odd N. With that particular h :math:`x_i` and</span>
+<span class="sd">    :math:`w_i` are calculated for :math:`-(N-1)/2 \leq i \leq (N-1)/2`. Afterwards the :math:`x_i` are linearly</span>
+<span class="sd">    scaled such that :math:`x_{-(N-1)/2} = 0` and :math:`x_{(N-1)/2} = t_\mathrm{max}`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">get_h_of_N</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="sd">r&quot;&quot;&quot;returns the stepsize h for sinh tanh quad for a given number of points N</span>
+<span class="sd">            such that the smallest weights are about 1e-14</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">16.12087683080651</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.393599730652087</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="mf">6.536936185577097</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.012504470475915</span>
+        <span class="k">if</span> <span class="n">N</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;only tested for N &gt;= 4&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">N</span> <span class="o">**</span> <span class="n">b</span> <span class="o">+</span> <span class="n">c</span> <span class="o">*</span> <span class="n">N</span> <span class="o">**</span> <span class="n">d</span>
+
+    <span class="n">h</span> <span class="o">=</span> <span class="n">get_h_of_N</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_grid_points</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;sinh tanh weights needs grid points ng such that ng = 2*k+1, but git ng=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_grid_points</span><span class="p">))</span>
+    <span class="n">kmax</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_grid_points</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">kmax</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">h</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cosh</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">cosh</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sinh</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">h</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">w</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">w</span><span class="p">))</span><span class="o">*</span><span class="n">t_max</span><span class="o">/</span><span class="mi">2</span>
+
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sinh</span><span class="p">(</span><span class="n">h</span><span class="o">*</span><span class="n">k</span><span class="p">)</span>
+    <span class="n">y_plus</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cosh</span><span class="p">(</span><span class="n">tmp</span><span class="p">))</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">y_plus</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="mi">2</span><span class="o">-</span><span class="n">y_plus</span><span class="p">)))</span><span class="o">*</span><span class="n">t_max</span><span class="o">/</span><span class="mi">2</span>
+    <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
+
+<span class="k">def</span> <span class="nf">get_rel_diff</span><span class="p">(</span><span class="n">corr</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">ng</span><span class="p">,</span> <span class="n">weights_times</span><span class="p">,</span> <span class="n">ng_fac</span><span class="p">):</span>
+    <span class="n">t</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">ng</span><span class="p">)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">corr</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">t</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">_eig_val</span><span class="p">,</span> <span class="n">_eig_vec</span> <span class="o">=</span> <span class="n">solve_hom_fredholm</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">eig_val_min</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">ng_fine</span> <span class="o">=</span> <span class="n">ng_fac</span> <span class="o">*</span> <span class="p">(</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">tfine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">ng_fine</span><span class="p">)</span>
+    <span class="n">bcf_n_plus</span> <span class="o">=</span> <span class="n">corr</span><span class="p">(</span><span class="n">tfine</span> <span class="o">-</span> <span class="n">tfine</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">alpha_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">bcf_n_plus</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">bcf_n_plus</span><span class="p">))</span>
+
+    <span class="n">u_i_all_t</span> <span class="o">=</span> <span class="n">stocproc_c</span><span class="o">.</span><span class="n">eig_func_all_interp</span><span class="p">(</span><span class="n">delta_t_fac</span> <span class="o">=</span> <span class="n">ng_fac</span><span class="p">,</span>
+                                               <span class="n">time_axis</span>   <span class="o">=</span> <span class="n">t</span><span class="p">,</span>
+                                               <span class="n">alpha_k</span>     <span class="o">=</span> <span class="n">alpha_k</span><span class="p">,</span>
+                                               <span class="n">weights</span>     <span class="o">=</span> <span class="n">w</span><span class="p">,</span>
+                                               <span class="n">eigen_val</span>   <span class="o">=</span> <span class="n">_eig_val</span><span class="p">,</span>
+                                               <span class="n">eigen_vec</span>   <span class="o">=</span> <span class="n">_eig_vec</span><span class="p">)</span>
+
+    <span class="n">u_i_all_ast_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">u_i_all_t</span><span class="p">)</span>  <span class="c1"># (N_gp, N_ev)</span>
+    <span class="n">num_ev</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">_eig_val</span><span class="p">)</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">_eig_val</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_ev</span><span class="p">)</span> <span class="o">*</span> <span class="n">u_i_all_t</span>  <span class="c1"># (N_gp, N_ev)</span>
+    <span class="n">recs_bcf</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">u_i_all_ast_s</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">([</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="n">refc_bcf</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">ng_fine</span><span class="p">,</span> <span class="n">ng_fine</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng_fine</span><span class="p">):</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">ng_fine</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">i</span>
+        <span class="n">refc_bcf</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha_k</span><span class="p">[</span><span class="n">idx</span><span class="p">:</span><span class="n">idx</span> <span class="o">+</span> <span class="n">ng_fine</span><span class="p">]</span>
+
+    <span class="n">rd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">recs_bcf</span> <span class="o">-</span> <span class="n">refc_bcf</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">refc_bcf</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">tfine</span><span class="p">,</span> <span class="n">rd</span>
+
+<span class="k">def</span> <span class="nf">subdevide_axis</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">ngfac</span><span class="p">):</span>
+    <span class="n">ng</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+    <span class="n">tfine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">((</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">ngfac</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">tfine</span><span class="p">[::</span><span class="n">ngfac</span><span class="p">]</span> <span class="o">=</span> <span class="n">t</span>
+    <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">ngfac</span><span class="p">):</span>
+        <span class="n">tfine</span><span class="p">[</span><span class="n">l</span><span class="p">::</span><span class="n">ngfac</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span> <span class="o">*</span> <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="p">(</span><span class="n">ngfac</span> <span class="o">-</span> <span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">t</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">ngfac</span>
+    <span class="k">return</span> <span class="n">tfine</span>
+
+<div class="viewcode-block" id="auto_ng"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.auto_ng">[docs]</a><span class="k">def</span> <span class="nf">auto_ng</span><span class="p">(</span><span class="n">corr</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">ngfac</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">meth</span><span class="o">=</span><span class="n">get_mid_point_weights_times</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="n">diff_method</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
+            <span class="n">dm_random_samples</span><span class="o">=</span><span class="mi">10</span><span class="o">**</span><span class="mi">4</span><span class="p">,</span> <span class="n">ret_eigvals</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">relative_difference</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">r&quot;&quot;&quot;increase the number of gridpoints until the desired accuracy is met</span>
+
+<span class="sd">    This function increases the number of grid points of the discrete Fredholm equation exponentially until</span>
+<span class="sd">    a given accuracy is met. The accuracy is determined from the deviation of the approximated</span>
+<span class="sd">    auto correlation of the Karhunen-Loève expansion from the given reference auto correlation.</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \Delta(n) = \max_{t,s \in [0,t_\mathrm{max}]}\left( \Big | \alpha(t-s) - \sum_{i=1}^n \lambda_i u_i(t) u_i^\ast(s) \Big | \right )</span>
+
+<span class="sd">    :param corr: the auto correlation function</span>
+<span class="sd">    :param t_max: specifies the interval [0, t_max] for which the stochastic process can be evaluated</span>
+<span class="sd">    :param ngfac: specifies the fine grid to use for the spline interpolation, the intermediate points are</span>
+<span class="sd">        calculated using integral interpolation</span>
+<span class="sd">    :param meth: the method for calculation integration weights and times, a callable or one of the following strings</span>
+<span class="sd">        &#39;midpoint&#39; (&#39;midp&#39;), &#39;trapezoidal&#39; (&#39;trapz&#39;), &#39;simpson&#39; (&#39;simp&#39;), &#39;fourpoint&#39; (&#39;fp&#39;),</span>
+<span class="sd">        &#39;gauss_legendre&#39; (&#39;gl&#39;), &#39;tanh_sinh&#39; (&#39;ts&#39;)</span>
+<span class="sd">    :param tol: defines the success criterion max(abs(corr_exact - corr_reconstr)) &lt; tol</span>
+<span class="sd">    :param diff_method: either &#39;full&#39; or &#39;random&#39;, determines the points where the above success criterion is evaluated,</span>
+<span class="sd">        &#39;full&#39;: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal</span>
+<span class="sd">        &#39;random&#39;: pick a fixed number of random times t and s within the interval [0, t_max]</span>
+<span class="sd">    :param dm_random_samples: the number of random times used for diff_method &#39;random&#39;</span>
+<span class="sd">    :param ret_eigvals: if True, return also the eigen values</span>
+<span class="sd">    :param relative_difference: if True, use relative difference instead of absolute</span>
+
+<span class="sd">    :return: an array containing the necessary eigenfunctions of the Karhunen-Loève expansion for sampling the</span>
+<span class="sd">        stochastic processes (shape=(num_eigen_functions, num_grid_points)</span>
+
+<span class="sd">    The procedure works as follows:</span>
+<span class="sd">        1) Solve the discrete Fredholm equation on a grid with ng points.</span>
+<span class="sd">           This gives ng eigenvalues/vectors where each ng-dimensional vector approximates the continuous eigenfunction.</span>
+<span class="sd">           (:math:`t, u_i(t) \leftrightarrow t_k, u_{ik}` where the :math:`t_k` depend on the integration weights</span>
+<span class="sd">           method) For performance reasons, especially when the auto correlation function evaluates slowly it</span>
+<span class="sd">           is advisable to use a method which uses equally distributed times :math;`t_k`.</span>
+
+<span class="sd">        2) Approximate the eigenfunction on a finer, equidistant grid</span>
+<span class="sd">           (:math:`ng_\mathrm{fine} = ng_\mathrm{fac}(ng-1)+1`) using</span>
+
+<span class="sd">           .. math::</span>
+
+<span class="sd">               u_i(t) = \frac{1}{\lambda_i} \int_0^{t_\mathrm{max}} \mathrm{d}s \; \alpha(t-s) u_i(s)</span>
+<span class="sd">               \approx \frac{1}{\lambda_i} \sum_k w_k \alpha(t-s_k) u_{ik}</span>
+
+<span class="sd">           According to the Numerical Recipes [1] this interpolation should perform better that simple</span>
+<span class="sd">           spline interpolation. However it turns that this is not the case in general (e.g. for exponential</span>
+<span class="sd">           auto correlation functions the spline interpolation performs better). For that reason it might be</span>
+<span class="sd">           usefull to set ngfac to 1 which will skip the integral interpolation</span>
+<span class="sd">        3) Use the eigenfunction on the fine grid to setup a cubic spline interpolation.</span>
+<span class="sd">        4) Use the spline interpolation to estimate the deviation :math:`\Delta(n)`. When using diff_method = &#39;full&#39;</span>
+<span class="sd">           the maximization is performed over all :math:`t&#39;_i, s&#39;_j` where :math:`t&#39;_i = (t_i + t_{i+1})/2` and</span>
+<span class="sd">           :math:`s&#39;_i = (s_i + s_{i+1})/2` with :math:`i,j = 0, \, ...\, , ng_\mathrm{fine}-2`. It is expected that</span>
+<span class="sd">           the interpolation error is maximal when beeing in between the reference points.</span>
+<span class="sd">        5) Now calculate the deviation :math:`\Delta(n)` for sequential n starting at n=0. Stop if</span>
+<span class="sd">           :math:`\Delta(n) &lt; tol`. If the deviation does not drop below tol for all :math:`0 \leq n &lt; ng-1` increase</span>
+<span class="sd">           ng as follows :math:`ng = 2*ng-1` and start over at 1). (This update scheme for ng asured that ng is odd</span>
+<span class="sd">           which is needed for the &#39;simpson&#39; and &#39;fourpoint&#39; integration weights)</span>
+
+<span class="sd">    .. note::</span>
+
+<span class="sd">        The scaling of the error of the various integration methods does not correspond to the scaling of</span>
+<span class="sd">        the number of eigenfunctions to use in order to reconstruct the auto correlation function within</span>
+<span class="sd">        a given tolerance. Surprisingly it turns out that in general the most trivial **mid-point method** performs</span>
+<span class="sd">        quite well. If other methods suite bettern needs to be check in every case.</span>
+
+<span class="sd">    [1] Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P.,</span>
+<span class="sd">    2007. Numerical Recipes 3rd Edition: The Art of Scientific Computing,</span>
+<span class="sd">    Auflage: 3. ed. Cambridge University Press, Cambridge, UK ; New York. (pp. 990)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">time_start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">diff_method</span> <span class="o">==</span> <span class="s1">&#39;full&#39;</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">elif</span> <span class="n">diff_method</span> <span class="o">==</span> <span class="s1">&#39;random&#39;</span><span class="p">:</span>
+        <span class="n">t_rand</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">dm_random_samples</span><span class="p">)</span> <span class="o">*</span> <span class="n">t_max</span>
+        <span class="n">s_rand</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">dm_random_samples</span><span class="p">)</span> <span class="o">*</span> <span class="n">t_max</span>
+        <span class="n">alpha_ref</span> <span class="o">=</span> <span class="n">corr</span><span class="p">(</span><span class="n">t_rand</span> <span class="o">-</span> <span class="n">s_rand</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;unknown diff_method &#39;</span><span class="si">{}</span><span class="s2">&#39;, use &#39;full&#39; or &#39;random&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">diff_method</span><span class="p">))</span>
+    <span class="n">alpha_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">corr</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;diff_method: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">diff_method</span><span class="p">))</span>
+
+    <span class="n">time_fredholm</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">time_calc_ac</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">time_integr_intp</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">time_spline</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">time_calc_diff</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">meth</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">meth</span> <span class="o">=</span> <span class="n">str_meth_to_meth</span><span class="p">(</span><span class="n">meth</span><span class="p">)</span>
+
+    <span class="n">k</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">k</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">ng</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;check </span><span class="si">{}</span><span class="s2"> grid points&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ng</span><span class="p">))</span>
+        <span class="n">t</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">meth</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">ng</span><span class="p">)</span>
+        <span class="n">is_equi</span> <span class="o">=</span> <span class="n">is_axis_equidistant</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;equidistant axis: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">is_equi</span><span class="p">))</span>
+
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>                                      <span class="c1"># efficient way to construct the</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">_calc_corr_matrix</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">corr</span><span class="p">,</span> <span class="n">is_equi</span><span class="p">)</span>               <span class="c1"># auto correlation matrix r</span>
+        <span class="n">time_calc_ac</span> <span class="o">+=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>
+
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>                                      <span class="c1"># solve the dicrete fredholm equation</span>
+        <span class="n">_eig_val</span><span class="p">,</span> <span class="n">_eig_vec</span> <span class="o">=</span> <span class="n">solve_hom_fredholm</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>         <span class="c1"># using integration weights w</span>
+        <span class="n">time_fredholm</span> <span class="o">+=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>
+
+        <span class="n">tfine</span> <span class="o">=</span> <span class="n">subdevide_axis</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">ngfac</span><span class="p">)</span>                      <span class="c1"># setup fine</span>
+        <span class="n">tsfine</span> <span class="o">=</span> <span class="n">subdevide_axis</span><span class="p">(</span><span class="n">tfine</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>                     <span class="c1"># and super fine time grid</span>
+
+        <span class="k">if</span> <span class="n">is_equi</span><span class="p">:</span>
+            <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>                                  <span class="c1"># efficient way to calculate the auto correlation</span>
+            <span class="n">alpha_k</span> <span class="o">=</span> <span class="n">_calc_corr_min_t_plus_t</span><span class="p">(</span><span class="n">tfine</span><span class="p">,</span> <span class="n">corr</span><span class="p">)</span>    <span class="c1"># from -tmax untill tmax on the fine grid</span>
+            <span class="n">time_calc_ac</span> <span class="o">+=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>                <span class="c1"># needed for integral interpolation</span>
+
+        <span class="k">if</span> <span class="n">diff_method</span> <span class="o">==</span> <span class="s1">&#39;full&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_equi</span><span class="p">:</span>
+                <span class="n">alpha_ref</span> <span class="o">=</span> <span class="n">corr</span><span class="p">(</span><span class="n">tsfine</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">tsfine</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">alpha_ref</span> <span class="o">=</span> <span class="n">_calc_corr_matrix</span><span class="p">(</span><span class="n">tsfine</span><span class="p">,</span> <span class="n">corr</span><span class="p">,</span> <span class="n">is_equi</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">diff</span> <span class="o">=</span> <span class="o">-</span><span class="n">alpha_ref</span>
+        <span class="k">if</span> <span class="n">relative_difference</span><span class="p">:</span>
+            <span class="n">abs_alpha_res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">alpha_ref</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">abs_alpha_res</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">sqrt_lambda_ui_fine_all</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng</span><span class="p">):</span>
+            <span class="n">evec</span> <span class="o">=</span> <span class="n">_eig_vec</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">_eig_val</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">ng</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="k">break</span>
+            <span class="n">sqrt_eval</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">_eig_val</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">ngfac</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                <span class="c1"># when using sqrt_lambda instead of lambda we get sqrt_lamda time u</span>
+                <span class="c1"># which is the quantity needed for the stochastic process generation</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">is_equi</span><span class="p">:</span>
+                    <span class="n">sqrt_lambda_ui_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">corr</span><span class="p">(</span><span class="n">ti</span> <span class="o">-</span> <span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">evec</span><span class="p">)</span> <span class="o">/</span> <span class="n">sqrt_eval</span> <span class="k">for</span> <span class="n">ti</span> <span class="ow">in</span> <span class="n">tfine</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">sqrt_lambda_ui_fine</span> <span class="o">=</span> <span class="n">stocproc_c</span><span class="o">.</span><span class="n">eig_func_interp</span><span class="p">(</span><span class="n">delta_t_fac</span><span class="o">=</span><span class="n">ngfac</span><span class="p">,</span>
+                                                                     <span class="n">time_axis</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                                                                     <span class="n">alpha_k</span><span class="o">=</span><span class="n">alpha_k</span><span class="p">,</span>
+                                                                     <span class="n">weights</span><span class="o">=</span><span class="n">w</span><span class="p">,</span>
+                                                                     <span class="n">eigen_val</span><span class="o">=</span><span class="n">sqrt_eval</span><span class="p">,</span>
+                                                                     <span class="n">eigen_vec</span><span class="o">=</span><span class="n">evec</span><span class="p">)</span>
+
+                <span class="n">time_integr_intp</span> <span class="o">+=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sqrt_lambda_ui_fine</span> <span class="o">=</span> <span class="n">evec</span><span class="o">*</span><span class="n">sqrt_eval</span>
+
+            <span class="n">sqrt_lambda_ui_fine_all</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">)</span>
+
+            <span class="c1"># setup cubic spline interpolator</span>
+            <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">sqrt_lambda_ui_spl</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">ComplexInterpolatedUnivariateSpline</span><span class="p">(</span><span class="n">tfine</span><span class="p">,</span> <span class="n">sqrt_lambda_ui_fine</span><span class="p">)</span>
+            <span class="n">time_spline</span> <span class="o">+=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>
+
+            <span class="c1"># calculate the max deviation</span>
+            <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">diff_method</span> <span class="o">==</span> <span class="s1">&#39;random&#39;</span><span class="p">:</span>
+                <span class="n">ui_t</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_spl</span><span class="p">(</span><span class="n">t_rand</span><span class="p">)</span>
+                <span class="n">ui_s</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_spl</span><span class="p">(</span><span class="n">s_rand</span><span class="p">)</span>
+                <span class="n">diff</span> <span class="o">+=</span> <span class="n">ui_t</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">ui_s</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">diff_method</span> <span class="o">==</span> <span class="s1">&#39;full&#39;</span><span class="p">:</span>
+                <span class="n">ui_super_fine</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_spl</span><span class="p">(</span><span class="n">tsfine</span><span class="p">)</span>
+                <span class="n">diff</span> <span class="o">+=</span> <span class="n">ui_super_fine</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">ui_super_fine</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+            <span class="n">md</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span> <span class="o">/</span> <span class="n">abs_alpha_res</span><span class="p">)</span>
+            <span class="n">time_calc_diff</span> <span class="o">+=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span>
+
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;num evec </span><span class="si">{}</span><span class="s2"> -&gt; max diff </span><span class="si">{:.3e}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">md</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">md</span> <span class="o">&lt;</span> <span class="n">tol</span><span class="p">:</span>
+                <span class="n">time_total</span> <span class="o">=</span> <span class="n">time_calc_diff</span> <span class="o">+</span> <span class="n">time_spline</span> <span class="o">+</span> <span class="n">time_integr_intp</span> <span class="o">+</span> <span class="n">time_calc_ac</span> <span class="o">+</span> <span class="n">time_fredholm</span>
+                <span class="n">time_overall</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">time_start</span>
+                <span class="n">time_rest</span> <span class="o">=</span> <span class="n">time_overall</span> <span class="o">-</span> <span class="n">time_total</span>
+
+                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;calc_ac </span><span class="si">{:.3%}</span><span class="s2">, fredholm </span><span class="si">{:.3%}</span><span class="s2">, integr_intp </span><span class="si">{:.3%}</span><span class="s2">, spline </span><span class="si">{:.3%}</span><span class="s2">, calc_diff </span><span class="si">{:.3%}</span><span class="s2">, rest </span><span class="si">{:.3%}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                          <span class="n">time_calc_ac</span><span class="o">/</span><span class="n">time_overall</span><span class="p">,</span> <span class="n">time_fredholm</span><span class="o">/</span><span class="n">time_overall</span><span class="p">,</span> <span class="n">time_integr_intp</span><span class="o">/</span><span class="n">time_overall</span><span class="p">,</span>
+                          <span class="n">time_spline</span><span class="o">/</span><span class="n">time_overall</span><span class="p">,</span> <span class="n">time_calc_diff</span><span class="o">/</span><span class="n">time_overall</span><span class="p">,</span> <span class="n">time_rest</span><span class="o">/</span><span class="n">time_overall</span><span class="p">))</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;auto ng SUCCESSFUL max diff </span><span class="si">{:.3e}</span><span class="s2"> &lt; tol </span><span class="si">{:.3e}</span><span class="s2"> ng </span><span class="si">{}</span><span class="s2"> num evec </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">tol</span><span class="p">,</span> <span class="n">ng</span><span class="p">,</span> <span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">ret_eigvals</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine_all</span><span class="p">),</span> <span class="n">tfine</span><span class="p">,</span> <span class="n">_eig_val</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine_all</span><span class="p">)]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine_all</span><span class="p">),</span> <span class="n">tfine</span>
+
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ng </span><span class="si">{}</span><span class="s2"> yields md </span><span class="si">{:.3e}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ng</span><span class="p">,</span> <span class="n">md</span><span class="p">))</span></div>
+
+<span class="k">def</span> <span class="nf">is_axis_equidistant</span><span class="p">(</span><span class="n">ax</span><span class="p">):</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">ax</span><span class="p">)</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">-</span><span class="n">ax</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">d</span> <span class="o">-</span> <span class="n">d</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">15</span>
+
+
+<span class="k">def</span> <span class="nf">str_meth_to_meth</span><span class="p">(</span><span class="n">meth</span><span class="p">):</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;midpoint&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;midp&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">get_mid_point_weights_times</span>
+    <span class="k">elif</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;trapezoidal&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;trapz&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">get_trapezoidal_weights_times</span>
+    <span class="k">elif</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;simpson&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;simp&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">get_simpson_weights_times</span>
+    <span class="k">elif</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;fourpoint&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;fp&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">get_four_point_weights_times</span>
+    <span class="k">elif</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;gauss_legendre&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;gl&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">get_gauss_legendre_weights_times</span>
+    <span class="k">elif</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;tanh_sinh&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">meth</span> <span class="o">==</span> <span class="s1">&#39;ts&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">get_tanh_sinh_weights_times</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;unknown method to get integration weights &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">meth</span><span class="p">))</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Richard Hartmann.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.2.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

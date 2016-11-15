@@ -1,0 +1,674 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>StocProc_KLE &mdash; StocProc 0.2.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="StocProc 0.2.0 documentation" href="index.html"/>
+        <link rel="up" title="Stochastic Process Generators" href="stocproc.html"/>
+        <link rel="next" title="StocProc_FFT" href="StocProc_FFT.html"/>
+        <link rel="prev" title="Stochastic Process Generators" href="stocproc.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> StocProc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="stocproc.html">Stochastic Process Generators</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="stocproc.html#karhunen-loeve-expansion">Karhunen-Loève expansion</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">StocProc_KLE</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="stocproc.html#fast-fourier-method">Fast-Fourier method</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Example</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">StocProc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="stocproc.html">Stochastic Process Generators</a> &raquo;</li>
+      
+    <li>StocProc_KLE</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/StocProc_KLE.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="stocproc-kle">
+<h1>StocProc_KLE<a class="headerlink" href="#stocproc-kle" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="stocproc.StocProc_KLE">
+<em class="property">class </em><code class="descclassname">stocproc.</code><code class="descname">StocProc_KLE</code><span class="sig-paren">(</span><em>r_tau</em>, <em>t_max</em>, <em>tol=0.01</em>, <em>ng_fac=4</em>, <em>meth='fourpoint'</em>, <em>diff_method='full'</em>, <em>dm_random_samples=10000</em>, <em>seed=None</em>, <em>align_eig_vec=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE" title="Permalink to this definition">¶</a></dt>
+<dd><p>A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
+The idea is that any stochastic process can be expressed in terms of the KLE</p>
+<div class="math">
+\[Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)\]</div>
+<p>where <span class="math">\(Y_i\)</span> and independent complex valued Gaussian random variables with variance one
+(<span class="math">\(\langle Y_i Y_j \rangle = \delta_{ij}\)</span>) and <span class="math">\(\lambda_i\)</span>, <span class="math">\(u_i(t)\)</span> are
+eigenvalues / eigenfunctions of the following homogeneous Fredholm equation</p>
+<div class="math">
+\[\int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)\]</div>
+<p>for a given positive integral kernel <span class="math">\(R(\tau)\)</span>. It turns out that the auto correlation of the
+stocastic processes <span class="math">\(\langle Z(t)Z^\ast(s) \rangle = R(t-s)\)</span> is given by that kernel.</p>
+<p>For the numeric implementation the integral equation will be discretized
+(see <a class="reference internal" href="#stocproc.method_kle.solve_hom_fredholm" title="stocproc.method_kle.solve_hom_fredholm"><code class="xref py py-func docutils literal"><span class="pre">stocproc.method_kle.solve_hom_fredholm()</span></code></a> for details) which leads to a regular matrix
+eigenvalue problem.
+The accuracy of the generated  process in terms of its auto correlation function depends on
+the quality of the eigenvalues and eigenfunction and thus of the number of discritization points.
+Further for a given threshold there is only a finite number of eigenvalues above that threshold,
+provided that the number of discritization points is large enough.</p>
+<p>Now the property of representing the integral kernel in terms of the eigenfunction</p>
+<div class="math">
+\[R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s)\]</div>
+<p>is used to find the number of discritization points and the number of used eigenfunctions such that
+the sum represents the kernel up to a given tolerance (see <a class="reference internal" href="#stocproc.method_kle.auto_ng" title="stocproc.method_kle.auto_ng"><code class="xref py py-func docutils literal"><span class="pre">stocproc.method_kle.auto_ng()</span></code></a>
+for details).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>r_tau</strong> &#8211; the idesired auto correlation function of a single parameter tau</li>
+<li><strong>t_max</strong> &#8211; specifies the time interval [0, t_max] for which the processes in generated</li>
+<li><strong>tol</strong> &#8211; maximal deviation of the auto correlation function of the sampled processes from
+the given auto correlation r_tau.</li>
+<li><strong>ngfac</strong> &#8211; specifies the fine grid to use for the spline interpolation, the intermediate points are
+calculated using integral interpolation</li>
+<li><strong>meth</strong> &#8211; the method for calculation integration weights and times, a callable or one of the following strings
+&#8216;midpoint&#8217; (&#8216;midp&#8217;), &#8216;trapezoidal&#8217; (&#8216;trapz&#8217;), &#8216;simpson&#8217; (&#8216;simp&#8217;), &#8216;fourpoint&#8217; (&#8216;fp&#8217;),
+&#8216;gauss_legendre&#8217; (&#8216;gl&#8217;), &#8216;tanh_sinh&#8217; (&#8216;ts&#8217;)</li>
+<li><strong>diff_method</strong> &#8211; either &#8216;full&#8217; or &#8216;random&#8217;, determines the points where the above success criterion is evaluated,
+&#8216;full&#8217;: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
+&#8216;random&#8217;: pick a fixed number of random times t and s within the interval [0, t_max]</li>
+<li><strong>dm_random_samples</strong> &#8211; the number of random times used for diff_method &#8216;random&#8217;</li>
+<li><strong>seed</strong> &#8211; if not None seed the random number generator on init of this class with seed</li>
+<li><strong>align_eig_vec</strong> &#8211; assures that <span class="math">\(re(u_i(0)) \leq 0\)</span> and <span class="math">\(im(u_i(0)) = 0\)</span> for all i</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">To circumvent the time consuming initializing the StocProc class can be saved and loaded using
+the standard python pickle module. The <a class="reference internal" href="#stocproc.StocProc_KLE.get_key" title="stocproc.StocProc_KLE.get_key"><code class="xref py py-func docutils literal"><span class="pre">get_key()</span></code></a> method may be used identify the
+Process class by its parameters (r_tau, t_max, tol).</p>
+</div>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p>Details on how to solve the homogeneous Fredholm equation: <a class="reference internal" href="#stocproc.method_kle.solve_hom_fredholm" title="stocproc.method_kle.solve_hom_fredholm"><code class="xref py py-func docutils literal"><span class="pre">stocproc.method_kle.solve_hom_fredholm()</span></code></a></p>
+<p class="last">Details on the error estimation and further clarification of the parameters ng_fac, meth,
+diff_method, dm_random_samples can be found at <a class="reference internal" href="#stocproc.method_kle.auto_ng" title="stocproc.method_kle.auto_ng"><code class="xref py py-func docutils literal"><span class="pre">stocproc.method_kle.auto_ng()</span></code></a>.</p>
+</div>
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.__call__">
+<code class="descname">__call__</code><span class="sig-paren">(</span><em>t=None</em><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.StocProc_KLE.__call__" title="Permalink to this definition">¶</a></dt>
+<dd><p>evaluates the stochastic process via spline interpolation of the discrete process <span class="math">\(z_k\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>t</strong> &#8211; time to evaluate the stochastic process at, float of array of floats, if t is None
+return the discrete process <span class="math">\(z_k\)</span> which corresponds to the times <span class="math">\(t_k\)</span> given by the
+integration weights method</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">a single complex value or a complex array of the shape of t that holds the values of
+stochastic process at times t</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.calc_z">
+<code class="descname">calc_z</code><span class="sig-paren">(</span><em>y</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE.calc_z"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE.calc_z" title="Permalink to this definition">¶</a></dt>
+<dd><p>evaluate <span class="math">\(z_k = \sum_i \lambda_i Y_i u_{ik}\)</span></p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.get_key">
+<code class="descname">get_key</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE.get_key"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE.get_key" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
+the StocProc class.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.get_num_y">
+<code class="descname">get_num_y</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE.get_num_y"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE.get_num_y" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of independent random variables Y is given by the number of used eigenfunction
+to approximate the auto correlation kernel.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.get_time">
+<code class="descname">get_time</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.StocProc_KLE.get_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the time <span class="math">\(t_k\)</span> corresponding to the values <span class="math">\(z_k\)</span></p>
+<p>These times are determined by the integration weights method.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.get_z">
+<code class="descname">get_z</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.StocProc_KLE.get_z" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the discrete process <span class="math">\(z_k\)</span>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.StocProc_KLE.new_process">
+<code class="descname">new_process</code><span class="sig-paren">(</span><em>y=None</em>, <em>seed=None</em><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.StocProc_KLE.new_process" title="Permalink to this definition">¶</a></dt>
+<dd><p>generate a new process by evaluating <a class="reference internal" href="#stocproc.StocProc_KLE.calc_z" title="stocproc.StocProc_KLE.calc_z"><code class="xref py py-func docutils literal"><span class="pre">calc_z()</span></code></a> with new random variables <span class="math">\(Y_i\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>y</strong> &#8211; independent normal distributed complex valued random variables with <span class="math">\(\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}\)</span></li>
+<li><strong>seed</strong> &#8211; if not None set seed to seed before generating samples</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>When y is given use these random numbers as input for <a class="reference internal" href="#stocproc.StocProc_KLE.calc_z" title="stocproc.StocProc_KLE.calc_z"><code class="xref py py-func docutils literal"><span class="pre">calc_z()</span></code></a>
+otherwise generate a new set of random numbers.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.solve_hom_fredholm">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">solve_hom_fredholm</code><span class="sig-paren">(</span><em>r</em>, <em>w</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#solve_hom_fredholm"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.solve_hom_fredholm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solves the discrete homogeneous Fredholm equation of the second kind</p>
+<div class="math">
+\[\int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)\]</div>
+<p>Quadrature approximation of the integral gives a discrete representation
+which leads to a regular eigenvalue problem.</p>
+<div class="math">
+\[\sum_i w_i R(t_j-s_i) u(s_i) = \lambda u(t_j) \equiv \mathrm{diag(w_i)} \cdot R \cdot u = \lambda u \]</div>
+<p>Note: If <span class="math">\(t_i = s_i \forall i\)</span> the matrix <span class="math">\(R(t_j-s_i)\)</span> is 
+a hermitian matrix. In order to preserve hermiticity for arbitrary <span class="math">\(w_i\)</span> 
+one defines the diagonal matrix <span class="math">\(D = \mathrm{diag(\sqrt{w_i})}\)</span> 
+with leads to the equivalent expression:</p>
+<div class="math">
+\[D \cdot R \cdot D \cdot D \cdot u = \lambda D \cdot u \equiv \tilde R \tilde u = \lambda \tilde u\]</div>
+<p>where <span class="math">\(\tilde R\)</span> is hermitian and <span class="math">\(u = D^{-1}\tilde u\)</span>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>r</strong> &#8211; correlation matrix <span class="math">\(R(t_j-s_i)\)</span></li>
+<li><strong>w</strong> &#8211; integrations weights <span class="math">\(w_i\)</span> 
+(they have to correspond to the discrete time <span class="math">\(t_i\)</span>)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, ordered in decreasing order)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p>There are various convenient functions to calculate the integration weights and times
+to approximate the integral over the interval [0, t_max] using ng points.</p>
+<p class="last"><a class="reference internal" href="#stocproc.method_kle.get_mid_point_weights_times" title="stocproc.method_kle.get_mid_point_weights_times"><code class="xref py py-func docutils literal"><span class="pre">get_mid_point_weights_times()</span></code></a>,
+<a class="reference internal" href="#stocproc.method_kle.get_trapezoidal_weights_times" title="stocproc.method_kle.get_trapezoidal_weights_times"><code class="xref py py-func docutils literal"><span class="pre">get_trapezoidal_weights_times()</span></code></a>,
+<a class="reference internal" href="#stocproc.method_kle.get_simpson_weights_times" title="stocproc.method_kle.get_simpson_weights_times"><code class="xref py py-func docutils literal"><span class="pre">get_simpson_weights_times()</span></code></a>,
+<a class="reference internal" href="#stocproc.method_kle.get_four_point_weights_times" title="stocproc.method_kle.get_four_point_weights_times"><code class="xref py py-func docutils literal"><span class="pre">get_four_point_weights_times()</span></code></a>,
+<a class="reference internal" href="#stocproc.method_kle.get_gauss_legendre_weights_times" title="stocproc.method_kle.get_gauss_legendre_weights_times"><code class="xref py py-func docutils literal"><span class="pre">get_gauss_legendre_weights_times()</span></code></a>,
+<a class="reference internal" href="#stocproc.method_kle.get_tanh_sinh_weights_times" title="stocproc.method_kle.get_tanh_sinh_weights_times"><code class="xref py py-func docutils literal"><span class="pre">get_tanh_sinh_weights_times()</span></code></a></p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">It has been noticed that the performance of the various weights depends on the auto correlation
+function. As default one should use the &#8216;simpson weights&#8217;. &#8216;four point&#8217;, &#8216;gauss legendre&#8217; and &#8216;tanh sinh&#8217;
+might perform better for auto correlation function that decay slowly. Their advantage becomes evident
+for a large numbers of grid points only. So if one cares about relative differences below 1e-4
+the more sophisticated weights are suitable.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.get_mid_point_weights_times">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">get_mid_point_weights_times</code><span class="sig-paren">(</span><em>t_max</em>, <em>num_grid_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#get_mid_point_weights_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.get_mid_point_weights_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the weights and grid points for numeric integration via <strong>mid point rule</strong>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> &#8211; number of grid points N</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">location of the grid points, corresponding weights</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Because this function is intended to provide the weights to be used in <a class="reference internal" href="#stocproc.method_kle.solve_hom_fredholm" title="stocproc.method_kle.solve_hom_fredholm"><code class="xref py py-func docutils literal"><span class="pre">solve_hom_fredholm()</span></code></a>
+it stretches the homogeneous weights over the grid points starting from 0 up to t_max, so the
+term min_point is somewhat miss leading. This is possible because we want to simulate
+stationary stochastic processes which allows <span class="math">\(\alpha(t_i+\Delta/2 - (s_j+\Delta/2)) = \alpha(t_i-s_j)\)</span>.</p>
+<p>The N grid points are located at</p>
+<div class="math">
+\[t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1\]</div>
+<p>and the corresponding weights are</p>
+<div class="math">
+\[w_i = \Delta t = \frac{t_\mathrm{max}}{N} \qquad i = 0,1, ... N - 1\]</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.get_trapezoidal_weights_times">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">get_trapezoidal_weights_times</code><span class="sig-paren">(</span><em>t_max</em>, <em>num_grid_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#get_trapezoidal_weights_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.get_trapezoidal_weights_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the weights and grid points for numeric integration via <strong>trapezoidal rule</strong>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> &#8211; number of grid points N</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">location of the grid points, corresponding weights</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The N grid points are located at</p>
+<div class="math">
+\[t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1\]</div>
+<p>and the corresponding weights are</p>
+<div class="math">
+\[w_0 = w_{N-1} = \Delta t /2 \qquad w_i = \Delta t \quad  0 &lt; i &lt; N - 1
+\qquad \Delta t = \frac{t_\mathrm{max}}{N-1}\]</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.get_simpson_weights_times">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">get_simpson_weights_times</code><span class="sig-paren">(</span><em>t_max</em>, <em>num_grid_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#get_simpson_weights_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.get_simpson_weights_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the weights and grid points for numeric integration via <strong>simpson rule</strong>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> &#8211; number of grid points N (needs to be odd)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">location of the grid points, corresponding weights</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The N grid points are located at</p>
+<div class="math">
+\[t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1\]</div>
+<p>and the corresponding weights are</p>
+<div class="math">
+\[w_0 = w_{N-1} = 1/3 \Delta t \qquad w_{2i} = 2/3 \Delta t \quad 0 &lt; i &lt; (N - 1)/2\]</div>
+<div class="math">
+\[\qquad w_{2i+1} = 4/3 \Delta t \quad  0 \leq i &lt; (N - 1)/2 \qquad \Delta t = \frac{t_\mathrm{max}}{N-1}\]</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.get_four_point_weights_times">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">get_four_point_weights_times</code><span class="sig-paren">(</span><em>t_max</em>, <em>num_grid_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#get_four_point_weights_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.get_four_point_weights_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the weights and grid points for numeric integration via <strong>four-point Newton-Cotes rule</strong>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> &#8211; number of grid points N (needs to be (4k+1) where k is an integer greater 0)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">location of the grid points, corresponding weights</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The N grid points are located at</p>
+<div class="math">
+\[t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1\]</div>
+<p>and the corresponding weights are</p>
+<div class="math">
+\[w_0 = w_{N-1} = 28/90 \Delta t\]</div>
+<div class="math">
+\[w_{4i+1} = w_{4i+3} = 128/90 \Delta t \quad 0 \leq i &lt; (N - 1)/4\]</div>
+<div class="math">
+\[w_{4i+2} = 48/90 \Delta t \quad 0 \leq i &lt; (N - 1)/4\]</div>
+<div class="math">
+\[w_{4i}   = 56/90 \Delta t \quad 0 &lt; i &lt; (N - 1)/4\]</div>
+<div class="math">
+\[\Delta t = \frac{t_\mathrm{max}}{N-1}\]</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.get_gauss_legendre_weights_times">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">get_gauss_legendre_weights_times</code><span class="sig-paren">(</span><em>t_max</em>, <em>num_grid_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#get_gauss_legendre_weights_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.get_gauss_legendre_weights_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the weights and grid points for numeric integration via <strong>Gauss integration</strong>
+by expanding the function in terms of Legendre Polynomials.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> &#8211; number of grid points N</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">location of the grid points, corresponding weights</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.get_tanh_sinh_weights_times">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">get_tanh_sinh_weights_times</code><span class="sig-paren">(</span><em>t_max</em>, <em>num_grid_points</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#get_tanh_sinh_weights_times"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.get_tanh_sinh_weights_times" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the weights and grid points for numeric integration via <strong>Tanh-Sinh integration</strong>. The idea is to
+transform the integral over a finite interval <span class="math">\(x \in [-1, 1]\)</span> via the variable transformation</p>
+<div class="math">
+\[x = \tanh(\pi/2 \sinh(t))\]</div>
+<p>to a integral over the entire real axis <span class="math">\(t \in [-\infty,\infty]\)</span> but where the new
+transformed integrand decay rapidly such that a simply midpoint rule performs very well.</p>
+<p>inspired by &#8216;Tanh-Sinh High-Precision Quadrature - David H. Bailey&#8217;</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> &#8211; number of grid points N (needs to be odd)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">location of the grid points, corresponding weights</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>For a fixed small parameter h the location of the grid points read</p>
+<div class="math">
+\[x_i = \tanh(\pi/2 \sinh(ih)\]</div>
+<p>with corresponding weights</p>
+<div class="math">
+\[w_i = \frac{\pi/2 \cosh(ih)}{\cosh^2(\pi/2 \sinh(ih))}\]</div>
+<p>where i can be any integer. For a given number of grid points N, h is chosen such that
+<span class="math">\(w_{(N-1)/2} &lt; 10^{-14}\)</span> which implies odd N. With that particular h <span class="math">\(x_i\)</span> and
+<span class="math">\(w_i\)</span> are calculated for <span class="math">\(-(N-1)/2 \leq i \leq (N-1)/2\)</span>. Afterwards the <span class="math">\(x_i\)</span> are linearly
+scaled such that <span class="math">\(x_{-(N-1)/2} = 0\)</span> and <span class="math">\(x_{(N-1)/2} = t_\mathrm{max}\)</span>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="stocproc.method_kle.auto_ng">
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">auto_ng</code><span class="sig-paren">(</span><em>corr</em>, <em>t_max</em>, <em>ngfac=2</em>, <em>meth=&lt;function get_mid_point_weights_times&gt;</em>, <em>tol=0.001</em>, <em>diff_method='full'</em>, <em>dm_random_samples=10000</em>, <em>ret_eigvals=False</em>, <em>relative_difference=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#auto_ng"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.auto_ng" title="Permalink to this definition">¶</a></dt>
+<dd><p>increase the number of gridpoints until the desired accuracy is met</p>
+<p>This function increases the number of grid points of the discrete Fredholm equation exponentially until
+a given accuracy is met. The accuracy is determined from the deviation of the approximated
+auto correlation of the Karhunen-Loève expansion from the given reference auto correlation.</p>
+<div class="math">
+\[\Delta(n) = \max_{t,s \in [0,t_\mathrm{max}]}\left( \Big | \alpha(t-s) - \sum_{i=1}^n \lambda_i u_i(t) u_i^\ast(s) \Big | \right )\]</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>corr</strong> &#8211; the auto correlation function</li>
+<li><strong>t_max</strong> &#8211; specifies the interval [0, t_max] for which the stochastic process can be evaluated</li>
+<li><strong>ngfac</strong> &#8211; specifies the fine grid to use for the spline interpolation, the intermediate points are
+calculated using integral interpolation</li>
+<li><strong>meth</strong> &#8211; the method for calculation integration weights and times, a callable or one of the following strings
+&#8216;midpoint&#8217; (&#8216;midp&#8217;), &#8216;trapezoidal&#8217; (&#8216;trapz&#8217;), &#8216;simpson&#8217; (&#8216;simp&#8217;), &#8216;fourpoint&#8217; (&#8216;fp&#8217;),
+&#8216;gauss_legendre&#8217; (&#8216;gl&#8217;), &#8216;tanh_sinh&#8217; (&#8216;ts&#8217;)</li>
+<li><strong>tol</strong> &#8211; defines the success criterion max(abs(corr_exact - corr_reconstr)) &lt; tol</li>
+<li><strong>diff_method</strong> &#8211; either &#8216;full&#8217; or &#8216;random&#8217;, determines the points where the above success criterion is evaluated,
+&#8216;full&#8217;: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
+&#8216;random&#8217;: pick a fixed number of random times t and s within the interval [0, t_max]</li>
+<li><strong>dm_random_samples</strong> &#8211; the number of random times used for diff_method &#8216;random&#8217;</li>
+<li><strong>ret_eigvals</strong> &#8211; if True, return also the eigen values</li>
+<li><strong>relative_difference</strong> &#8211; if True, use relative difference instead of absolute</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">an array containing the necessary eigenfunctions of the Karhunen-Loève expansion for sampling the
+stochastic processes (shape=(num_eigen_functions, num_grid_points)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>The procedure works as follows:</dt>
+<dd><ol class="first last arabic">
+<li><p class="first">Solve the discrete Fredholm equation on a grid with ng points.
+This gives ng eigenvalues/vectors where each ng-dimensional vector approximates the continuous eigenfunction.
+(<span class="math">\(t, u_i(t) \leftrightarrow t_k, u_{ik}\)</span> where the <span class="math">\(t_k\)</span> depend on the integration weights
+method) For performance reasons, especially when the auto correlation function evaluates slowly it
+is advisable to use a method which uses equally distributed times :math;`t_k`.</p>
+</li>
+<li><p class="first">Approximate the eigenfunction on a finer, equidistant grid
+(<span class="math">\(ng_\mathrm{fine} = ng_\mathrm{fac}(ng-1)+1\)</span>) using</p>
+<div class="math">
+\[u_i(t) = \frac{1}{\lambda_i} \int_0^{t_\mathrm{max}} \mathrm{d}s \; \alpha(t-s) u_i(s)
+\approx \frac{1}{\lambda_i} \sum_k w_k \alpha(t-s_k) u_{ik}\]</div>
+<p>According to the Numerical Recipes [1] this interpolation should perform better that simple
+spline interpolation. However it turns that this is not the case in general (e.g. for exponential
+auto correlation functions the spline interpolation performs better). For that reason it might be
+usefull to set ngfac to 1 which will skip the integral interpolation</p>
+</li>
+<li><p class="first">Use the eigenfunction on the fine grid to setup a cubic spline interpolation.</p>
+</li>
+<li><p class="first">Use the spline interpolation to estimate the deviation <span class="math">\(\Delta(n)\)</span>. When using diff_method = &#8216;full&#8217;
+the maximization is performed over all <span class="math">\(t'_i, s'_j\)</span> where <span class="math">\(t'_i = (t_i + t_{i+1})/2\)</span> and
+<span class="math">\(s'_i = (s_i + s_{i+1})/2\)</span> with <span class="math">\(i,j = 0, \, ...\, , ng_\mathrm{fine}-2\)</span>. It is expected that
+the interpolation error is maximal when beeing in between the reference points.</p>
+</li>
+<li><p class="first">Now calculate the deviation <span class="math">\(\Delta(n)\)</span> for sequential n starting at n=0. Stop if
+<span class="math">\(\Delta(n) &lt; tol\)</span>. If the deviation does not drop below tol for all <span class="math">\(0 \leq n &lt; ng-1\)</span> increase
+ng as follows <span class="math">\(ng = 2*ng-1\)</span> and start over at 1). (This update scheme for ng asured that ng is odd
+which is needed for the &#8216;simpson&#8217; and &#8216;fourpoint&#8217; integration weights)</p>
+</li>
+</ol>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The scaling of the error of the various integration methods does not correspond to the scaling of
+the number of eigenfunctions to use in order to reconstruct the auto correlation function within
+a given tolerance. Surprisingly it turns out that in general the most trivial <strong>mid-point method</strong> performs
+quite well. If other methods suite bettern needs to be check in every case.</p>
+</div>
+<p>[1] Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P.,
+2007. Numerical Recipes 3rd Edition: The Art of Scientific Computing,
+Auflage: 3. ed. Cambridge University Press, Cambridge, UK ; New York. (pp. 990)</p>
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="StocProc_FFT.html" class="btn btn-neutral float-right" title="StocProc_FFT" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="stocproc.html" class="btn btn-neutral" title="Stochastic Process Generators" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Richard Hartmann.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
