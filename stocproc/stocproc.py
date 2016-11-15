@@ -272,7 +272,7 @@ class StocProc_FFT(_absStocProc):
     spectral density :math:`J(\omega)`. The integral can be approximated by a discrete integration scheme
 
     .. math::
-        \alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+        \alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
         \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}
 
     where the weights :math:`\omega_k` depend on the particular integration scheme. For a process defined as
@@ -303,17 +303,35 @@ class StocProc_FFT(_absStocProc):
     For that reason the stochastic process has only :math:`(N+1)/2` (odd :math:`N`) and
     :math:`(N/2 + 1)` (even :math:`N`) independent time grid points.
 
-    The requirement
+    To generate a process with given auto correlation function on the interval [0, t_max]
+    requires that the auto correlation function approximation is valid for all t in [0, t_max].
 
+    This is ensured by automatically determining the number of sumands N and the integral
+    boundaries :math:`\omega_\mathrm{min}` and :math:`\omega_\mathrm{max}` such that
+    discrete Fourier transform of the spectral density matches the desired auto correlation function
+    within the tolerance intgr_tol for all discrete :math:`t_l \in [0, t_\mathrm{max}]`.
+
+    As the time continuous process is generated via cubic spline interpolation, the deviation
+    due to the interpolation is controlled by the parameter intpl_tol. The maximum time step :math:`\Delta t`
+    is chosen such that the interpolated valued at each half step :math:`t_i + \Delta t /2` differs at
+    most intpl_tol from the exact value of the auto correlation function.
+
+    If not fulfilled already N and the integration boundaries are increased such that the :math:`\Delta t`
+    criterion from the interpolation is met.
 
 
     :param spectral_density: the spectral density :math:`J(\omega)` as callable function object
     :param t_max: :math:`[0,t_\mathrm{max}]` is the interval for which the process will be calculated
-    :param bcf_ref:
-    :param intgr_tol:
-    :param intpl_tol:
-    :param seed:
-    :param negative_frequencies:
+    :param bcf_ref: a callable which evaluates the Fourier integral exactly
+    :param intgr_tol: tolerance for the integral approximation
+    :param intpl_tol: tolerance for the interpolation
+    :param seed: if not None, use this seed to seed the random number generator
+    :param negative_frequencies: if False, keep :math:`\omega_\mathrm{min} = 0` otherwise
+       find a negative :math:`\omega_\mathrm{min}` appropriately just like :math:`\omega_\mathrm{max}
+
+    .. todo::
+       implement bcf_ref = None and use numeric integration as default
+
 
     """
     def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
@@ -387,8 +405,18 @@ class StocProc_FFT(_absStocProc):
                          seed            = seed)
             
     def calc_z(self, y):
+        r"""calculate
+
+        .. math::
+            Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \mathrm{DFT}\left( \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \right)
+
+        and return values with :math:`t_l < t_\mathrm{max}`
+        """
         z = np.fft.fft(self.yl * y)[0:self.num_grid_points] * self.omega_min_correction
         return z
 
     def get_num_y(self):
+        r"""The number of independent random variables Y is given by the number of discrete times
+        :math:`t_l < t_\mathrm{max}` from the Fourier Transform
+        """
         return len(self.yl)
