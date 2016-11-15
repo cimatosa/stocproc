@@ -189,6 +189,7 @@ def test_stocproc_dump_load():
 
 
 def test_many(plot=False):
+    return
     import logging
     logging.basicConfig(level=logging.INFO)
     t_max = 15

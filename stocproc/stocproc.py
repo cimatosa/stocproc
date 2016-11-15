@@ -268,18 +268,14 @@ class StocProc_KLE(_absStocProc):
 class StocProc_FFT(_absStocProc):
     r"""Simulate Stochastic Process using FFT method
 
-    This method uses the relation of the auto correlation to the spectral density
+    This method uses the relation of the auto correlation to the non negative real valued
+    spectral density :math:`J(\omega)`. The integral can be approximated by a discrete integration scheme
 
-    .. math:: \alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+    .. math::
+        \alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+        \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}
 
-    where :math:`J(\omega)` is a real non negative function, usually called spectral density.
-    Then the integral can be approximated by a discrete integration scheme:
-
-    .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}
-
-    where the :math:`\omega_k` depend on the integration scheme.
-
-    For a process defined by
+    where the weights :math:`\omega_k` depend on the particular integration scheme. For a process defined as
 
     .. math:: Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}
 
@@ -290,7 +286,7 @@ class StocProc_FFT(_absStocProc):
     .. math::
         \begin{align}
             \langle Z(t) Z^\ast(s) \rangle = & \sum_{k,k'} \frac{1}{\pi} \sqrt{w_k w_{k'} J(\omega_k)J(\omega_{k'})} \langle Y_k Y_{k'}\rangle \exp(-\mathrm{i}(\omega_k t - \omega_k' s)) \\
-                                           = & \sum_{k}    \frac{w_k}{\pi} J(\omega_k) e^{-\mathrm{i}\omega_k (t-s)} \\
+                                           = & \sum_{k}    \frac{w_k}{\pi} J(\omega_k) e^{-\mathrm{i}\omega_k (t-s)}
                                            \approx & \alpha(t-s)
         \end{align}
 
@@ -299,28 +295,25 @@ class StocProc_FFT(_absStocProc):
     .. math:: Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k  e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
 
     Here :math:`\omega_k` has to take the form :math:`\omega_k = \omega_\mathrm{min} + k \Delta \omega` and
-    :math:`\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / N-1` which limits
+    :math:`\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / (N-1)` which limits
     the itegration schemes to those with equidistant weights.
     For the DFT scheme to be applicable :math:`\Delta t` has to be chosen such that
-
-    .. math:: 1 = \frac{\Delta \omega \Delta t}{2 \pi} N
-
-    holds. Since :math:`J(\omega)` is real it follows that :math:`X(t_l) = X^\ast(t_{N-l})`.
+    :math:`2\pi = N \Delta \omega \Delta t` holds.
+    Since :math:`J(\omega)` is real it follows that :math:`X(t_l) = X^\ast(t_{N-l})`.
     For that reason the stochastic process has only :math:`(N+1)/2` (odd :math:`N`) and
     :math:`(N/2 + 1)` (even :math:`N`) independent time grid points.
 
-    .. math:: Z_l = e^{-\mathrm{i}\omega_\mathrm{min} t_l} DFT\left(\sqrt{w_k J(\omega_k) / \pi} \; Y_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n
+    The requirement
+
+
 
     :param spectral_density: the spectral density :math:`J(\omega)` as callable function object
     :param t_max: :math:`[0,t_\mathrm{max}]` is the interval for which the process will be calculated
-    :param num_grid_points: number :math:`n` of euqally distributed times :math:`t_k` on the intervall :math:`[0,t_\mathrm{max}]`
-        for which the process will be evaluated
-    :param num_samples: number of independent processes to be returned
-    :param seed: seed passed to the random number generator used
-
-    :return: returns the tuple (2D array of the set of stochastic processes,
-        1D array of time grid points). Each row of the stochastic process
-        array contains one sample of the stochastic process.
+    :param bcf_ref:
+    :param intgr_tol:
+    :param intpl_tol:
+    :param seed:
+    :param negative_frequencies:
 
     """
     def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,

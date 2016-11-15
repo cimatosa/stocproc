@@ -29,6 +29,8 @@ script:
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
+- echo $TRAVIS_PYTHON_VERSION
+- exit 0
 - pip install sphinx
 - pip install sphinx_rtd_theme
 - cd doc
