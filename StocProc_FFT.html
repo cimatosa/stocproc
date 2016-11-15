@@ -150,7 +150,7 @@
 <p>This method uses the relation of the auto correlation to the non negative real valued
 spectral density <span class="math">\(J(\omega)\)</span>. The integral can be approximated by a discrete integration scheme</p>
 <div class="math">
-\[\alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+\[\alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
 \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}\]</div>
 <p>where the weights <span class="math">\(\omega_k\)</span> depend on the particular integration scheme. For a process defined as</p>
 <div class="math">
@@ -175,7 +175,18 @@ For the DFT scheme to be applicable <span class="math">\(\Delta t\)</span> has t
 Since <span class="math">\(J(\omega)\)</span> is real it follows that <span class="math">\(X(t_l) = X^\ast(t_{N-l})\)</span>.
 For that reason the stochastic process has only <span class="math">\((N+1)/2\)</span> (odd <span class="math">\(N\)</span>) and
 <span class="math">\((N/2 + 1)\)</span> (even <span class="math">\(N\)</span>) independent time grid points.</p>
-<p>The requirement</p>
+<p>To generate a process with given auto correlation function on the interval [0, t_max]
+requires that the auto correlation function approximation is valid for all t in [0, t_max].</p>
+<p>This is ensured by automatically determining the number of sumands N and the integral
+boundaries <span class="math">\(\omega_\mathrm{min}\)</span> and <span class="math">\(\omega_\mathrm{max}\)</span> such that
+discrete Fourier transform of the spectral density matches the desired auto correlation function
+within the tolerance intgr_tol for all discrete <span class="math">\(t_l \in [0, t_\mathrm{max}]\)</span>.</p>
+<p>As the time continuous process is generated via cubic spline interpolation, the deviation
+due to the interpolation is controlled by the parameter intpl_tol. The maximum time step <span class="math">\(\Delta t\)</span>
+is chosen such that the interpolated valued at each half step <span class="math">\(t_i + \Delta t /2\)</span> differs at
+most intpl_tol from the exact value of the auto correlation function.</p>
+<p>If not fulfilled already N and the integration boundaries are increased such that the <span class="math">\(\Delta t\)</span>
+criterion from the interpolation is met.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -183,16 +194,70 @@ For that reason the stochastic process has only <span class="math">\((N+1)/2\)</
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>spectral_density</strong> &#8211; the spectral density <span class="math">\(J(\omega)\)</span> as callable function object</li>
 <li><strong>t_max</strong> &#8211; <span class="math">\([0,t_\mathrm{max}]\)</span> is the interval for which the process will be calculated</li>
-<li><strong>bcf_ref</strong> &#8211; </li>
-<li><strong>intgr_tol</strong> &#8211; </li>
-<li><strong>intpl_tol</strong> &#8211; </li>
-<li><strong>seed</strong> &#8211; </li>
-<li><strong>negative_frequencies</strong> &#8211; </li>
+<li><strong>bcf_ref</strong> &#8211; a callable which evaluates the Fourier integral exactly</li>
+<li><strong>intgr_tol</strong> &#8211; tolerance for the integral approximation</li>
+<li><strong>intpl_tol</strong> &#8211; tolerance for the interpolation</li>
+<li><strong>seed</strong> &#8211; if not None, use this seed to seed the random number generator</li>
+<li><strong>negative_frequencies</strong> &#8211; if False, keep <span class="math">\(\omega_\mathrm{min} = 0\)</span> otherwise
+find a negative <span class="math">\(\omega_\mathrm{min}\)</span> appropriately just like :math:<a href="#id1"><span class="problematic" id="id2">`</span></a>omega_mathrm{max}</li>
 </ul>
 </td>
 </tr>
 </tbody>
 </table>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Todo</p>
+<p class="last">implement bcf_ref = None and use numeric integration as default</p>
+</div>
+<dl class="method">
+<dt id="stocproc.stocproc.StocProc_FFT.calc_z">
+<code class="descname">calc_z</code><span class="sig-paren">(</span><em>y</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_FFT.calc_z"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.stocproc.StocProc_FFT.calc_z" title="Permalink to this definition">¶</a></dt>
+<dd><p>calculate</p>
+<div class="math">
+\[Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \mathrm{DFT}\left( \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \right)\]</div>
+<p>and return values with <span class="math">\(t_l &lt; t_\mathrm{max}\)</span></p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.stocproc.StocProc_FFT.get_num_y">
+<code class="descname">get_num_y</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_FFT.get_num_y"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.stocproc.StocProc_FFT.get_num_y" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of independent random variables Y is given by the number of discrete times
+<span class="math">\(t_l &lt; t_\mathrm{max}\)</span> from the Fourier Transform</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.stocproc.StocProc_FFT.get_time">
+<code class="descname">get_time</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.stocproc.StocProc_FFT.get_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the time <span class="math">\(t_k\)</span> corresponding to the values <span class="math">\(z_k\)</span></p>
+<p>These times are determined by the integration weights method.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.stocproc.StocProc_FFT.get_z">
+<code class="descname">get_z</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.stocproc.StocProc_FFT.get_z" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the discrete process <span class="math">\(z_k\)</span>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="stocproc.stocproc.StocProc_FFT.new_process">
+<code class="descname">new_process</code><span class="sig-paren">(</span><em>y=None</em>, <em>seed=None</em><span class="sig-paren">)</span><a class="headerlink" href="#stocproc.stocproc.StocProc_FFT.new_process" title="Permalink to this definition">¶</a></dt>
+<dd><p>generate a new process by evaluating <code class="xref py py-func docutils literal"><span class="pre">calc_z()</span></code> with new random variables <span class="math">\(Y_i\)</span></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>y</strong> &#8211; independent normal distributed complex valued random variables with <span class="math">\(\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}\)</span></li>
+<li><strong>seed</strong> &#8211; if not None set seed to seed before generating samples</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>When y is given use these random numbers as input for <code class="xref py py-func docutils literal"><span class="pre">calc_z()</span></code>
+otherwise generate a new set of random numbers.</p>
+</dd></dl>
+
 </dd></dl>
 
 </div>
