@@ -48,6 +48,5 @@ after_success:
 - SHA=`git rev-parse --verify HEAD`
 - REPO=`git config remote.origin.url`
 - SSH_REPO=${REPO/https:\/\/github.com\//git@github.com:}
-- git commit -m "Deploy to GitHub Pages: ${SHA}"
+- git commit -m "Deploy to GitHub Pages: $SHA"
 - git push $SSH_REPO gh-pages
-
