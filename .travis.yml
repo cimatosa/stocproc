@@ -29,4 +29,4 @@ script:
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
-- if [ $TRAVIS_PYTHON_VERSION = '3.4' ]; then cd doc && deploy_ghp.sh; fi
+- if [ $TRAVIS_PYTHON_VERSION = '3.4' ]; then cd doc && ./deploy_ghp.sh; fi
