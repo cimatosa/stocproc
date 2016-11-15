@@ -2,7 +2,6 @@
 
 pip install sphinx
 pip install sphinx_rtd_theme
-cd doc
 openssl aes-256-cbc -K $encrypted_b45fa9d06fcb_key -iv $encrypted_b45fa9d06fcb_iv -in deploy_key.enc -out deploy_key -d
 chmod 600 deploy_key
 eval `ssh-agent -s`
