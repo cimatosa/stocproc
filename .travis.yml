@@ -46,6 +46,8 @@ after_success:
 - git config user.email "$COMMIT_AUTHOR_EMAIL"
 - git add .
 - SHA=`git rev-parse --verify HEAD`
-- commit -m "Deploy to GitHub Pages: ${SHA}"
-- git push
+- REPO=`git config remote.origin.url`
+- SSH_REPO=${REPO/https:\/\/github.com\//git@github.com:}
+- git commit -m "Deploy to GitHub Pages: ${SHA}"
+- git push $SSH_REPO gh-pages
 
