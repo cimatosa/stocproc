@@ -3,6 +3,10 @@ language: python
 notifications:
   email: false
 
+env:
+  global:
+    - COMMIT_AUTHOR_EMAIL: "cimatosa@gmx.de"
+
 python:
 - '3.4'
 - '3.5'
@@ -25,3 +29,21 @@ script:
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
+- cd doc
+- openssl aes-256-cbc -K $encrypted_b45fa9d06fcb_key -iv $encrypted_b45fa9d06fcb_iv -in deploy_key.enc -out deploy_key -d
+- chmod 600 deploy_key
+- eval `ssh-agent -s`
+- ssh-add deploy_key
+- mkdir build
+- cd build
+- git clone https://github.com/cimatosa/stocproc.git --branch gh-pages html
+- cd ..
+- make html
+- cd build/html
+- git config user.name "travis gh-pages"
+- git config user.email "$COMMIT_AUTHOR_EMAIL"
+- git add .
+- SHA=`git rev-parse --verify HEAD`
+- commit -m "Deploy to GitHub Pages: ${SHA}"
+- git push
+
