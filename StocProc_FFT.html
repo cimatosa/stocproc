@@ -147,15 +147,12 @@
 <dt id="stocproc.stocproc.StocProc_FFT">
 <em class="property">class </em><code class="descclassname">stocproc.stocproc.</code><code class="descname">StocProc_FFT</code><span class="sig-paren">(</span><em>spectral_density</em>, <em>t_max</em>, <em>bcf_ref</em>, <em>intgr_tol=0.01</em>, <em>intpl_tol=0.01</em>, <em>seed=None</em>, <em>negative_frequencies=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_FFT"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.stocproc.StocProc_FFT" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulate Stochastic Process using FFT method</p>
-<p>This method uses the relation of the auto correlation to the spectral density</p>
+<p>This method uses the relation of the auto correlation to the non negative real valued
+spectral density <span class="math">\(J(\omega)\)</span>. The integral can be approximated by a discrete integration scheme</p>
 <div class="math">
-\[\alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}\]</div>
-<p>where <span class="math">\(J(\omega)\)</span> is a real non negative function, usually called spectral density.
-Then the integral can be approximated by a discrete integration scheme:</p>
-<div class="math">
-\[\alpha(\tau) \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}\]</div>
-<p>where the <span class="math">\(\omega_k\)</span> depend on the integration scheme.</p>
-<p>For a process defined by</p>
+\[\alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+\approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}\]</div>
+<p>where the weights <span class="math">\(\omega_k\)</span> depend on the particular integration scheme. For a process defined as</p>
 <div class="math">
 \[Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}\]</div>
 <p>with independent complex random variables <span class="math">\(Y_k\)</span> such that <span class="math">\(\langle Y_k \rangle = 0\)</span>,
@@ -164,40 +161,34 @@ it is easy to see that its auto correlation function will be exactly the approxi
 <div class="math">
 \[\begin{split}\begin{align}
     \langle Z(t) Z^\ast(s) \rangle = &amp; \sum_{k,k'} \frac{1}{\pi} \sqrt{w_k w_{k'} J(\omega_k)J(\omega_{k'})} \langle Y_k Y_{k'}\rangle \exp(-\mathrm{i}(\omega_k t - \omega_k' s)) \\
-                                   = &amp; \sum_{k}    \frac{w_k}{\pi} J(\omega_k) e^{-\mathrm{i}\omega_k (t-s)} \\
+                                   = &amp; \sum_{k}    \frac{w_k}{\pi} J(\omega_k) e^{-\mathrm{i}\omega_k (t-s)}
                                    \approx &amp; \alpha(t-s)
 \end{align}\end{split}\]</div>
 <p>To calculate <span class="math">\(Z(t)\)</span> the Discrete Fourier Transform (DFT) can be applied as follows:</p>
 <div class="math">
 \[Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k  e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}\]</div>
 <p>Here <span class="math">\(\omega_k\)</span> has to take the form <span class="math">\(\omega_k = \omega_\mathrm{min} + k \Delta \omega\)</span> and
-<span class="math">\(\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / N-1\)</span> which limits
+<span class="math">\(\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / (N-1)\)</span> which limits
 the itegration schemes to those with equidistant weights.
-For the DFT scheme to be applicable <span class="math">\(\Delta t\)</span> has to be chosen such that</p>
-<div class="math">
-\[1 = \frac{\Delta \omega \Delta t}{2 \pi} N\]</div>
-<p>holds. Since <span class="math">\(J(\omega)\)</span> is real it follows that <span class="math">\(X(t_l) = X^\ast(t_{N-l})\)</span>.
+For the DFT scheme to be applicable <span class="math">\(\Delta t\)</span> has to be chosen such that
+<span class="math">\(2\pi = N \Delta \omega \Delta t\)</span> holds.
+Since <span class="math">\(J(\omega)\)</span> is real it follows that <span class="math">\(X(t_l) = X^\ast(t_{N-l})\)</span>.
 For that reason the stochastic process has only <span class="math">\((N+1)/2\)</span> (odd <span class="math">\(N\)</span>) and
 <span class="math">\((N/2 + 1)\)</span> (even <span class="math">\(N\)</span>) independent time grid points.</p>
-<div class="math">
-\[Z_l = e^{-\mathrm{i}\omega_\mathrm{min} t_l} DFT\left(\sqrt{w_k J(\omega_k) / \pi} \; Y_k\right) \qquad k = 0 \; ... \; N-1, \quad l = 0 \; ... \; n\]</div>
+<p>The requirement</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>spectral_density</strong> &#8211; the spectral density <span class="math">\(J(\omega)\)</span> as callable function object</li>
 <li><strong>t_max</strong> &#8211; <span class="math">\([0,t_\mathrm{max}]\)</span> is the interval for which the process will be calculated</li>
-<li><strong>num_grid_points</strong> &#8211; number <span class="math">\(n\)</span> of euqally distributed times <span class="math">\(t_k\)</span> on the intervall <span class="math">\([0,t_\mathrm{max}]\)</span>
-for which the process will be evaluated</li>
-<li><strong>num_samples</strong> &#8211; number of independent processes to be returned</li>
-<li><strong>seed</strong> &#8211; seed passed to the random number generator used</li>
+<li><strong>bcf_ref</strong> &#8211; </li>
+<li><strong>intgr_tol</strong> &#8211; </li>
+<li><strong>intpl_tol</strong> &#8211; </li>
+<li><strong>seed</strong> &#8211; </li>
+<li><strong>negative_frequencies</strong> &#8211; </li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">returns the tuple (2D array of the set of stochastic processes,
-1D array of time grid points). Each row of the stochastic process
-array contains one sample of the stochastic process.</p>
 </td>
 </tr>
 </tbody>
