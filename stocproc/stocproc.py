@@ -268,16 +268,16 @@ class StocProc_KLE(_absStocProc):
 class StocProc_FFT(_absStocProc):
     r"""Simulate Stochastic Process using FFT method
 
-    This method works only for auto correlations functions of the form
+    This method uses the relation of the auto correlation to the spectral density
 
-    .. math:: \alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
+    .. math:: \alpha(\tau) = \int \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
 
     where :math:`J(\omega)` is a real non negative function, usually called spectral density.
-    Then the integral can be approximated by a discrete integration schema:
+    Then the integral can be approximated by a discrete integration scheme:
 
     .. math:: \alpha(\tau) \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}
 
-    where the :math:`\omega_k` depend on the integration schema.
+    where the :math:`\omega_k` depend on the integration scheme.
 
     For a process defined by
 
@@ -294,14 +294,14 @@ class StocProc_FFT(_absStocProc):
                                            \approx & \alpha(t-s)
         \end{align}
 
-    To calculate :math:`Z(t)` the schema of the Discrete Fourier Transform (DFT) can be applied as follows:
+    To calculate :math:`Z(t)` the Discrete Fourier Transform (DFT) can be applied as follows:
 
     .. math:: Z(t_l) = e^{-\mathrm{i}\omega_\mathrm{min} t_l} \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k  e^{-\mathrm{i} 2 \pi \frac{k l}{N} \frac{\Delta \omega \Delta t}{ 2 \pi} N}
 
     Here :math:`\omega_k` has to take the form :math:`\omega_k = \omega_\mathrm{min} + k \Delta \omega` and
     :math:`\Delta \omega = (\omega_\mathrm{max} - \omega_\mathrm{min}) / N-1` which limits
-    the itegration schemas to those with equidistant weights.
-    For the DFT schema to be applicable :math:`\Delta t` has to be chosen such that
+    the itegration schemes to those with equidistant weights.
+    For the DFT scheme to be applicable :math:`\Delta t` has to be chosen such that
 
     .. math:: 1 = \frac{\Delta \omega \Delta t}{2 \pi} N
 

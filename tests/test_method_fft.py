@@ -1,21 +1,21 @@
+import os
+import pathlib
+import sys
+p = pathlib.PosixPath(os.path.abspath(__file__))
+sys.path.insert(0, str(p.parent.parent))
+
 import math
 import logging
 import numpy as np
-import os
-import pathlib
 import scipy.integrate as sp_int
 from scipy.special import gamma as gamma_func
 import stocproc as sp
-import sys
+from stocproc import method_fft
 
 try:
     import matplotlib.pyplot as plt
 except ImportError:
     print("matplotlib not found -> any plotting will crash")
-
-p = pathlib.PosixPath(os.path.abspath(__file__))
-sys.path.insert(0, str(p.parent.parent))
-
 
 def test_find_integral_boundary():
     def f(x):
@@ -41,14 +41,14 @@ def test_find_integral_boundary():
     b = sp.method_fft.find_integral_boundary(integrand=f2, tol=tol, ref_val=1, x0=+1, max_val=1e6)
     a = sp.method_fft.find_integral_boundary(integrand=f2, tol=tol, ref_val=-1, x0=-1, max_val=1e6)
     assert a != b
-    assert abs(f2(a)/f2(1) -tol) < 1e-14
-    assert abs(f2(b)/f2(-1)-tol) < 1e-14
+    assert abs(f2(a) -tol) < 1e-14
+    assert abs(f2(b)-tol) < 1e-14
     
     b = sp.method_fft.find_integral_boundary(integrand=f2, tol=tol, ref_val=1, x0=b+5, max_val=1e6)
     a = sp.method_fft.find_integral_boundary(integrand=f2, tol=tol, ref_val=-1, x0=a-5, max_val=1e6)
     assert a != b
-    assert abs(f2(a)/f2(1)-tol) < 1e-14, "diff {}".format(abs(f2(a)/f2(1)-tol))
-    assert abs(f2(b)/f2(-1)-tol) < 1e-14, "diff {}".format(abs(f2(b)/f2(-1)-tol))
+    assert abs(f2(a)-tol) < 1e-14, "diff {}".format(abs(f2(a)/f2(1)-tol))
+    assert abs(f2(b)-tol) < 1e-14, "diff {}".format(abs(f2(b)/f2(-1)-tol))
     
     def f3(x):
         return np.exp(-(x-5)**2)*x**2
@@ -57,16 +57,30 @@ def test_find_integral_boundary():
     b = sp.method_fft.find_integral_boundary(integrand=f3, tol=tol, ref_val=5, x0=+1, max_val=1e6)
     a = sp.method_fft.find_integral_boundary(integrand=f3, tol=tol, ref_val=5, x0=-1, max_val=1e6)
     assert a != b
-    f3_refval = f3(5)
-    assert abs(f3(a)/f3_refval-tol) < 1e-14
-    assert abs(f3(b)/f3_refval-tol) < 1e-14
+    assert abs(f3(a)-tol) < 1e-14
+    assert abs(f3(b)-tol) < 1e-14
     
     b = sp.method_fft.find_integral_boundary(integrand=f3, tol=tol, ref_val=5, x0=b+5, max_val=1e6)
     a = sp.method_fft.find_integral_boundary(integrand=f3, tol=tol, ref_val=5, x0=a-5, max_val=1e6)
     assert a != b
-    assert abs(f3(a)/f3_refval-tol) < 1e-14, "diff {}".format(abs(f3(a)-tol))
-    assert abs(f3(b)/f3_refval-tol) < 1e-14, "diff {}".format(abs(f3(b)-tol))
-    
+    assert abs(f3(a)-tol) < 1e-14, "diff {}".format(abs(f3(a)-tol))
+    assert abs(f3(b)-tol) < 1e-14, "diff {}".format(abs(f3(b)-tol))
+
+
+    ##################################
+    ## the case where f(xref) < tol ##
+    ##################################
+
+    def f(x):
+        return np.exp(-x ** 2)
+
+    tol = 1e-3
+    b = sp.method_fft.find_integral_boundary(integrand=f, tol=tol, ref_val=10, x0=+1, max_val=1e6)
+    assert abs(f(b) - tol) < 1e-14
+    a = sp.method_fft.find_integral_boundary(integrand=f, tol=tol, ref_val=-10, x0=-1., max_val=1e6)
+    assert abs(f(a) - tol) < 1e-14
+
+
 def fourier_integral_trapz(integrand, a, b, N):
     """
         approximates int_a^b dx integrand(x) by the riemann sum with N terms
@@ -324,44 +338,44 @@ def test_calc_abN():
     
     tol = 1e-3
     tmax=40
+    diff_method = method_fft._absDiff
 
-    a,b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
-    a, b, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand = intg,
-                                                  intgr_tol = tol, 
-                                                  intpl_tol = tol,
-                                                  t_max = tmax,
-                                                  a    = 0, 
-                                                  b    = b, 
-                                                  ft_ref = bcf_ref,
-                                                  opt_b_only = True)
+    a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
+    a, b, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand=intg,
+                                                    intgr_tol=tol,
+                                                    intpl_tol=tol,
+                                                    t_max=tmax,
+                                                    a=0,
+                                                    b=b,
+                                                    ft_ref=bcf_ref,
+                                                    opt_b_only=True,
+                                                    diff_method=diff_method)
 
     tau, ft_tau = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
-    print(dt, tau[1])
     idx = np.where(tau <= tmax)
     ft_ref_tau = bcf_ref(tau[idx])
-    rd = np.max(np.abs(ft_tau[idx] - ft_ref_tau) / np.abs(ft_ref_tau))
-    print("rd {:.3e} <= tol {:.3e}".format(rd, tol))
-    assert rd < tol
+    rd = diff_method(ft_tau[idx], ft_ref_tau)
 
     tau_fine = np.linspace(0, tmax, 1500)
     ft_ref_n = bcf_ref(tau_fine)
     ft_intp = sp.tools.ComplexInterpolatedUnivariateSpline(x=tau[idx], y=ft_tau[idx], k=3)
     ft_intp_n = ft_intp(tau_fine)
-    d = np.max(np.abs(ft_intp_n - ft_ref_n))
-    print("d {:.3e} <= tol {:.3e}".format(d, tol))
-    assert d < tol
+    d = diff_method(ft_intp_n, ft_ref_n)
 
+    assert rd < tol
+    assert d < tol
     assert (np.abs(dx*dt*N - np.pi*2)) < 1e-15
 
     
     
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    #logging.basicConfig(level=logging.DEBUG)
     test_find_integral_boundary()
-    # test_fourier_integral_finite_boundary()
-    # test_fourier_integral_infinite_boundary(plot=True)
-    # test_get_N_a_b_for_accurate_fourier_integral()
-    # test_get_N_a_b_for_accurate_fourier_integral_b_only()
-    # test_get_dt_for_accurate_interpolation()
-    # test_sclicing()
-    # test_calc_abN()
+    test_fourier_integral_finite_boundary()
+    test_fourier_integral_infinite_boundary(plot=False)
+    test_get_N_a_b_for_accurate_fourier_integral()
+    test_get_N_a_b_for_accurate_fourier_integral_b_only()
+    test_get_dt_for_accurate_interpolation()
+    test_sclicing()
+    test_calc_abN()

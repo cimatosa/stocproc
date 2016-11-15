@@ -365,7 +365,7 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
            the interpolation error is maximal when beeing in between the reference points.
         5) Now calculate the deviation :math:`\Delta(n)` for sequential n starting at n=0. Stop if
            :math:`\Delta(n) < tol`. If the deviation does not drop below tol for all :math:`0 \leq n < ng-1` increase
-           ng as follows :math:`ng = 2*ng-1` and start over at 1). (This update schema for ng asured that ng is odd
+           ng as follows :math:`ng = 2*ng-1` and start over at 1). (This update scheme for ng asured that ng is odd
            which is needed for the 'simpson' and 'fourpoint' integration weights)
 
     .. note::

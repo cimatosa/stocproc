@@ -43,14 +43,43 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     """
     _max_num_iteration = 100
     _i = 0
+    x0 = float(x0)
     I_ref = integrand(ref_val)
     if I_ref < tol:
-        pass
+        # return find_integral_boundary(integrand = lambda x: 1/integrand(x),
+        #                               tol = 1/tol,
+        #                               ref_val=ref_val,
+        #                               max_val=max_val,
+        #                               x0=-x0)
+        x_old = ref_val
+        while True:
+            _i += 1
+            if _i > _max_num_iteration:
+                raise RuntimeError("max number of iteration reached")
+            x = ref_val - x0
+            try:
+                I_x = integrand(x)
+            except Exception as e:
+                raise RuntimeError("evaluation of integrand failed due to {}".format(e))
+
+            if I_x > tol:
+                break
+            x0 *= 2
+            x_old = x
+        a = brentq(lambda x: integrand(x) - tol, x_old, x)
+        return a
     elif I_ref > tol:
         x_old = ref_val
         while True:
+            _i += 1
+            if _i > _max_num_iteration:
+                raise RuntimeError("max number of iteration reached")
             x = ref_val + x0
-            I_x = integrand(x)
+            try:
+                I_x = integrand(x)
+            except Exception as e:
+                raise RuntimeError("evaluation of integrand failed due to {}".format(e))
+
             if I_x < tol:
                 break
             x0 *= 2
@@ -148,28 +177,33 @@ def _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_on
         else:
             a_ = find_integral_boundary(integrand, tol=tol, ref_val=a, max_val=1e6, x0=-1)
             b_ = find_integral_boundary(integrand, tol=tol, ref_val=b, max_val=1e6, x0=1)
-    except ValueError:
-        a_ = -1
-        b_ = 1
+    except RuntimeError:
+        # in case 'find_integral_boundary' failes
+        d = 300
+        _f_opt_cache[key] = d, None, None
+        return d
+
 
     tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
     idx = np.where(tau <= t_max)
     ft_ref_tau = ft_ref(tau[idx])
     d = diff_method(ft_ref_tau, ft_tau[idx])
     _f_opt_cache[key] = d, a_, b_
+    #log.debug("f_opt tol {} -> d {}".format(10**x, d))
     return np.log10(d)
 
 def _lower_contrs(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_only):
     _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_only)
-    tol = 10**x
     d, a_, b_ = _f_opt_cache[float(x[0])]
+    if (a_ is None) or (b_ is None):
+        return -1
     v = N * np.pi / (b_ - a_) - t_max
-    log.debug("lower constr value {} for x {} (tol {})".format(v, x, tol))
+    #log.debug("lower constr value {} for x {} (tol {})".format(v, 10**x, tol))
     return v
 
 
 def _upper_contrs(x):
-    log.debug("upper constr value {}".format(-x))
+    #log.debug("upper constr value {}".format(-x))
     return -x
 
 
@@ -178,7 +212,8 @@ def opt_integral_boundaries(integrand, a, b, t_max, ft_ref, opt_b_only, N, diff_
 
     _f_opt_cache = dict()
     args = (integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, opt_b_only)
-    r = minimize(_f_opt, x0 = [-0.1], args = args,
+    x0 = np.log10(0.1*integrand(b))
+    r = minimize(_f_opt, x0 = x0, args = args,
                  method='SLSQP',
                  constraints=[{"type": "ineq", "fun": _lower_contrs, "args": args},
                               {"type": "ineq", "fun": _upper_contrs}])
@@ -219,7 +254,7 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, t_max, tol, ft_ref,
             raise RuntimeError("maximum number of points for Fourier Transform reached")
         i += 1    
 
-def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
+def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
     N = 32
     sub_sampl = 8
     
@@ -231,43 +266,40 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref):
         ft_intp = ComplexInterpolatedUnivariateSpline(x = tau_sub, y = ft_ref_n[::sub_sampl], k=3)
         ft_intp_n = ft_intp(tau)
         
-        d = np.max(np.abs(ft_intp_n-ft_ref_n))
+        d = diff_method(ft_intp_n, ft_ref_n)
+        log.debug("acc interp N {} dt {:.3e} {:.3e} -> d {:.3e}".format(N, sub_sampl*tau[1], t_max/(N/sub_sampl), d))
         if d < tol:
             return t_max/(N/sub_sampl)
         N*=2
 
 
-def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_only, N_max = 2**20):
+def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_only, N_max = 2**20, diff_method=_absDiff):
     N, a, b = get_N_a_b_for_accurate_fourier_integral(integrand, a, b,
                                                       t_max  = t_max,
                                                       tol    = intgr_tol,
                                                       ft_ref = ft_ref,
                                                       opt_b_only=opt_b_only,
-                                                      N_max  = N_max)
+                                                      N_max  = N_max,
+                                                      diff_method=diff_method)
     dt_tol = get_dt_for_accurate_interpolation(t_max  = t_max,
                                                tol    = intpl_tol,
-                                               ft_ref = ft_ref)
-    
+                                               ft_ref = ft_ref,
+                                               diff_method=diff_method)
     dx = (b-a)/N
     dt = 2*np.pi/dx/N
     if dt <= dt_tol:
-        log.info("dt criterion fulfilled")
+        log.debug("dt criterion fulfilled")
         return a, b, N, dx, dt
     else:
-        log.info("down scale dx and dt to match new power of 2 N")
+        log.debug("down scale dx and dt to match new power of 2 N")
 
     N_min = 2*np.pi/dx/dt_tol
     N = 2**int(np.ceil(np.log2(N_min)))
-
-
-    #scale = np.sqrt(N_min/N)
-    #assert scale <= 1
-    scale = 1
-
+    scale = np.sqrt(N_min/N)
     dx_new = scale*dx
     b_minus_a = dx_new*N
-    
     dt_new = 2*np.pi/dx_new/N
+    assert dt_new < dt_tol
     if opt_b_only:
         b = a + b_minus_a
     else:
@@ -275,13 +307,4 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
         b += delta/2
         a -= delta/2
 
-    rd, a, b = opt_integral_boundaries(integrand=integrand, a=a, b=b, t_max=t_max, ft_ref=ft_ref,
-                                       opt_b_only=opt_b_only, N=N)
-
-    log.debug("rd after final optimization:{:.3e}".format(rd))
-
     return a, b, N, dx_new, dt_new
-        
-        
-    
-    
