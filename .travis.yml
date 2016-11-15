@@ -25,7 +25,7 @@ install:
 - python setup.py build_ext --inplace
 
 script:
-- py.test tests/ -v --cov=stocproc --cov-report term-missing
+- py.test tests/ -v -s --cov=stocproc --cov-report term-missing
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
