@@ -44,7 +44,7 @@ import time
 from . import method_kle
 from . import method_fft
 from . import stocproc_c
-from .tools import ComplexInterpolatedUnivariateSpline
+import fcSpline
 
 import logging
 log = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class _absStocProc(abc.ABC):
         else:
             if self._interpolator is None:
                 t0 = time.time()
-                self._interpolator = ComplexInterpolatedUnivariateSpline(self.t, self._z, k=3)
+                self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
                 log.debug("created interpolator [{:.2e}s]".format(time.time() - t0))
             return self._interpolator(t)
 

@@ -1,17 +1,13 @@
-from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.integrate import quad
 from scipy.optimize import bisect
 
 from functools import partial
-
 from .stocproc_c import auto_correlation as auto_correlation_c
-
 import sys
 import os
 from warnings import warn
 sys.path.append(os.path.dirname(__file__))
 import numpy as np
-from scipy.linalg import eigh as scipy_eigh
 from collections import namedtuple
 
 stocproc_key_type = namedtuple(typename    = 'stocproc_key_type', 
@@ -20,9 +16,10 @@ stocproc_key_type = namedtuple(typename    = 'stocproc_key_type',
 
 class ComplexInterpolatedUnivariateSpline(object):
     def __init__(self, x, y, k=3):
+        raise DeprecationWarning("use fast cubic Spline (fcSpline) instead")
+        from scipy.interpolate import InterpolatedUnivariateSpline
         self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
         self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
-
     def __call__(self, t):
         return self.re_spline(t) + 1j * self.im_spline(t)
 
