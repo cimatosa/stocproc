@@ -50,7 +50,7 @@ with the exact auto correlation.
 .. image:: ../../examples/ac.*
 """
 
-version = '0.2.0'
+__version__ = '0.2.1'
 
 import sys
 if sys.version_info.major < 3:

@@ -6,8 +6,9 @@
 """
 from __future__ import division, print_function
 
-from .tools import ComplexInterpolatedUnivariateSpline
-from functools import lru_cache
+#from .tools import ComplexInterpolatedUnivariateSpline
+#from functools import lru_cache
+import fcSpline
 import logging
 import numpy as np
 from numpy.fft import rfft as np_rfft
@@ -261,9 +262,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
     while True:
         tau = np.linspace(0, t_max, N+1)
         ft_ref_n = ft_ref(tau)
-        tau_sub = tau[::sub_sampl]
-        
-        ft_intp = ComplexInterpolatedUnivariateSpline(x = tau_sub, y = ft_ref_n[::sub_sampl], k=3)
+        ft_intp = fcSpline.FCS(x_low = 0, x_high=t_max, y=ft_ref_n[::sub_sampl])
         ft_intp_n = ft_intp(tau)
         
         d = diff_method(ft_intp_n, ft_ref_n)

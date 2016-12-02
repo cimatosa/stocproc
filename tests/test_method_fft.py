@@ -358,7 +358,7 @@ def test_calc_abN():
 
     tau_fine = np.linspace(0, tmax, 1500)
     ft_ref_n = bcf_ref(tau_fine)
-    ft_intp = sp.tools.ComplexInterpolatedUnivariateSpline(x=tau[idx], y=ft_tau[idx], k=3)
+    ft_intp = sp.tools.ComplexInterpolatedUnivariateSpline(x=tau[idx], y=ft_tau[idx], k=3, noWarning=True)
     ft_intp_n = ft_intp(tau_fine)
     d = diff_method(ft_intp_n, ft_ref_n)
 

@@ -15,11 +15,12 @@ stocproc_key_type = namedtuple(typename    = 'stocproc_key_type',
 
 
 class ComplexInterpolatedUnivariateSpline(object):
-    def __init__(self, x, y, k=3):
-        raise DeprecationWarning("use fast cubic Spline (fcSpline) instead")
+    def __init__(self, x, y, k=3, noWarning=False):
+        if not noWarning:
+            raise DeprecationWarning("use fast cubic Spline (fcSpline) instead")
         from scipy.interpolate import InterpolatedUnivariateSpline
-        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y))
-        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y))
+        self.re_spline = InterpolatedUnivariateSpline(x, np.real(y), k=k)
+        self.im_spline = InterpolatedUnivariateSpline(x, np.imag(y), k=k)
     def __call__(self, t):
         return self.re_spline(t) + 1j * self.im_spline(t)
 
