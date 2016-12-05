@@ -103,10 +103,6 @@ class _absStocProc(abc.ABC):
         if t is None:
             return self._z
         else:
-            if self._interpolator is None:
-                t0 = time.time()
-                self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
-                log.debug("created interpolator [{:.2e}s]".format(time.time() - t0))
             return self._interpolator(t)
 
     @abc.abstractmethod
@@ -160,6 +156,9 @@ class _absStocProc(abc.ABC):
             y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
         self._z = self._calc_scaled_z(y)
         log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
+        t0 = time.time()
+        self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
+        log.debug("created interpolator [{:.2e}s]".format(time.time() - t0))
         
     def set_scale(self, scale):
         self.sqrt_scale = np.sqrt(scale)
