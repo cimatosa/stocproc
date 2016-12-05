@@ -50,11 +50,14 @@ with the exact auto correlation.
 .. image:: ../../examples/ac.*
 """
 
-__version__ = '0.2.1'
+__version__ = "0.2.1"
 
 import sys
 if sys.version_info.major < 3:
     raise SystemError("no support for Python 2")
 
-from .stocproc import StocProc_FFT
-from .stocproc import StocProc_KLE
+try:
+    from .stocproc import StocProc_FFT
+    from .stocproc import StocProc_KLE
+except ImportError:
+    pass
