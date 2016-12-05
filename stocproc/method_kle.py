@@ -471,7 +471,7 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
             if not is_equi:
                 sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(tfine, sqrt_lambda_ui_fine, noWarning=True)
             else:
-                sqrt_lambda_ui_spl = fcSpline.FCS(x_low=0, x_high=t_max, y=sqrt_lambda_ui_fine)
+                sqrt_lambda_ui_spl = fcSpline.FCS(x_low=0, x_high=t_max, y=sqrt_lambda_ui_fine, ord_bound_apprx=2)
             time_spline += (time.time() - t0)
 
             # calculate the max deviation

@@ -86,6 +86,7 @@ class _absStocProc(abc.ABC):
             np.random.seed(seed)
         self._one_over_sqrt_2 = 1/np.sqrt(2)
         self._proc_cnt = 0
+        self.sqrt_scale = 1.
         log.debug("init StocProc with t_max {} and {} grid points".format(t_max, num_grid_points))
 
     def __call__(self, t=None):
@@ -117,6 +118,10 @@ class _absStocProc(abc.ABC):
         :return: the stochastic process, array of complex numbers 
         """
         pass
+    
+    def _calc_scaled_z(self, y):
+        r"""scaled the discrete process z with sqrt(scale), such that <z_i z^ast_j> = scale bcf(i,j)"""
+        return self.sqrt_scale * self.calc_z(y)
 
     @abc.abstractmethod
     def get_num_y(self):
@@ -154,8 +159,11 @@ class _absStocProc(abc.ABC):
         if y is None:
             #random complex normal samples
             y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
-        self._z = self.calc_z(y)
+        self._z = self._calc_scaled_z(y)
         log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
+        
+    def set_scale(self, scale):
+        self.sqrt_scale = np.sqrt(scale)
 
 
 class StocProc_KLE(_absStocProc):
@@ -221,7 +229,8 @@ class StocProc_KLE(_absStocProc):
            Details on the error estimation and further clarification of the parameters ng_fac, meth,
            diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
         """
-
+        self.key = r_tau, t_max, tol
+        
         sqrt_lambda_ui_fine, t = method_kle.auto_ng(corr=r_tau,
                                                     t_max=t_max,
                                                     ngfac=ng_fac,
@@ -236,7 +245,7 @@ class StocProc_KLE(_absStocProc):
 
         state = sqrt_lambda_ui_fine, t, seed
         self.__setstate__(state)
-        self.key = r_tau, t_max, tol
+        
 
     def get_key(self):
         """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
@@ -336,6 +345,8 @@ class StocProc_FFT(_absStocProc):
     """
     def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
                  seed=None, negative_frequencies=False):
+        self.key = bcf_ref, t_max, intgr_tol, intpl_tol
+                
         if not negative_frequencies: 
             log.info("non neg freq only")
             # assume the spectral_density is 0 for w<0 
@@ -393,7 +404,6 @@ class StocProc_FFT(_absStocProc):
         self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
         self.yl = np.sqrt(self.yl)
         self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
-        self.key = bcf_ref, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed

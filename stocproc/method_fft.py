@@ -178,12 +178,18 @@ def _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, _f_opt_cache, b_on
         else:
             a_ = find_integral_boundary(integrand, tol=tol, ref_val=a, max_val=1e6, x0=-1)
             b_ = find_integral_boundary(integrand, tol=tol, ref_val=b, max_val=1e6, x0=1)
-    except RuntimeError:
+    except Exception as e:
+        log.debug("Exception {} ({}) in _f_opt".format(type(e), e))
         # in case 'find_integral_boundary' failes
         d = 300
         _f_opt_cache[key] = d, None, None
         return d
 
+    if a_ == b_:
+        d = 300
+        _f_opt_cache[key] = d, None, None
+        return d
+        
 
     tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
     idx = np.where(tau <= t_max)

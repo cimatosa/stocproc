@@ -239,7 +239,7 @@ def test_many(plot=False):
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     # test_stochastic_process_KLE_correlation_function(plot=False)
     # test_stochastic_process_FFT_correlation_function(plot=False)
     # test_stocproc_dump_load()
