@@ -43,7 +43,6 @@ import time
 
 from . import method_kle
 from . import method_fft
-from . import stocproc_c
 import fcSpline
 
 import logging
