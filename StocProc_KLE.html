@@ -145,7 +145,7 @@
 <h1>StocProc_KLE<a class="headerlink" href="#stocproc-kle" title="Permalink to this headline">¶</a></h1>
 <dl class="class">
 <dt id="stocproc.StocProc_KLE">
-<em class="property">class </em><code class="descclassname">stocproc.</code><code class="descname">StocProc_KLE</code><span class="sig-paren">(</span><em>r_tau</em>, <em>t_max</em>, <em>tol=0.01</em>, <em>ng_fac=4</em>, <em>meth='fourpoint'</em>, <em>diff_method='full'</em>, <em>dm_random_samples=10000</em>, <em>seed=None</em>, <em>align_eig_vec=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">stocproc.</code><code class="descname">StocProc_KLE</code><span class="sig-paren">(</span><em>r_tau</em>, <em>t_max</em>, <em>tol=0.01</em>, <em>ng_fac=4</em>, <em>meth='fourpoint'</em>, <em>diff_method='full'</em>, <em>dm_random_samples=10000</em>, <em>seed=None</em>, <em>align_eig_vec=False</em>, <em>scale=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE" title="Permalink to this definition">¶</a></dt>
 <dd><p>A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
 The idea is that any stochastic process can be expressed in terms of the KLE</p>
 <div class="math">
@@ -198,7 +198,7 @@ calculated using integral interpolation</li>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">To circumvent the time consuming initializing the StocProc class can be saved and loaded using
-the standard python pickle module. The <a class="reference internal" href="#stocproc.StocProc_KLE.get_key" title="stocproc.StocProc_KLE.get_key"><code class="xref py py-func docutils literal"><span class="pre">get_key()</span></code></a> method may be used identify the
+the standard python pickle module. The <code class="xref py py-func docutils literal"><span class="pre">get_key()</span></code> method may be used identify the
 Process class by its parameters (r_tau, t_max, tol).</p>
 </div>
 <div class="admonition seealso">
@@ -230,13 +230,6 @@ stochastic process at times t</td>
 <dt id="stocproc.StocProc_KLE.calc_z">
 <code class="descname">calc_z</code><span class="sig-paren">(</span><em>y</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE.calc_z"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE.calc_z" title="Permalink to this definition">¶</a></dt>
 <dd><p>evaluate <span class="math">\(z_k = \sum_i \lambda_i Y_i u_{ik}\)</span></p>
-</dd></dl>
-
-<dl class="method">
-<dt id="stocproc.StocProc_KLE.get_key">
-<code class="descname">get_key</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE.get_key"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE.get_key" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
-the StocProc class.</p>
 </dd></dl>
 
 <dl class="method">

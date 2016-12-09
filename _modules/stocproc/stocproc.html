@@ -195,7 +195,7 @@
 <span class="sd">        </span>
 <span class="sd">      </span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">t_axis</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">t_axis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="sd">r&quot;&quot;&quot;</span>
 <span class="sd">            :param t_max: specify time axis as [0, t_max], if None, the times must be explicitly</span>
 <span class="sd">                given by t_axis</span>
@@ -218,7 +218,8 @@
             <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_one_over_sqrt_2</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_proc_cnt</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_scale</span> <span class="o">=</span> <span class="mf">1.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">)</span>
         <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;init StocProc with t_max </span><span class="si">{}</span><span class="s2"> and </span><span class="si">{}</span><span class="s2"> grid points&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">))</span>
 
     <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -294,6 +295,7 @@
         <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;created interpolator [</span><span class="si">{:.2e}</span><span class="s2">s]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">))</span>
         
     <span class="k">def</span> <span class="nf">set_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scale</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">scale</span><span class="p">)</span>
 
 
@@ -331,7 +333,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r_tau</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">ng_fac</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">meth</span><span class="o">=</span><span class="s1">&#39;fourpoint&#39;</span><span class="p">,</span> <span class="n">diff_method</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="n">dm_random_samples</span><span class="o">=</span><span class="mi">10</span><span class="o">**</span><span class="mi">4</span><span class="p">,</span>
-        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">align_eig_vec</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">align_eig_vec</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        :param r_tau: the idesired auto correlation function of a single parameter tau</span>
 <span class="sd">        :param t_max: specifies the time interval [0, t_max] for which the processes in generated</span>
@@ -374,23 +376,26 @@
         <span class="k">if</span> <span class="n">align_eig_vec</span><span class="p">:</span>
             <span class="n">method_kle</span><span class="o">.</span><span class="n">align_eig_vec</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">)</span>
 
-        <span class="n">state</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">__setstate__</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
         
 
-<div class="viewcode-block" id="StocProc_KLE.get_key"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.stocproc.StocProc_KLE.get_key">[docs]</a>    <span class="k">def</span> <span class="nf">get_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump</span>
-<span class="sd">        the StocProc class.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span></div>
+    <span class="c1"># def get_key(self):</span>
+    <span class="c1">#     &quot;&quot;&quot;Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump</span>
+    <span class="c1">#     the StocProc class.</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     return self.key</span>
+
+    <span class="k">def</span> <span class="nf">__bfkey__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span>
 
     <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
 
     <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
-        <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span> <span class="o">=</span> <span class="n">state</span>
         <span class="n">num_ev</span><span class="p">,</span> <span class="n">ng</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="o">.</span><span class="n">shape</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_axis</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_axis</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_ev</span> <span class="o">=</span> <span class="n">num_ev</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span>
 
@@ -475,7 +480,7 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spectral_density</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">bcf_ref</span><span class="p">,</span> <span class="n">intgr_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">intpl_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span>
-                 <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">negative_frequencies</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                 <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">negative_frequencies</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">bcf_ref</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">intgr_tol</span><span class="p">,</span> <span class="n">intpl_tol</span>
                 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">negative_frequencies</span><span class="p">:</span> 
@@ -529,7 +534,8 @@
         
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_max</span>           <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span> 
                          <span class="n">num_grid_points</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span> 
-                         <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">)</span>
+                         <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">,</span>
+                         <span class="n">scale</span>           <span class="o">=</span> <span class="n">scale</span><span class="p">)</span>
         
         <span class="n">omega</span> <span class="o">=</span> <span class="n">dx</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">(</span><span class="n">omega</span> <span class="o">+</span> <span class="n">a</span> <span class="o">+</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
@@ -537,13 +543,14 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="p">(</span><span class="n">a</span><span class="o">+</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>   <span class="c1">#self.t is from the parent class</span>
 
     <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
 
     <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">seed</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span> <span class="o">=</span> <span class="n">state</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_max</span>           <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span>
                          <span class="n">num_grid_points</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span>
-                         <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">)</span>
+                         <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">,</span>
+                         <span class="n">scale</span>           <span class="o">=</span> <span class="n">scale</span><span class="p">)</span>
             
 <div class="viewcode-block" id="StocProc_FFT.calc_z"><a class="viewcode-back" href="../../StocProc_FFT.html#stocproc.stocproc.StocProc_FFT.calc_z">[docs]</a>    <span class="k">def</span> <span class="nf">calc_z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
         <span class="sd">r&quot;&quot;&quot;calculate</span>
