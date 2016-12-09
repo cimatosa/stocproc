@@ -236,6 +236,36 @@ def test_many(plot=False):
     stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
     stocproc_metatest(stp, num_samples, tol, ac, plot)
 
+def test_pickle_scale():
+    t_max = 1
+    tol = 0.1
+
+    sd = lsd
+    ac = lac
+    stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=True, seed=0, intgr_tol=tol, intpl_tol=tol)
+    stp.set_scale(0.56)
+    stp_dump = pickle.dumps(stp)
+    stp_prime = pickle.loads(stp_dump)
+    assert stp_prime.scale == 0.56
+
+    stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=True, seed=0, intgr_tol=tol, intpl_tol=tol, scale=0.56)
+    stp_dump = pickle.dumps(stp)
+    stp_prime = pickle.loads(stp_dump)
+    assert stp_prime.scale == 0.56
+
+    stp = sp.StocProc_KLE(ac, t_max, tol=tol)
+    stp.set_scale(0.56)
+    stp_dump = pickle.dumps(stp)
+    stp_prime = pickle.loads(stp_dump)
+    assert stp_prime.scale == 0.56
+
+    stp = sp.StocProc_KLE(ac, t_max, tol=tol, scale=0.56)
+    stp_dump = pickle.dumps(stp)
+    stp_prime = pickle.loads(stp_dump)
+    assert stp_prime.scale == 0.56
+
+
+
 
 if __name__ == "__main__":
     import logging
@@ -244,5 +274,7 @@ if __name__ == "__main__":
     # test_stochastic_process_FFT_correlation_function(plot=False)
     # test_stocproc_dump_load()
 
-    test_many(plot=False)
+    # test_many(plot=False)
+    test_pickle_scale()
     pass
+
