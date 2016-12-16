@@ -232,7 +232,7 @@
 <span class="sd">            stochastic process at times t</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;StocProc_FFT has NO random data, call &#39;new_process&#39; to generate a new random process&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;StocProc has NO random data, call &#39;new_process&#39; to generate a new random process&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">t</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span>
@@ -362,7 +362,7 @@
 <span class="sd">           Details on the error estimation and further clarification of the parameters ng_fac, meth,</span>
 <span class="sd">           diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">r_tau</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">tol</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">r_tau</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">tol</span>
         
         <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="n">method_kle</span><span class="o">.</span><span class="n">auto_ng</span><span class="p">(</span><span class="n">corr</span><span class="o">=</span><span class="n">r_tau</span><span class="p">,</span>
                                                     <span class="n">t_max</span><span class="o">=</span><span class="n">t_max</span><span class="p">,</span>
@@ -376,7 +376,7 @@
         <span class="k">if</span> <span class="n">align_eig_vec</span><span class="p">:</span>
             <span class="n">method_kle</span><span class="o">.</span><span class="n">align_eig_vec</span><span class="p">(</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">)</span>
 
-        <span class="n">state</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">key</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">__setstate__</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
         
 
@@ -390,10 +390,10 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span>
 
     <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span>
 
     <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
-        <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">sqrt_lambda_ui_fine</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">state</span>
         <span class="n">num_ev</span><span class="p">,</span> <span class="n">ng</span> <span class="o">=</span> <span class="n">sqrt_lambda_ui_fine</span><span class="o">.</span><span class="n">shape</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_axis</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_ev</span> <span class="o">=</span> <span class="n">num_ev</span>
@@ -543,10 +543,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="p">(</span><span class="n">a</span><span class="o">+</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>   <span class="c1">#self.t is from the parent class</span>
 
     <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span>
 
     <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">state</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">t_max</span>           <span class="o">=</span> <span class="n">t_max</span><span class="p">,</span>
                          <span class="n">num_grid_points</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span>
                          <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">,</span>
