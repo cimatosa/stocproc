@@ -99,7 +99,7 @@ class _absStocProc(abc.ABC):
             stochastic process at times t
         """
         if self._z is None:
-            raise RuntimeError("StocProc_FFT has NO random data, call 'new_process' to generate a new random process")
+            raise RuntimeError("StocProc has NO random data, call 'new_process' to generate a new random process")
 
         if t is None:
             return self._z
@@ -229,7 +229,7 @@ class StocProc_KLE(_absStocProc):
            Details on the error estimation and further clarification of the parameters ng_fac, meth,
            diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
         """
-        self.key = r_tau, t_max, tol
+        key = r_tau, t_max, tol
         
         sqrt_lambda_ui_fine, t = method_kle.auto_ng(corr=r_tau,
                                                     t_max=t_max,
@@ -243,7 +243,7 @@ class StocProc_KLE(_absStocProc):
         if align_eig_vec:
             method_kle.align_eig_vec(sqrt_lambda_ui_fine)
 
-        state = sqrt_lambda_ui_fine, t, seed, scale
+        state = sqrt_lambda_ui_fine, t, seed, scale, key
         self.__setstate__(state)
         
 
@@ -257,10 +257,10 @@ class StocProc_KLE(_absStocProc):
         return self.key
 
     def __getstate__(self):
-        return self.sqrt_lambda_ui_fine, self.t, self._seed, self.scale
+        return self.sqrt_lambda_ui_fine, self.t, self._seed, self.scale, self.key
 
     def __setstate__(self, state):
-        sqrt_lambda_ui_fine, t, seed, scale = state
+        sqrt_lambda_ui_fine, t, seed, scale, self.key = state
         num_ev, ng = sqrt_lambda_ui_fine.shape
         super().__init__(t_axis=t, seed=seed, scale=scale)
         self.num_ev = num_ev
@@ -410,10 +410,10 @@ class StocProc_FFT(_absStocProc):
         self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
 
     def __getstate__(self):
-        return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed, self.scale
+        return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed, self.scale, self.key
 
     def __setstate__(self, state):
-        self.yl, num_grid_points, self.omega_min_correction, t_max, seed, scale = state
+        self.yl, num_grid_points, self.omega_min_correction, t_max, seed, scale, self.key = state
         super().__init__(t_max           = t_max,
                          num_grid_points = num_grid_points,
                          seed            = seed,
