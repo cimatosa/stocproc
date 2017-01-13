@@ -245,6 +245,10 @@ class StocProc_KLE(_absStocProc):
 
         state = sqrt_lambda_ui_fine, t, seed, scale, key
         self.__setstate__(state)
+
+    @staticmethod
+    def get_key(r_tau, t_max, tol=1e-2):
+        return r_tau, t_max, tol
         
 
     # def get_key(self):
@@ -408,6 +412,10 @@ class StocProc_FFT(_absStocProc):
         self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
         self.yl = np.sqrt(self.yl)
         self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
+
+    @staticmethod
+    def get_key(t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2):
+        return bcf_ref, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed, self.scale, self.key
