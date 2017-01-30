@@ -379,24 +379,24 @@ class StocProc_FFT(_absStocProc):
             # assume the spectral_density is non zero also for w<0 
             # but decays fast for large |w|
             b = method_fft.find_integral_boundary(integrand = spectral_density, 
-                                                  tol       = intgr_tol**2,
+                                                  tol       = intgr_tol,
                                                   ref_val   = 1, 
                                                   max_val   = 1e6, 
                                                   x0        = 1)
             a = method_fft.find_integral_boundary(integrand = spectral_density, 
-                                                  tol       = intgr_tol**2,
+                                                  tol       = intgr_tol,
                                                   ref_val   = -1, 
                                                   max_val   = 1e6, 
                                                   x0        = -1)            
             a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
-                                                              intgr_tol = intgr_tol, 
-                                                              intpl_tol = intpl_tol, 
-                                                              t_max     = t_max,
-                                                              a         = a,
-                                                              b         = b,
-                                                              ft_ref    = lambda tau:bcf_ref(tau)*np.pi,
-                                                              opt_b_only= False,
-                                                              N_max     = 2**24)
+                                                         intgr_tol = intgr_tol,
+                                                         intpl_tol = intpl_tol,
+                                                         t_max     = t_max,
+                                                         a         = a,
+                                                         b         = b,
+                                                         ft_ref    = lambda tau:bcf_ref(tau)*np.pi,
+                                                         opt_b_only= False,
+                                                         N_max     = 2**24)
             log.info("required tol result in N {}".format(N))
 
         assert abs(2*np.pi - N*dx*dt) < 1e-12
