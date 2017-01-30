@@ -218,11 +218,11 @@ def _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, b_only):
     tol = x
 
     if b_only:
-        a_ = a
-        b_ = find_integral_boundary(integrand, tol=tol, ref_val=b, max_val=1e6, x0=1)
+        a_ = 0
+        b_ = find_integral_boundary(integrand, tol=tol, ref_val=1, max_val=1e6, x0=1)
     else:
-        a_ = find_integral_boundary(integrand, tol=tol, ref_val=a, max_val=1e6, x0=-1)
-        b_ = find_integral_boundary(integrand, tol=tol, ref_val=b, max_val=1e6, x0=1)
+        a_ = find_integral_boundary(integrand, tol=tol, ref_val=-1, max_val=1e6, x0=-1)
+        b_ = find_integral_boundary(integrand, tol=tol, ref_val=1, max_val=1e6, x0=1)
 
     tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
     idx = np.where(tau <= t_max)
@@ -254,40 +254,43 @@ def opt_integral_boundaries_use_SLSQP_minimizer(integrand, a, b, t_max, ft_ref, 
     log.info("optimization with N {} yields max rd {:.3e} and new boundaries [{:.2e},{:.2e}]".format(N, d, a_, b_))
     return d, a_, b_
 
-def opt_integral_boundaries(integrand, a, b, t_max, ft_ref, tol, opt_b_only, N, diff_method):
-    log.info("optimize integral boundary N:{} [{:.3e},{:.3e}], please wait ...".format(N, a, b))
+def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_method):
 
 
-    args = (integrand, a, b, N, t_max, ft_ref, diff_method, opt_b_only)
-    x0 = integrand(b)
-    d1 = np.inf, None, None
+    tol_0 = 2
+    N_0 = 10
+    i = 0
     while True:
-        d = _f_opt(x0, *args)
-        log.info("opt int: J(w) min:{:.3e} and N:{} -> tol:{:.3e}".format(x0, N, d[0]))
-        if d[0] < tol:
-            log.info("return, cause tol of {} was reached".format(tol))
-            return d
-        x0 *= 0.1
-        if d[0] > d1[0]:
-            log.info("return cause further decrease of 'J(w) min' does not improove accuracy")
-            return d
-        if x0 < 1e-12:
-            log.info("return cause 'J(w) min' < 1e-6")
-            return d
-        d1 = d
+        for j in range(0, i+1):
+            J_w_min = 10**(-(tol_0 + i-j))
+            N = 2**(N_0 + j)
+
+            if opt_b_only:
+                a_ = 0
+                b_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=1, max_val=1e6, x0=1)
+            else:
+                a_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=-1, max_val=1e6, x0=-1)
+                b_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=1, max_val=1e6, x0=1)
+
+            tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
+            idx = np.where(tau <= t_max)
+            ft_ref_tau = ft_ref(tau[idx])
+            d = diff_method(ft_ref_tau, ft_tau[idx])
+            log.info("J_w_min:{:.3e} and N {} yields: interval [{:.3e},{:.3e}] -> diff {:.3e}".format(J_w_min, N, a_, b_, d))
+            if d < tol:
+                log.info("return, cause tol of {} was reached".format(tol))
+                return d, N, a_, b_
+        i += 1
 
 
 
-def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, N_start, t_max, tol, ft_ref, opt_b_only, N_max = 2**20,
-                                            diff_method=_absDiff):
+
+def get_N_a_b_for_accurate_fourier_integral(integrand, t_max, tol, ft_ref, opt_b_only, diff_method=_absDiff):
+
     """
-        chooses N such that the approximated Fourier integral 
-        meets the exact solution within a given tolerance of the
-        relative deviation for a given interval of interest
     """
-    log.info("error estimation up to tmax {:.3e} (tol={:.3e})".format(t_max, tol))
     if opt_b_only:
-        I0 = quad(integrand, a, np.inf)[0]
+        I0 = quad(integrand, 0, np.inf)[0]
     else:
         I0 = quad(integrand, -np.inf, np.inf)[0]
     ft_ref_0 = ft_ref(0)
@@ -296,19 +299,11 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, a, b, N_start, t_max, tol
     if rd > 1e-6:
         raise FTReferenceError("it seems that 'ft_ref' is not the fourier transform of 'integrand'")
 
-    N = N_start
-    while True:
-        rd, a_new, b_new = opt_integral_boundaries(integrand=integrand, a=a, b=b, t_max=t_max, ft_ref=ft_ref, tol=tol,
-                                                   opt_b_only=opt_b_only, N=N, diff_method=diff_method)
-        #a = a_new
-        #b = b_new
 
-        if rd < tol:
-            log.info("reached rd ({:.3e}) < tol ({:.3e}), return N={}".format(rd, tol, N))
-            return N, a_new, b_new
-        if N > N_max:
-            raise RuntimeError("maximum number of points for Fourier Transform reached")
-        N *= 2
+    d, N, a_new, b_new = opt_integral_boundaries(integrand=integrand, t_max=t_max, ft_ref=ft_ref, tol=tol,
+                                                 opt_b_only=opt_b_only, diff_method=diff_method)
+    return N, a_new, b_new
+
 
 def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
     N = 32
@@ -331,25 +326,25 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
     log.info("get_dt_for_accurate_interpolation, please wait ...")
     c = find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
                                                    intgr_tol, 1, 1e6, 1)
+
     dt_tol = get_dt_for_accurate_interpolation(t_max=c,
                                                tol=intpl_tol,
                                                ft_ref=ft_ref,
                                                diff_method=diff_method)
 
-    N_start = t_max / dt_tol
-    N_start = 2 ** int(np.ceil(np.log2(N_start)))
+    log.info("requires dt < {:.3e}".format(dt_tol))
 
     log.info("get_N_a_b_for_accurate_fourier_integral, please wait ...")
-    N, a, b = get_N_a_b_for_accurate_fourier_integral(integrand, a, b,
-                                                      N_start=N_start,
-                                                      t_max  = t_max,
-                                                      tol    = intgr_tol,
-                                                      ft_ref = ft_ref,
-                                                      opt_b_only=opt_b_only,
-                                                      N_max  = N_max,
-                                                      diff_method=diff_method)
-
+    N, a, b = get_N_a_b_for_accurate_fourier_integral(integrand,
+                                                      t_max       = t_max,
+                                                      tol         = intgr_tol,
+                                                      ft_ref      = ft_ref,
+                                                      opt_b_only  = opt_b_only,
+                                                      diff_method = diff_method)
     dx = (b-a)/N
+    log.info("requires dx < {:.3e}".format(dx))
+
+
     dt = 2*np.pi/dx/N
     if dt <= dt_tol:
         log.debug("dt criterion fulfilled")
@@ -364,6 +359,8 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
     b_minus_a = dx_new*N
     dt_new = 2*np.pi/dx_new/N
     assert dt_new < dt_tol
+
+    print(a, b)
     if opt_b_only:
         b = a + b_minus_a
     else:

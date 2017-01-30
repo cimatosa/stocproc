@@ -284,12 +284,11 @@ def test_get_N_a_b_for_accurate_fourier_integral():
     intg = lambda w: 1 / (1 + (w - _WC_) ** 2) / np.pi
     bcf_ref = lambda t: np.exp(- np.abs(t) - 1j * _WC_ * t)
     a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=_WC_)
-    N, a, b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg, a, b,
+    N, a, b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg,
                                                                     t_max=50,
                                                                     tol=1e-2,
                                                                     ft_ref=bcf_ref,
-                                                                    opt_b_only=False,
-                                                                    N_max=2 ** 20)
+                                                                    opt_b_only=False)
     print(N, a, b)
     
 def test_get_N_a_b_for_accurate_fourier_integral_b_only():
@@ -300,12 +299,11 @@ def test_get_N_a_b_for_accurate_fourier_integral_b_only():
     
     a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
     a = 0
-    N, a, b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg, a, b,
+    N, a, b = sp.method_fft.get_N_a_b_for_accurate_fourier_integral(intg,
                                                                     t_max=15,
                                                                     tol=1e-5,
                                                                     ft_ref=bcf_ref,
-                                                                    opt_b_only=True,
-                                                                    N_max = 2 ** 20)
+                                                                    opt_b_only=True)
     print(N,a,b)
 
 def test_get_dt_for_accurate_interpolation():
@@ -331,6 +329,35 @@ def test_sclicing():
     assert yl[9] == 3/6
     
 def test_calc_abN():
+    def testing(intg, bcf_ref, tol, tmax):
+        diff_method = method_fft._absDiff
+
+        a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
+        a, b, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand=intg,
+                                                        intgr_tol=tol,
+                                                        intpl_tol=tol,
+                                                        t_max=tmax,
+                                                        a=0,
+                                                        b=b,
+                                                        ft_ref=bcf_ref,
+                                                        opt_b_only=True,
+                                                        diff_method=diff_method)
+
+        tau, ft_tau = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
+        idx = np.where(tau <= tmax)
+        ft_ref_tau = bcf_ref(tau[idx])
+        rd = diff_method(ft_tau[idx], ft_ref_tau)
+
+        tau_fine = np.linspace(0, tmax, 1500)
+        ft_ref_n = bcf_ref(tau_fine)
+        ft_intp = sp.tools.ComplexInterpolatedUnivariateSpline(x=tau[idx], y=ft_tau[idx], k=3, noWarning=True)
+        ft_intp_n = ft_intp(tau_fine)
+        d = diff_method(ft_intp_n, ft_ref_n)
+
+        assert rd < tol
+        assert d < tol
+        assert (np.abs(dx * dt * N - np.pi * 2)) < 1e-15
+
     s = 0.5
     wc = 4
     intg = lambda x: osd(x, s, wc)
@@ -338,33 +365,19 @@ def test_calc_abN():
     
     tol = 1e-3
     tmax=40
-    diff_method = method_fft._absDiff
+    testing(intg, bcf_ref, tol, tmax)
 
-    a, b = sp.method_fft.find_integral_boundary_auto(integrand=intg, tol=1e-2, ref_val=1)
-    a, b, N, dx, dt = sp.method_fft.calc_ab_N_dx_dt(integrand=intg,
-                                                    intgr_tol=tol,
-                                                    intpl_tol=tol,
-                                                    t_max=tmax,
-                                                    a=0,
-                                                    b=b,
-                                                    ft_ref=bcf_ref,
-                                                    opt_b_only=True,
-                                                    diff_method=diff_method)
+    s = 0.5
+    wc = 40
+    intg = lambda x: osd(x, s, wc)
+    bcf_ref = lambda t: gamma_func(s + 1) * wc ** (s + 1) * (1 + 1j * wc * t) ** (-(s + 1))
 
-    tau, ft_tau = sp.method_fft.fourier_integral_midpoint(intg, a, b, N)
-    idx = np.where(tau <= tmax)
-    ft_ref_tau = bcf_ref(tau[idx])
-    rd = diff_method(ft_tau[idx], ft_ref_tau)
+    tol = 1e-3
+    tmax = 40
+    testing(intg, bcf_ref, tol, tmax)
 
-    tau_fine = np.linspace(0, tmax, 1500)
-    ft_ref_n = bcf_ref(tau_fine)
-    ft_intp = sp.tools.ComplexInterpolatedUnivariateSpline(x=tau[idx], y=ft_tau[idx], k=3, noWarning=True)
-    ft_intp_n = ft_intp(tau_fine)
-    d = diff_method(ft_intp_n, ft_ref_n)
 
-    assert rd < tol
-    assert d < tol
-    assert (np.abs(dx*dt*N - np.pi*2)) < 1e-15
+
 
     
     
