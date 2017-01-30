@@ -142,10 +142,10 @@
 <span class="kn">import</span> <span class="nn">fcSpline</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 <div class="viewcode-block" id="solve_hom_fredholm"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.solve_hom_fredholm">[docs]</a><span class="k">def</span> <span class="nf">solve_hom_fredholm</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">w</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;Solves the discrete homogeneous Fredholm equation of the second kind</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Solves the discrete homogeneous Fredholm equation of the second kind</span>
 <span class="sd">    </span>
 <span class="sd">    .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)</span>
 <span class="sd">    </span>
@@ -238,7 +238,7 @@
 
 
 <div class="viewcode-block" id="get_mid_point_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_mid_point_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_mid_point_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **mid point rule**.</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **mid point rule**.</span>
 
 <span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
 <span class="sd">    :param num_grid_points: number of grid points N</span>
@@ -263,7 +263,7 @@
     <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
 
 <div class="viewcode-block" id="get_trapezoidal_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_trapezoidal_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_trapezoidal_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **trapezoidal rule**.</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **trapezoidal rule**.</span>
 
 <span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
 <span class="sd">    :param num_grid_points: number of grid points N</span>
@@ -285,7 +285,7 @@
     <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
 
 <div class="viewcode-block" id="get_simpson_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_simpson_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_simpson_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **simpson rule**.</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **simpson rule**.</span>
 
 <span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
 <span class="sd">    :param num_grid_points: number of grid points N (needs to be odd)</span>
@@ -311,7 +311,7 @@
     <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">w</span></div>
 
 <div class="viewcode-block" id="get_four_point_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_four_point_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_four_point_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **four-point Newton-Cotes rule**.</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **four-point Newton-Cotes rule**.</span>
 
 <span class="sd">    :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`</span>
 <span class="sd">    :param num_grid_points: number of grid points N (needs to be (4k+1) where k is an integer greater 0)</span>
@@ -352,7 +352,7 @@
     <span class="k">return</span> <span class="n">gquad</span><span class="o">.</span><span class="n">gauss_nodes_weights_legendre</span><span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="n">num_grid_points</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">t_max</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="get_tanh_sinh_weights_times"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.get_tanh_sinh_weights_times">[docs]</a><span class="k">def</span> <span class="nf">get_tanh_sinh_weights_times</span><span class="p">(</span><span class="n">t_max</span><span class="p">,</span> <span class="n">num_grid_points</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **Tanh-Sinh integration**. The idea is to</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the weights and grid points for numeric integration via **Tanh-Sinh integration**. The idea is to</span>
 <span class="sd">    transform the integral over a finite interval :math:`x \in [-1, 1]` via the variable transformation</span>
 
 <span class="sd">    .. math :: x = \tanh(\pi/2 \sinh(t))</span>
@@ -380,7 +380,7 @@
 <span class="sd">    scaled such that :math:`x_{-(N-1)/2} = 0` and :math:`x_{(N-1)/2} = t_\mathrm{max}`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="nf">get_h_of_N</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
-        <span class="sd">r&quot;&quot;&quot;returns the stepsize h for sinh tanh quad for a given number of points N</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;returns the stepsize h for sinh tanh quad for a given number of points N</span>
 <span class="sd">            such that the smallest weights are about 1e-14</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">a</span> <span class="o">=</span> <span class="mf">16.12087683080651</span>
@@ -443,9 +443,9 @@
         <span class="n">tfine</span><span class="p">[</span><span class="n">l</span><span class="p">::</span><span class="n">ngfac</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span> <span class="o">*</span> <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="p">(</span><span class="n">ngfac</span> <span class="o">-</span> <span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">t</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">ngfac</span>
     <span class="k">return</span> <span class="n">tfine</span>
 
-<div class="viewcode-block" id="auto_ng"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.auto_ng">[docs]</a><span class="k">def</span> <span class="nf">auto_ng</span><span class="p">(</span><span class="n">corr</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">ngfac</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">meth</span><span class="o">=</span><span class="n">get_mid_point_weights_times</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="n">diff_method</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
+<div class="viewcode-block" id="auto_ng"><a class="viewcode-back" href="../../StocProc_KLE.html#stocproc.method_kle.auto_ng">[docs]</a><span class="k">def</span> <span class="nf">auto_ng</span><span class="p">(</span><span class="n">corr</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">ngfac</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">meth</span><span class="o">=</span><span class="n">get_mid_point_weights_times</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">diff_method</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
             <span class="n">dm_random_samples</span><span class="o">=</span><span class="mi">10</span><span class="o">**</span><span class="mi">4</span><span class="p">,</span> <span class="n">ret_eigvals</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">relative_difference</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-    <span class="sd">r&quot;&quot;&quot;increase the number of gridpoints until the desired accuracy is met</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;increase the number of gridpoints until the desired accuracy is met</span>
 
 <span class="sd">    This function increases the number of grid points of the discrete Fredholm equation exponentially until</span>
 <span class="sd">    a given accuracy is met. The accuracy is determined from the deviation of the approximated</span>
@@ -640,7 +640,7 @@
 <span class="k">def</span> <span class="nf">is_axis_equidistant</span><span class="p">(</span><span class="n">ax</span><span class="p">):</span>
     <span class="n">ax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">ax</span><span class="p">)</span>
     <span class="n">d</span> <span class="o">=</span> <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">-</span><span class="n">ax</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">d</span> <span class="o">-</span> <span class="n">d</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">15</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">d</span> <span class="o">-</span> <span class="n">d</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="mf">1e-15</span>
 
 
 <span class="k">def</span> <span class="nf">str_meth_to_meth</span><span class="p">(</span><span class="n">meth</span><span class="p">):</span>

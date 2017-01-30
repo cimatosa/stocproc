@@ -172,7 +172,7 @@ and sample a single realization.</p>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;setup process generator&quot;</span><span class="p">)</span>
 <span class="n">stp</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">StocProc_FFT_tol</span><span class="p">(</span><span class="n">lsd</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">lac</span><span class="p">,</span>
                           <span class="n">negative_frequencies</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-                          <span class="n">intgr_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">intpl_tol</span><span class="o">=</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+                          <span class="n">intgr_tol</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">intpl_tol</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;generate single process&quot;</span><span class="p">)</span>
 <span class="n">stp</span><span class="o">.</span><span class="n">new_process</span><span class="p">()</span>
 <span class="n">zt</span> <span class="o">=</span> <span class="n">stp</span><span class="p">()</span>    <span class="c1"># get discrete process</span>
