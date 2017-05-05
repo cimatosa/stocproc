@@ -401,7 +401,11 @@ class StocProc_FFT(_absStocProc):
             log.info("required tol result in N {}".format(N))
 
         assert abs(2*np.pi - N*dx*dt) < 1e-12
+
         num_grid_points = int(np.ceil(t_max/dt))+1
+
+        assert num_grid_points <= N
+
         t_max = (num_grid_points-1)*dt
         
         super().__init__(t_max           = t_max, 
@@ -435,7 +439,8 @@ class StocProc_FFT(_absStocProc):
 
         and return values with :math:`t_l < t_\mathrm{max}`
         """
-        z = np.fft.fft(self.yl * y)[0:self.num_grid_points] * self.omega_min_correction
+        z_fft = np.fft.fft(self.yl * y)
+        z = z_fft[0:self.num_grid_points] * self.omega_min_correction
         return z
 
     def get_num_y(self):

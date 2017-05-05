@@ -391,4 +391,13 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
         b += delta/2
         a -= delta/2
 
+    if dt_new*(N-1) < t_max:
+        log.info("increase N to match dt_new*(N-1) < t_max")
+        N_tmp = t_max/dt_new + 1
+        N = 2 ** int(np.ceil(np.log2(N_tmp)))
+        dx_new = 2*np.pi/N/dt_new
+
+        print("dx", dx_new)
+        print("(b-a)/N", (b-a)/N)
+
     return a, b, N, dx_new, dt_new
