@@ -155,6 +155,7 @@ class _absStocProc(abc.ABC):
         if y is None:
             #random complex normal samples
             y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
+        del self._z
         self._z = self._calc_scaled_z(y)
         log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
         t0 = time.time()
@@ -289,14 +290,14 @@ class StocProc_FFT(_absStocProc):
 
     .. math::
         \alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
-        \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}
+        \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} \omega_k \tau}
 
     where the weights :math:`\omega_k` depend on the particular integration scheme. For a process defined as
 
     .. math:: Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}
 
     with independent complex random variables :math:`Y_k` such that :math:`\langle Y_k \rangle = 0`,
-    :math:`\langle Y_k Y_{k'}\rangle = 0` and :math:`\langle Y_k Y^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}`
+    :math:`\langle Y_k Y_{k'}\rangle = 0` and :math:`\langle Y_k Y^\ast_{k'}\rangle = \delta_{k,k'}`
     it is easy to see that its auto correlation function will be exactly the approximated auto correlation function.
 
     .. math::
@@ -362,7 +363,7 @@ class StocProc_FFT(_absStocProc):
                                                   tol       = intgr_tol**2,
                                                   ref_val   = 1, 
                                                   max_val   = 1e6, 
-                                                  x0        = 1)
+                                                  x0        = 0.777)
             log.info("upper int bound b {:.3e}".format(b))
             a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
                                                          intgr_tol = intgr_tol,
@@ -382,12 +383,12 @@ class StocProc_FFT(_absStocProc):
                                                   tol       = intgr_tol,
                                                   ref_val   = 1, 
                                                   max_val   = 1e6, 
-                                                  x0        = 1)
+                                                  x0        = 0.777)
             a = method_fft.find_integral_boundary(integrand = spectral_density, 
                                                   tol       = intgr_tol,
                                                   ref_val   = -1, 
                                                   max_val   = 1e6, 
-                                                  x0        = -1)            
+                                                  x0        = -0.777)
             a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
                                                          intgr_tol = intgr_tol,
                                                          intpl_tol = intpl_tol,
@@ -408,8 +409,7 @@ class StocProc_FFT(_absStocProc):
                          seed            = seed,
                          scale           = scale)
         
-        omega = dx*np.arange(N)
-        self.yl = spectral_density(omega + a + dx/2) * dx / np.pi
+        self.yl = spectral_density(dx*np.arange(N) + a + dx/2) * dx / np.pi
         self.yl = np.sqrt(self.yl)
         self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
 

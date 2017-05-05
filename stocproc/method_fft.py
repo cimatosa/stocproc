@@ -46,7 +46,10 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     _i = 0
     x0 = float(x0)
     I_ref = integrand(ref_val)
+    log.debug("find_integral_boundary")
+    log.debug("I_ref: {:.2e} at ref_val: {:.2e}".format(I_ref, ref_val))
     if I_ref < tol:
+        log.debug("I_ref < tol: {:.2e}".format(tol))
         # return find_integral_boundary(integrand = lambda x: 1/integrand(x),
         #                               tol = 1/tol,
         #                               ref_val=ref_val,
@@ -60,16 +63,20 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
             x = ref_val - x0
             try:
                 I_x = integrand(x)
+                assert I_x is not np.nan
             except Exception as e:
                 raise RuntimeError("evaluation of integrand failed due to {}".format(e))
-
+            log.debug("x0: {:.2e} -> x: {:.2e} -> I_x: {:.2e}".format(x0, x, I_x))
             if I_x > tol:
                 break
-            x0 *= 2
+            x0 *= 1.3
             x_old = x
         a = brentq(lambda x: integrand(x) - tol, x_old, x)
+        log.debug("found x_tol: {:.2e} I(x): {:.2}".format(float(a), float(integrand(a))))
+        log.debug("done!")
         return a
     elif I_ref > tol:
+        log.debug("I_ref > tol: {:.2e}".format(tol))
         x_old = ref_val
         while True:
             _i += 1
@@ -78,16 +85,21 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
             x = ref_val + x0
             try:
                 I_x = integrand(x)
+                assert I_x is not np.nan
             except Exception as e:
                 raise RuntimeError("evaluation of integrand failed due to {}".format(e))
-
+            log.debug("x0: {:.2e} -> x: {:.2e} -> I_x: {:.2e}".format(x0, x, I_x))
             if I_x < tol:
                 break
-            x0 *= 2
+            x0 *= 1.3
             x_old = x
         a = brentq(lambda x: integrand(x) - tol, x_old, x)
+        log.debug("found x_tol: {:.2e} I(x): {:.2}".format(a, integrand(a)))
+        log.debug("done!")
         return a
     else:   # I_ref == tol
+        log.debug("I_ref = tol: {:.2e}".format(tol))
+        log.debug("done!")
         return ref_val
 
 def find_integral_boundary_auto(integrand, tol, ref_val=0, max_val=1e6, 
@@ -267,16 +279,16 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
 
             if opt_b_only:
                 a_ = 0
-                b_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=1, max_val=1e6, x0=1)
+                b_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=1, max_val=1e6, x0=0.777)
             else:
-                a_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=-1, max_val=1e6, x0=-1)
-                b_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=1, max_val=1e6, x0=1)
+                a_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=-1, max_val=1e6, x0=-0.777)
+                b_ = find_integral_boundary(integrand, tol=J_w_min, ref_val=1, max_val=1e6, x0=0.777)
 
             tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
             idx = np.where(tau <= t_max)
             ft_ref_tau = ft_ref(tau[idx])
             d = diff_method(ft_ref_tau, ft_tau[idx])
-            log.info("J_w_min:{:.3e} and N {} yields: interval [{:.3e},{:.3e}] -> diff {:.3e}".format(J_w_min, N, a_, b_, d))
+            log.info("J_w_min:{:.2e} N {} yields: interval [{:.2e},{:.2e}] diff {:.2e}".format(J_w_min, N, a_, b_, d))
             if d < tol:
                 log.info("return, cause tol of {} was reached".format(tol))
                 return d, N, a_, b_
@@ -314,9 +326,13 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
         ft_ref_n = ft_ref(tau)
         ft_intp = fcSpline.FCS(x_low = 0, x_high=t_max, y=ft_ref_n[::sub_sampl])
         ft_intp_n = ft_intp(tau)
-        
+
+        ft_ref_0 = abs(ft_ref(0))
+        ft_ref_n /= ft_ref_0
+        ft_intp_n /= ft_ref_0
+
         d = diff_method(ft_intp_n, ft_ref_n)
-        log.info("acc interp N {} dt {:.3e} {:.3e} -> d {:.3e}".format(N, sub_sampl*tau[1], t_max/(N/sub_sampl), d))
+        log.info("acc interp N {} dt {:.2e} -> diff {:.2e}".format(N, sub_sampl*tau[1], d))
         if d < tol:
             return t_max/(N/sub_sampl)
         N*=2
@@ -324,9 +340,16 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
 
 def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_only, N_max = 2**20, diff_method=_absDiff):
     log.info("get_dt_for_accurate_interpolation, please wait ...")
-    c = find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
-                                                   intgr_tol, 1, 1e6, 1)
 
+    try:
+        c = find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
+                                                       intgr_tol, 1, 1e6, 0.777)
+    except RuntimeError:
+        c = t_max
+
+
+
+    c = min(c, t_max)
     dt_tol = get_dt_for_accurate_interpolation(t_max=c,
                                                tol=intpl_tol,
                                                ft_ref=ft_ref,

@@ -425,6 +425,9 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
             t0 = time.time()                                  # efficient way to calculate the auto correlation
             alpha_k = _calc_corr_min_t_plus_t(tfine, corr)    # from -tmax untill tmax on the fine grid
             time_calc_ac += (time.time() - t0)                # needed for integral interpolation
+            alpha_k_is_real = np.isrealobj(alpha_k)
+            if alpha_k_is_real:
+                print("alpha_k is real")
 
         if diff_method == 'full':
             if not is_equi:
@@ -454,7 +457,7 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
                 else:
                     sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(delta_t_fac=ngfac,
                                                                      time_axis=t,
-                                                                     alpha_k=alpha_k,
+                                                                     alpha_k=np.asarray(alpha_k, dtype=np.complex128),
                                                                      weights=w,
                                                                      eigen_val=sqrt_eval,
                                                                      eigen_vec=evec)
@@ -479,7 +482,10 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
             if diff_method == 'random':
                 ui_t = sqrt_lambda_ui_spl(t_rand)
                 ui_s = sqrt_lambda_ui_spl(s_rand)
-                diff += ui_t * np.conj(ui_s)
+                if alpha_k_is_real:
+                    diff += np.real(ui_t * np.conj(ui_s))
+                else:
+                    diff += ui_t * np.conj(ui_s)
             elif diff_method == 'full':
                 ui_super_fine = sqrt_lambda_ui_spl(tsfine)
                 diff += ui_super_fine.reshape(-1, 1) * np.conj(ui_super_fine.reshape(1, -1))
