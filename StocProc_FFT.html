@@ -13,6 +13,8 @@
 
   
   
+  
+  
 
   
 
@@ -45,6 +47,7 @@
 
 <body class="wy-body-for-nav" role="document">
 
+   
   <div class="wy-grid-for-nav">
 
     
@@ -85,7 +88,10 @@
           
             
             
-                <ul class="current">
+              
+            
+            
+              <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="stocproc.html">Stochastic Process Generators</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="stocproc.html#karhunen-loeve-expansion">Karhunen-Loève expansion</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="stocproc.html#fast-fourier-method">Fast-Fourier method</a><ul class="current">
@@ -107,8 +113,10 @@
 
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
-        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="index.html">StocProc</a>
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">StocProc</a>
+        
       </nav>
 
 
@@ -117,25 +125,42 @@
         <div class="rst-content">
           
 
- 
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 <div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-    <li><a href="index.html">Docs</a> &raquo;</li>
-      
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
           <li><a href="stocproc.html">Stochastic Process Generators</a> &raquo;</li>
-      
-    <li>StocProc_FFT</li>
+        
+      <li>StocProc_FFT</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
         
-          
+            
             <a href="_sources/StocProc_FFT.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
@@ -151,12 +176,12 @@
 spectral density <span class="math">\(J(\omega)\)</span>. The integral can be approximated by a discrete integration scheme</p>
 <div class="math">
 \[\alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
-\approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}\]</div>
+\approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} \omega_k \tau}\]</div>
 <p>where the weights <span class="math">\(\omega_k\)</span> depend on the particular integration scheme. For a process defined as</p>
 <div class="math">
 \[Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}\]</div>
 <p>with independent complex random variables <span class="math">\(Y_k\)</span> such that <span class="math">\(\langle Y_k \rangle = 0\)</span>,
-<span class="math">\(\langle Y_k Y_{k'}\rangle = 0\)</span> and <span class="math">\(\langle Y_k Y^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}\)</span>
+<span class="math">\(\langle Y_k Y_{k'}\rangle = 0\)</span> and <span class="math">\(\langle Y_k Y^\ast_{k'}\rangle = \delta_{k,k'}\)</span>
 it is easy to see that its auto correlation function will be exactly the approximated auto correlation function.</p>
 <div class="math">
 \[\begin{split}\begin{align}
@@ -274,15 +299,18 @@ otherwise generate a new set of random numbers.</p>
 
 
            </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="example.html" class="btn btn-neutral float-right" title="Example" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="example.html" class="btn btn-neutral float-right" title="Example" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="StocProc_KLE.html" class="btn btn-neutral" title="StocProc_KLE" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="StocProc_KLE.html" class="btn btn-neutral" title="StocProc_KLE" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -316,13 +344,14 @@ otherwise generate a new set of random numbers.</p>
             VERSION:'0.2.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
         };
     </script>
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

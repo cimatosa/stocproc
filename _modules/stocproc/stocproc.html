@@ -13,6 +13,8 @@
 
   
   
+  
+  
 
   
 
@@ -43,6 +45,7 @@
 
 <body class="wy-body-for-nav" role="document">
 
+   
   <div class="wy-grid-for-nav">
 
     
@@ -83,7 +86,10 @@
           
             
             
-                <ul>
+              
+            
+            
+              <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../stocproc.html">Stochastic Process Generators</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../example.html">Example</a></li>
 </ul>
@@ -98,8 +104,10 @@
 
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
-        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="../../index.html">StocProc</a>
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">StocProc</a>
+        
       </nav>
 
 
@@ -112,19 +120,36 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-    <li><a href="../../index.html">Docs</a> &raquo;</li>
-      
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
           <li><a href="../index.html">Module code</a> &raquo;</li>
-      
-    <li>stocproc.stocproc</li>
+        
+      <li>stocproc.stocproc</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
         
-          
+            
         
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
@@ -288,6 +313,7 @@
         <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="c1">#random complex normal samples</span>
             <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_one_over_sqrt_2</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">get_num_y</span><span class="p">())</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">complex</span><span class="p">)</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calc_scaled_z</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
         <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;proc_cnt:</span><span class="si">{}</span><span class="s2"> new process generated [</span><span class="si">{:.2e}</span><span class="s2">s]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_proc_cnt</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">))</span>
         <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
@@ -422,14 +448,14 @@
 
 <span class="sd">    .. math::</span>
 <span class="sd">        \alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}</span>
-<span class="sd">        \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}</span>
+<span class="sd">        \approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} \omega_k \tau}</span>
 
 <span class="sd">    where the weights :math:`\omega_k` depend on the particular integration scheme. For a process defined as</span>
 
 <span class="sd">    .. math:: Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}</span>
 
 <span class="sd">    with independent complex random variables :math:`Y_k` such that :math:`\langle Y_k \rangle = 0`,</span>
-<span class="sd">    :math:`\langle Y_k Y_{k&#39;}\rangle = 0` and :math:`\langle Y_k Y^\ast_{k&#39;}\rangle = \Delta \omega \delta_{k,k&#39;}`</span>
+<span class="sd">    :math:`\langle Y_k Y_{k&#39;}\rangle = 0` and :math:`\langle Y_k Y^\ast_{k&#39;}\rangle = \delta_{k,k&#39;}`</span>
 <span class="sd">    it is easy to see that its auto correlation function will be exactly the approximated auto correlation function.</span>
 
 <span class="sd">    .. math::</span>
@@ -495,7 +521,7 @@
                                                   <span class="n">tol</span>       <span class="o">=</span> <span class="n">intgr_tol</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
                                                   <span class="n">ref_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
                                                   <span class="n">max_val</span>   <span class="o">=</span> <span class="mf">1e6</span><span class="p">,</span> 
-                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="mf">0.777</span><span class="p">)</span>
             <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;upper int bound b </span><span class="si">{:.3e}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b</span><span class="p">))</span>
             <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dt</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">calc_ab_N_dx_dt</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span>
                                                          <span class="n">intgr_tol</span> <span class="o">=</span> <span class="n">intgr_tol</span><span class="p">,</span>
@@ -515,12 +541,12 @@
                                                   <span class="n">tol</span>       <span class="o">=</span> <span class="n">intgr_tol</span><span class="p">,</span>
                                                   <span class="n">ref_val</span>   <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
                                                   <span class="n">max_val</span>   <span class="o">=</span> <span class="mf">1e6</span><span class="p">,</span> 
-                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="mf">0.777</span><span class="p">)</span>
             <span class="n">a</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">find_integral_boundary</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span> 
                                                   <span class="n">tol</span>       <span class="o">=</span> <span class="n">intgr_tol</span><span class="p">,</span>
                                                   <span class="n">ref_val</span>   <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> 
                                                   <span class="n">max_val</span>   <span class="o">=</span> <span class="mf">1e6</span><span class="p">,</span> 
-                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>            
+                                                  <span class="n">x0</span>        <span class="o">=</span> <span class="o">-</span><span class="mf">0.777</span><span class="p">)</span>
             <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dt</span> <span class="o">=</span> <span class="n">method_fft</span><span class="o">.</span><span class="n">calc_ab_N_dx_dt</span><span class="p">(</span><span class="n">integrand</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">,</span>
                                                          <span class="n">intgr_tol</span> <span class="o">=</span> <span class="n">intgr_tol</span><span class="p">,</span>
                                                          <span class="n">intpl_tol</span> <span class="o">=</span> <span class="n">intpl_tol</span><span class="p">,</span>
@@ -541,8 +567,7 @@
                          <span class="n">seed</span>            <span class="o">=</span> <span class="n">seed</span><span class="p">,</span>
                          <span class="n">scale</span>           <span class="o">=</span> <span class="n">scale</span><span class="p">)</span>
         
-        <span class="n">omega</span> <span class="o">=</span> <span class="n">dx</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">(</span><span class="n">omega</span> <span class="o">+</span> <span class="n">a</span> <span class="o">+</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">spectral_density</span><span class="p">(</span><span class="n">dx</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span> <span class="o">+</span> <span class="n">a</span> <span class="o">+</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">omega_min_correction</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="p">(</span><span class="n">a</span><span class="o">+</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">)</span>   <span class="c1">#self.t is from the parent class</span>
 
@@ -579,6 +604,9 @@
 </pre></div>
 
            </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
           <footer>
   
@@ -612,13 +640,14 @@
             VERSION:'0.2.0',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
         };
     </script>
       <script type="text/javascript" src="../../_static/jquery.js"></script>
       <script type="text/javascript" src="../../_static/underscore.js"></script>
       <script type="text/javascript" src="../../_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 
