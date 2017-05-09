@@ -10,6 +10,7 @@ from __future__ import division, print_function
 #from functools import lru_cache
 import fcSpline
 import logging
+import mpmath
 import numpy as np
 from numpy.fft import rfft as np_rfft
 from scipy.integrate import quad
@@ -130,6 +131,64 @@ def fourier_integral_midpoint(integrand, a, b, N):
     tau = np.arange(len(fft_vals))*delta_k
     #log.debug("yields d_x={:.3e}, d_k={:.3e} kmax={:.3e}".format(delta_x, delta_k, tau[-1]))
     return tau, delta_x*np.exp(-1j*tau*(a+delta_x/2))*fft_vals
+
+def wk(h, k):
+    return float(0.5*mpmath.pi*h*mpmath.cosh(k*h)/(mpmath.cosh(0.5*mpmath.pi*mpmath.sinh(k*h))**2))
+
+def yk(h, k):
+    return float(1 / (mpmath.exp(mpmath.pi / 2 * mpmath.sinh(k * h)) * mpmath.cosh(mpmath.pi / 2 * mpmath.sinh(k * h))))
+
+def fourier_integral_TanhSinh(integrand, w_max, tau, h, kmax):
+    I, feed_back = fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax)
+    return I
+
+def fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax):
+    """
+    
+    integrate from [0, w_max] the function
+    integrand*exp(-1j*w*ti) for ti = dt*n, n in [0, N]
+    
+    w = w_max/2 (x + 1)     # maps the integral from [-1,1] to the integral [a, b]
+    
+    weights_k = (0.5 pi cosh(kh)/(cosh(0.5 pi sinh(kh))**2) = weights_minus_k
+    x_k = 1-y_k = -x_minus_k  
+    y_k = 1/( exp(pi/2 sinh(kh)) cosh(pi/2 np.sinh(kh)))
+    
+    I = sum_k weights_k * (b-a)/2 * (integrand(w(x_k)) + integrand(w(x_minus_k))) 
+    
+    :param integrand: 
+    :param a: 
+    :param b: 
+    :param dt: 
+    :param N: 
+    :return: 
+    """
+    k_list = np.arange(kmax+1)
+    weights_k = [wk(h, ki) for ki in k_list]
+    y_k = [yk(h, ki) for ki in k_list]
+    tmp1 = w_max/2
+    I = []
+    feed_back = "ok"
+    for ti in tau:
+        r = weights_k[0] * integrand(tmp1)*np.exp(-1j*tmp1*ti)
+        for i in range(1, kmax+1):
+            if (y_k[i] * tmp1) == 0:
+                log.debug("y_k is 0")
+                feed_back = "max kmax reached"
+                break
+
+            r_tmp = weights_k[i] * (  integrand(y_k[i] * tmp1)     * np.exp(-1j*y_k[i]     * tmp1*ti)
+                                    + integrand((2-y_k[i]) * tmp1) * np.exp(-1j*(2-y_k[i]) * tmp1*ti))
+            if np.isnan(r_tmp):
+                log.debug("integrand yields nan at {} or {}".format(y_k[i] * tmp1, (2-y_k[i]) * tmp1))
+                feed_back = "integrand nan"
+                break
+            r += r_tmp
+        I.append(tmp1*r)
+
+    return np.asarray(I), feed_back
+
+
 
 def get_fourier_integral_simps_weighted_values(yl):
     N = len(yl)
@@ -338,7 +397,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
         N*=2
 
 
-def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_only, N_max = 2**20, diff_method=_absDiff):
+def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, ft_ref, opt_b_only, diff_method=_absDiff):
     log.info("get_dt_for_accurate_interpolation, please wait ...")
 
     try:
@@ -346,8 +405,6 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
                                                        intgr_tol, 1, 1e6, 0.777)
     except RuntimeError:
         c = t_max
-
-
 
     c = min(c, t_max)
     dt_tol = get_dt_for_accurate_interpolation(t_max=c,
@@ -369,35 +426,30 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, a, b, ft_ref, opt_b_
 
 
     dt = 2*np.pi/dx/N
-    if dt <= dt_tol:
-        log.debug("dt criterion fulfilled")
-        return a, b, N, dx, dt
-    else:
+    if dt > dt_tol:
         log.debug("down scale dx and dt to match new power of 2 N")
 
-    N_min = 2*np.pi/dx/dt_tol
-    N = 2**int(np.ceil(np.log2(N_min)))
-    scale = np.sqrt(N_min/N)
-    dx_new = scale*dx
-    b_minus_a = dx_new*N
-    dt_new = 2*np.pi/dx_new/N
-    assert dt_new < dt_tol
+        N_min = 2*np.pi/dx/dt_tol
+        N = 2**int(np.ceil(np.log2(N_min)))
+        scale = np.sqrt(N_min/N)
+        dx_new = scale*dx
+        b_minus_a = dx_new*N
+        dt_new = 2*np.pi/dx_new/N
+        assert dt_new < dt_tol
 
-    print(a, b)
-    if opt_b_only:
-        b = a + b_minus_a
+        if opt_b_only:
+            b = a + b_minus_a
+        else:
+            delta = b_minus_a - (b-a)
+            b += delta/2
+            a -= delta/2
     else:
-        delta = b_minus_a - (b-a)
-        b += delta/2
-        a -= delta/2
+        dt_new = dt
 
     if dt_new*(N-1) < t_max:
         log.info("increase N to match dt_new*(N-1) < t_max")
         N_tmp = t_max/dt_new + 1
         N = 2 ** int(np.ceil(np.log2(N_tmp)))
         dx_new = 2*np.pi/N/dt_new
-
-        print("dx", dx_new)
-        print("(b-a)/N", (b-a)/N)
 
     return a, b, N, dx_new, dt_new

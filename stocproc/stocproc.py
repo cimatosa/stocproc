@@ -357,50 +357,28 @@ class StocProc_FFT(_absStocProc):
                 
         if not negative_frequencies: 
             log.info("non neg freq only")
-            # assume the spectral_density is 0 for w<0 
-            # and decays fast for large w
-            b = method_fft.find_integral_boundary(integrand = spectral_density, 
-                                                  tol       = intgr_tol**2,
-                                                  ref_val   = 1, 
-                                                  max_val   = 1e6, 
-                                                  x0        = 0.777)
-            log.info("upper int bound b {:.3e}".format(b))
             a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
                                                          intgr_tol = intgr_tol,
                                                          intpl_tol = intpl_tol,
                                                          t_max     = t_max,
-                                                         a         = 0,
-                                                         b         = b,
                                                          ft_ref    = lambda tau:bcf_ref(tau)*np.pi,
-                                                         opt_b_only= True,
-                                                         N_max     = 2**24)
-            log.info("required tol results in N {}".format(N))
+                                                         opt_b_only= True)
         else:
             log.info("use neg freq")
-            # assume the spectral_density is non zero also for w<0 
-            # but decays fast for large |w|
-            b = method_fft.find_integral_boundary(integrand = spectral_density, 
-                                                  tol       = intgr_tol,
-                                                  ref_val   = 1, 
-                                                  max_val   = 1e6, 
-                                                  x0        = 0.777)
-            a = method_fft.find_integral_boundary(integrand = spectral_density, 
-                                                  tol       = intgr_tol,
-                                                  ref_val   = -1, 
-                                                  max_val   = 1e6, 
-                                                  x0        = -0.777)
             a, b, N, dx, dt = method_fft.calc_ab_N_dx_dt(integrand = spectral_density,
                                                          intgr_tol = intgr_tol,
                                                          intpl_tol = intpl_tol,
                                                          t_max     = t_max,
-                                                         a         = a,
-                                                         b         = b,
                                                          ft_ref    = lambda tau:bcf_ref(tau)*np.pi,
-                                                         opt_b_only= False,
-                                                         N_max     = 2**24)
-            log.info("required tol result in N {}".format(N))
+                                                         opt_b_only= False)
 
         assert abs(2*np.pi - N*dx*dt) < 1e-12
+
+        print("Fourier Integral Boundaries: [{:.3e}, {:.3e}]".format(a,b))
+        print("Number of Nodes            : {}".format(N))
+        print("yields dx                  : {:.3e}".format(dx))
+        print("yields dt                  : {:.3e}".format(dt))
+        print("yields t_max               : {:.3e}".format( (N-1)*dt))
 
         num_grid_points = int(np.ceil(t_max/dt))+1
 
@@ -448,3 +426,126 @@ class StocProc_FFT(_absStocProc):
         :math:`t_l < t_\mathrm{max}` from the Fourier Transform
         """
         return len(self.yl)
+
+
+class StocProc_TanhSinh(_absStocProc):
+    r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral  
+    """
+
+    def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
+                 seed=None, negative_frequencies=False, scale=1):
+        self.key = bcf_ref, t_max, intgr_tol, intpl_tol
+
+        if not negative_frequencies:
+            log.info("non neg freq only")
+            log.info("get_dt_for_accurate_interpolation, please wait ...")
+            try:
+                ft_ref = lambda tau: bcf_ref(tau) * np.pi
+                c = method_fft.find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
+                                                      intgr_tol, 1, 1e6, 0.777)
+            except RuntimeError:
+                c = t_max
+
+            c = min(c, t_max)
+            dt_tol = method_fft.get_dt_for_accurate_interpolation(t_max=c,
+                                                                  tol=intpl_tol,
+                                                                  ft_ref=ft_ref)
+            log.info("requires dt < {:.3e}".format(dt_tol))
+        else:
+            raise NotImplementedError
+
+        N = int(np.ceil(t_max/dt_tol))
+        log.info("yields N = {}".format(N))
+
+        wmax = method_fft.find_integral_boundary(spectral_density, tol=intgr_tol/4, ref_val=1, max_val=1e6, x0=0.777)
+
+        h = 0.1
+        k = 15
+        kstep = 5
+        conv_fac = 2
+        old_d = None
+        log.info("find h and kmax for TanhSinh integration ...")
+        while True:
+            tau = np.asarray([t_max])
+            num_FT, fb = method_fft.fourier_integral_TanhSinh_with_feedback(integrand=lambda w: spectral_density(w) / np.pi,
+                                                                            w_max=wmax,
+                                                                            tau=tau,
+                                                                            h=h,
+                                                                            kmax=k)
+            d = np.abs(num_FT - bcf_ref(tau)) / np.abs(bcf_ref(0))
+            if fb == 'ok':
+                k += kstep
+            else:
+                log.info("lowest diff with h {:.3e}: {:.3e} < tol ({:.3e}) -> new h {:.3e}".format(h, d, intgr_tol, h/2))
+                h /= 2
+                k = 15
+                kstep *= 2
+
+                if old_d is None:
+                    old_d = d[0]
+                else:
+                    if old_d < conv_fac * d[0]:
+                        wmax *= 1.5
+                        log.info("convergence factor of {} not met -> inc wmax to {}".format(conv_fac, wmax))
+                        h = 0.1
+                        k = 15
+                        kstep = 5
+                        old_d = None
+                    else:
+                        old_d = d[0]
+
+            if d < intgr_tol:
+                log.info("intgration tolerance met with h {} and kmax {}".format(h, k))
+                break
+
+        tau = np.linspace(0, (N-1)*dt_tol, N)
+        num_FT = method_fft.fourier_integral_TanhSinh(
+            integrand=lambda w: spectral_density(w) / np.pi,
+            w_max=wmax,
+            tau=tau,
+            h=h,
+            kmax=k)
+        d = np.max(np.abs(num_FT - bcf_ref(tau)) / np.abs(bcf_ref(0)))
+        assert d < intgr_tol
+
+        wk = [method_fft.wk(h, ki) for ki in range(1, k+1)]
+        wk = np.hstack((wk[::-1], [method_fft.wk(h, 0)], wk))
+
+        yk = [method_fft.yk(h, ki) for ki in range(1, k+1)]
+
+        tmp1 = wmax / 2
+        #sd = np.hstack((spectral_density(yk * tmp1, ))
+
+
+
+
+        self.yl = wk*spectral_density()
+
+
+
+
+
+
+
+        # assert abs(2 * np.pi - N * dx * dt) < 1e-12
+        #
+        # print("Fourier Integral Boundaries: [{:.3e}, {:.3e}]".format(a, b))
+        # print("Number of Nodes            : {}".format(N))
+        # print("yields dx                  : {:.3e}".format(dx))
+        # print("yields dt                  : {:.3e}".format(dt))
+        # print("yields t_max               : {:.3e}".format((N - 1) * dt))
+        #
+        # num_grid_points = int(np.ceil(t_max / dt)) + 1
+        #
+        # assert num_grid_points <= N
+        #
+        # t_max = (num_grid_points - 1) * dt
+        #
+        # super().__init__(t_max=t_max,
+        #                  num_grid_points=num_grid_points,
+        #                  seed=seed,
+        #                  scale=scale)
+        #
+        # self.yl = spectral_density(dx * np.arange(N) + a + dx / 2) * dx / np.pi
+        # self.yl = np.sqrt(self.yl)
+        # self.omega_min_correction = np.exp(-1j * (a + dx / 2) * self.t)  # self.t is from the parent class
