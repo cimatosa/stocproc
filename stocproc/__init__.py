@@ -59,5 +59,6 @@ if sys.version_info.major < 3:
 try:
     from .stocproc import StocProc_FFT
     from .stocproc import StocProc_KLE
+    from .stocproc import StocProc_TanhSinh
 except ImportError:
     pass

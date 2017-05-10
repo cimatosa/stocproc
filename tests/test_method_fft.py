@@ -378,17 +378,41 @@ def test_calc_abN():
 
 
 
+def test_SP_TanhSinh():
+    s = -0.5
+    wc = 5
+    tmax = 25
 
-    
+    sd = lambda w: w**s*np.exp(-w/wc)
+    bcf = lambda tau: (wc/(1+1j*wc*tau))**(s+1)*gamma_func(s+1)/np.pi
+
+    _sp = sp.StocProc_TanhSinh(spectral_density=sd, t_max=tmax, bcf_ref=bcf, intgr_tol=1e-2, intpl_tol=1e-2, seed=0)
+
+    d_tol = [0.09, 0.05]
+    for j, N in enumerate([1000, 5000]):
+        t = np.linspace(0, tmax, 500)
+        idx = 200
+        c = 0
+        for i in range(N):
+            _sp.new_process()
+            zt = _sp(t)
+            c += zt*np.conj(zt[idx])
+        c /= N
+
+        d = np.max(np.abs(c - bcf(t-t[idx])))
+        print(d)
+        assert d < d_tol[j]
+
     
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     #logging.basicConfig(level=logging.DEBUG)
-    test_find_integral_boundary()
-    test_fourier_integral_finite_boundary()
-    test_fourier_integral_infinite_boundary(plot=False)
-    test_get_N_a_b_for_accurate_fourier_integral()
-    test_get_N_a_b_for_accurate_fourier_integral_b_only()
-    test_get_dt_for_accurate_interpolation()
-    test_sclicing()
-    test_calc_abN()
+    # test_find_integral_boundary()
+    # test_fourier_integral_finite_boundary()
+    # test_fourier_integral_infinite_boundary(plot=False)
+    # test_get_N_a_b_for_accurate_fourier_integral()
+    # test_get_N_a_b_for_accurate_fourier_integral_b_only()
+    # test_get_dt_for_accurate_interpolation()
+    # test_sclicing()
+    # test_calc_abN()
+    test_SP_TanhSinh()

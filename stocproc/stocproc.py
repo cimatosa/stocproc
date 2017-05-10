@@ -462,7 +462,7 @@ class StocProc_TanhSinh(_absStocProc):
         h = 0.1
         k = 15
         kstep = 5
-        conv_fac = 2
+        conv_fac = 1
         old_d = None
         log.info("find h and kmax for TanhSinh integration ...")
         while True:
@@ -476,7 +476,7 @@ class StocProc_TanhSinh(_absStocProc):
             if fb == 'ok':
                 k += kstep
             else:
-                log.info("lowest diff with h {:.3e}: {:.3e} < tol ({:.3e}) -> new h {:.3e}".format(h, d, intgr_tol, h/2))
+                log.info("lowest diff with h {:.3e}: {:.3e} < tol ({:.3e}) -> new h {:.3e}".format(h, d[0], intgr_tol, h/2))
                 h /= 2
                 k = 15
                 kstep *= 2
@@ -511,41 +511,46 @@ class StocProc_TanhSinh(_absStocProc):
         wk = [method_fft.wk(h, ki) for ki in range(1, k+1)]
         wk = np.hstack((wk[::-1], [method_fft.wk(h, 0)], wk))
 
-        yk = [method_fft.yk(h, ki) for ki in range(1, k+1)]
+        yk = np.asarray([method_fft.yk(h, ki) for ki in range(1, k+1)])
+        tmp1 = wmax/2
+        self.omega_k = np.hstack( (yk[::-1] * tmp1, tmp1, (2 - yk) * tmp1))
+        self.fl = np.sqrt(tmp1*wk*spectral_density(self.omega_k)/np.pi)
 
-        tmp1 = wmax / 2
-        #sd = np.hstack((spectral_density(yk * tmp1, ))
-
-
-
-
-        self.yl = wk*spectral_density()
-
-
+        super().__init__(t_max=t_max,
+                         num_grid_points=N,
+                         seed=seed,
+                         scale=scale)
 
 
+    @staticmethod
+    def get_key(t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2):
+        return bcf_ref, t_max, intgr_tol, intpl_tol
 
 
+    def __getstate__(self):
+        return self.fl, self.omega_k, self.num_grid_points, self.t_max, self._seed, self.scale, self.key
 
-        # assert abs(2 * np.pi - N * dx * dt) < 1e-12
-        #
-        # print("Fourier Integral Boundaries: [{:.3e}, {:.3e}]".format(a, b))
-        # print("Number of Nodes            : {}".format(N))
-        # print("yields dx                  : {:.3e}".format(dx))
-        # print("yields dt                  : {:.3e}".format(dt))
-        # print("yields t_max               : {:.3e}".format((N - 1) * dt))
-        #
-        # num_grid_points = int(np.ceil(t_max / dt)) + 1
-        #
-        # assert num_grid_points <= N
-        #
-        # t_max = (num_grid_points - 1) * dt
-        #
-        # super().__init__(t_max=t_max,
-        #                  num_grid_points=num_grid_points,
-        #                  seed=seed,
-        #                  scale=scale)
-        #
-        # self.yl = spectral_density(dx * np.arange(N) + a + dx / 2) * dx / np.pi
-        # self.yl = np.sqrt(self.yl)
-        # self.omega_min_correction = np.exp(-1j * (a + dx / 2) * self.t)  # self.t is from the parent class
+
+    def __setstate__(self, state):
+        self.fl, self.omega_k, num_grid_points, t_max, seed, scale, self.key = state
+        super().__init__(t_max=t_max,
+                         num_grid_points=num_grid_points,
+                         seed=seed,
+                         scale=scale)
+
+
+    def calc_z(self, y):
+        r"""calculate
+    
+        .. math::
+            Z(t_l) = sum_k \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k e^{-\i \omega_k t_l}
+        """
+        z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
+        for i, ti in enumerate(self.t):
+            z[i] = np.sum(self.fl*y*np.exp(-1j*self.omega_k*ti))
+
+        return z
+
+
+    def get_num_y(self):
+        return len(self.fl)

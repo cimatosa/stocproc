@@ -170,7 +170,7 @@ def fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax):
     I = []
     feed_back = "ok"
     for ti in tau:
-        r = weights_k[0] * integrand(tmp1)*np.exp(-1j*tmp1*ti)
+        r = weights_k[0] * integrand(tmp1) * np.exp(-1j * tmp1 * ti)
         for i in range(1, kmax+1):
             if (y_k[i] * tmp1) == 0:
                 log.debug("y_k is 0")
