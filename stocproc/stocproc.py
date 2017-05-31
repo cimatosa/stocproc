@@ -526,10 +526,8 @@ class StocProc_TanhSinh(_absStocProc):
     def get_key(t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2):
         return bcf_ref, t_max, intgr_tol, intpl_tol
 
-
     def __getstate__(self):
         return self.fl, self.omega_k, self.num_grid_points, self.t_max, self._seed, self.scale, self.key
-
 
     def __setstate__(self, state):
         self.fl, self.omega_k, num_grid_points, t_max, seed, scale, self.key = state
@@ -537,7 +535,6 @@ class StocProc_TanhSinh(_absStocProc):
                          num_grid_points=num_grid_points,
                          seed=seed,
                          scale=scale)
-
 
     def calc_z(self, y):
         r"""calculate
@@ -550,7 +547,6 @@ class StocProc_TanhSinh(_absStocProc):
             z[i] = np.sum(self.fl*y*np.exp(-1j*self.omega_k*ti))
 
         return z
-
 
     def get_num_y(self):
         return len(self.fl)

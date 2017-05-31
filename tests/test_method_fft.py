@@ -403,6 +403,46 @@ def test_SP_TanhSinh():
         print(d)
         assert d < d_tol[j]
 
+def sd(w):
+    s = -0.5
+    wc = 5
+    return w**s*np.exp(-w/wc)
+
+def bcf(tau):
+    s = -0.5
+    wc = 5
+    return (wc/(1+1j*wc*tau))**(s+1)*gamma_func(s+1)/np.pi
+
+def test_SP_TanhSinh_dump():
+    tmax = 25
+    _sp = sp.StocProc_TanhSinh(spectral_density=sd, t_max=tmax, bcf_ref=bcf, intgr_tol=1e-2, intpl_tol=1e-2, seed=0)
+
+    t = np.linspace(0, tmax, 500)
+    _sp.new_process()
+    zt = _sp(t)
+    import pickle
+    sp_dump = pickle.dumps(_sp)
+    del _sp
+    _sp2 = pickle.loads(sp_dump)
+
+    _sp2.new_process()
+    zt2 = _sp2(t)
+
+    assert np.all(zt == zt2)
+    N = 1000
+    t = np.linspace(0, tmax, 500)
+    idx = 200
+    c = 0
+    for i in range(N):
+        _sp2.new_process()
+        zt = _sp2(t)
+        c += zt*np.conj(zt[idx])
+    c /= N
+
+    d = np.max(np.abs(c - bcf(t-t[idx])))
+    print(d)
+    assert d < 0.09
+
     
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -415,4 +455,5 @@ if __name__ == "__main__":
     # test_get_dt_for_accurate_interpolation()
     # test_sclicing()
     # test_calc_abN()
-    test_SP_TanhSinh()
+    # test_SP_TanhSinh()
+    test_SP_TanhSinh_dump()
