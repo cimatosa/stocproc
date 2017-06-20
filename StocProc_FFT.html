@@ -176,12 +176,12 @@
 spectral density <span class="math">\(J(\omega)\)</span>. The integral can be approximated by a discrete integration scheme</p>
 <div class="math">
 \[\alpha(\tau) = \int_{\omega_\mathrm{min}}^{\omega_\mathrm{max}} \mathrm{d}\omega \, \frac{J(\omega)}{\pi} e^{-\mathrm{i}\omega \tau}
-\approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} \omega_k \tau}\]</div>
+\approx \sum_{k=0}^{N-1} w_k \frac{J(\omega_k)}{\pi} e^{-\mathrm{i} k \omega_k \tau}\]</div>
 <p>where the weights <span class="math">\(\omega_k\)</span> depend on the particular integration scheme. For a process defined as</p>
 <div class="math">
 \[Z(t) = \sum_{k=0}^{N-1} \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k \exp^{-\mathrm{i}\omega_k t}\]</div>
 <p>with independent complex random variables <span class="math">\(Y_k\)</span> such that <span class="math">\(\langle Y_k \rangle = 0\)</span>,
-<span class="math">\(\langle Y_k Y_{k'}\rangle = 0\)</span> and <span class="math">\(\langle Y_k Y^\ast_{k'}\rangle = \delta_{k,k'}\)</span>
+<span class="math">\(\langle Y_k Y_{k'}\rangle = 0\)</span> and <span class="math">\(\langle Y_k Y^\ast_{k'}\rangle = \Delta \omega \delta_{k,k'}\)</span>
 it is easy to see that its auto correlation function will be exactly the approximated auto correlation function.</p>
 <div class="math">
 \[\begin{split}\begin{align}
@@ -217,13 +217,13 @@ criterion from the interpolation is met.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>spectral_density</strong> &#8211; the spectral density <span class="math">\(J(\omega)\)</span> as callable function object</li>
-<li><strong>t_max</strong> &#8211; <span class="math">\([0,t_\mathrm{max}]\)</span> is the interval for which the process will be calculated</li>
-<li><strong>bcf_ref</strong> &#8211; a callable which evaluates the Fourier integral exactly</li>
-<li><strong>intgr_tol</strong> &#8211; tolerance for the integral approximation</li>
-<li><strong>intpl_tol</strong> &#8211; tolerance for the interpolation</li>
-<li><strong>seed</strong> &#8211; if not None, use this seed to seed the random number generator</li>
-<li><strong>negative_frequencies</strong> &#8211; if False, keep <span class="math">\(\omega_\mathrm{min} = 0\)</span> otherwise
+<li><strong>spectral_density</strong> – the spectral density <span class="math">\(J(\omega)\)</span> as callable function object</li>
+<li><strong>t_max</strong> – <span class="math">\([0,t_\mathrm{max}]\)</span> is the interval for which the process will be calculated</li>
+<li><strong>bcf_ref</strong> – a callable which evaluates the Fourier integral exactly</li>
+<li><strong>intgr_tol</strong> – tolerance for the integral approximation</li>
+<li><strong>intpl_tol</strong> – tolerance for the interpolation</li>
+<li><strong>seed</strong> – if not None, use this seed to seed the random number generator</li>
+<li><strong>negative_frequencies</strong> – if False, keep <span class="math">\(\omega_\mathrm{min} = 0\)</span> otherwise
 find a negative <span class="math">\(\omega_\mathrm{min}\)</span> appropriately just like :math:<a href="#id1"><span class="problematic" id="id2">`</span></a>omega_mathrm{max}</li>
 </ul>
 </td>
@@ -277,8 +277,8 @@ find a negative <span class="math">\(\omega_\mathrm{min}\)</span> appropriately 
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>y</strong> &#8211; independent normal distributed complex valued random variables with <span class="math">\(\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}\)</span></li>
-<li><strong>seed</strong> &#8211; if not None set seed to seed before generating samples</li>
+<li><strong>y</strong> – independent normal distributed complex valued random variables with <span class="math">\(\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}\)</span></li>
+<li><strong>seed</strong> – if not None set seed to seed before generating samples</li>
 </ul>
 </td>
 </tr>

@@ -170,7 +170,7 @@
 <h1>StocProc_KLE<a class="headerlink" href="#stocproc-kle" title="Permalink to this headline">¶</a></h1>
 <dl class="class">
 <dt id="stocproc.StocProc_KLE">
-<em class="property">class </em><code class="descclassname">stocproc.</code><code class="descname">StocProc_KLE</code><span class="sig-paren">(</span><em>r_tau</em>, <em>t_max</em>, <em>tol=0.01</em>, <em>ng_fac=4</em>, <em>meth='fourpoint'</em>, <em>diff_method='full'</em>, <em>dm_random_samples=10000</em>, <em>seed=None</em>, <em>align_eig_vec=False</em>, <em>scale=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">stocproc.</code><code class="descname">StocProc_KLE</code><span class="sig-paren">(</span><em>r_tau</em>, <em>t_max</em>, <em>tol=0.01</em>, <em>ng_fac=4</em>, <em>meth=’fourpoint’</em>, <em>diff_method=’full’</em>, <em>dm_random_samples=10000</em>, <em>seed=None</em>, <em>align_eig_vec=False</em>, <em>scale=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/stocproc.html#StocProc_KLE"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.StocProc_KLE" title="Permalink to this definition">¶</a></dt>
 <dd><p>A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
 The idea is that any stochastic process can be expressed in terms of the KLE</p>
 <div class="math">
@@ -200,21 +200,21 @@ for details).</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>r_tau</strong> &#8211; the idesired auto correlation function of a single parameter tau</li>
-<li><strong>t_max</strong> &#8211; specifies the time interval [0, t_max] for which the processes in generated</li>
-<li><strong>tol</strong> &#8211; maximal deviation of the auto correlation function of the sampled processes from
+<li><strong>r_tau</strong> – the idesired auto correlation function of a single parameter tau</li>
+<li><strong>t_max</strong> – specifies the time interval [0, t_max] for which the processes in generated</li>
+<li><strong>tol</strong> – maximal deviation of the auto correlation function of the sampled processes from
 the given auto correlation r_tau.</li>
-<li><strong>ngfac</strong> &#8211; specifies the fine grid to use for the spline interpolation, the intermediate points are
+<li><strong>ngfac</strong> – specifies the fine grid to use for the spline interpolation, the intermediate points are
 calculated using integral interpolation</li>
-<li><strong>meth</strong> &#8211; the method for calculation integration weights and times, a callable or one of the following strings
-&#8216;midpoint&#8217; (&#8216;midp&#8217;), &#8216;trapezoidal&#8217; (&#8216;trapz&#8217;), &#8216;simpson&#8217; (&#8216;simp&#8217;), &#8216;fourpoint&#8217; (&#8216;fp&#8217;),
-&#8216;gauss_legendre&#8217; (&#8216;gl&#8217;), &#8216;tanh_sinh&#8217; (&#8216;ts&#8217;)</li>
-<li><strong>diff_method</strong> &#8211; either &#8216;full&#8217; or &#8216;random&#8217;, determines the points where the above success criterion is evaluated,
-&#8216;full&#8217;: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
-&#8216;random&#8217;: pick a fixed number of random times t and s within the interval [0, t_max]</li>
-<li><strong>dm_random_samples</strong> &#8211; the number of random times used for diff_method &#8216;random&#8217;</li>
-<li><strong>seed</strong> &#8211; if not None seed the random number generator on init of this class with seed</li>
-<li><strong>align_eig_vec</strong> &#8211; assures that <span class="math">\(re(u_i(0)) \leq 0\)</span> and <span class="math">\(im(u_i(0)) = 0\)</span> for all i</li>
+<li><strong>meth</strong> – the method for calculation integration weights and times, a callable or one of the following strings
+‘midpoint’ (‘midp’), ‘trapezoidal’ (‘trapz’), ‘simpson’ (‘simp’), ‘fourpoint’ (‘fp’),
+‘gauss_legendre’ (‘gl’), ‘tanh_sinh’ (‘ts’)</li>
+<li><strong>diff_method</strong> – either ‘full’ or ‘random’, determines the points where the above success criterion is evaluated,
+‘full’: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
+‘random’: pick a fixed number of random times t and s within the interval [0, t_max]</li>
+<li><strong>dm_random_samples</strong> – the number of random times used for diff_method ‘random’</li>
+<li><strong>seed</strong> – if not None seed the random number generator on init of this class with seed</li>
+<li><strong>align_eig_vec</strong> – assures that <span class="math">\(re(u_i(0)) \leq 0\)</span> and <span class="math">\(im(u_i(0)) = 0\)</span> for all i</li>
 </ul>
 </td>
 </tr>
@@ -240,7 +240,7 @@ diff_method, dm_random_samples can be found at <a class="reference internal" hre
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>t</strong> &#8211; time to evaluate the stochastic process at, float of array of floats, if t is None
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>t</strong> – time to evaluate the stochastic process at, float of array of floats, if t is None
 return the discrete process <span class="math">\(z_k\)</span> which corresponds to the times <span class="math">\(t_k\)</span> given by the
 integration weights method</td>
 </tr>
@@ -291,8 +291,8 @@ to approximate the auto correlation kernel.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>y</strong> &#8211; independent normal distributed complex valued random variables with <span class="math">\(\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}\)</span></li>
-<li><strong>seed</strong> &#8211; if not None set seed to seed before generating samples</li>
+<li><strong>y</strong> – independent normal distributed complex valued random variables with <span class="math">\(\sigma_{ij}^2 = \langle y_i y_j^\ast \rangle = 2 \delta_{ij}\)</span></li>
+<li><strong>seed</strong> – if not None set seed to seed before generating samples</li>
 </ul>
 </td>
 </tr>
@@ -331,8 +331,8 @@ with leads to the equivalent expression:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>r</strong> &#8211; correlation matrix <span class="math">\(R(t_j-s_i)\)</span></li>
-<li><strong>w</strong> &#8211; integrations weights <span class="math">\(w_i\)</span> 
+<li><strong>r</strong> – correlation matrix <span class="math">\(R(t_j-s_i)\)</span></li>
+<li><strong>w</strong> – integrations weights <span class="math">\(w_i\)</span> 
 (they have to correspond to the discrete time <span class="math">\(t_i\)</span>)</li>
 </ul>
 </td>
@@ -356,7 +356,7 @@ to approximate the integral over the interval [0, t_max] using ng points.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">It has been noticed that the performance of the various weights depends on the auto correlation
-function. As default one should use the &#8216;simpson weights&#8217;. &#8216;four point&#8217;, &#8216;gauss legendre&#8217; and &#8216;tanh sinh&#8217;
+function. As default one should use the ‘simpson weights’. ‘four point’, ‘gauss legendre’ and ‘tanh sinh’
 might perform better for auto correlation function that decay slowly. Their advantage becomes evident
 for a large numbers of grid points only. So if one cares about relative differences below 1e-4
 the more sophisticated weights are suitable.</p>
@@ -372,8 +372,8 @@ the more sophisticated weights are suitable.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
-<li><strong>num_grid_points</strong> &#8211; number of grid points N</li>
+<li><strong>t_max</strong> – end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> – number of grid points N</li>
 </ul>
 </td>
 </tr>
@@ -403,8 +403,8 @@ stationary stochastic processes which allows <span class="math">\(\alpha(t_i+\De
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
-<li><strong>num_grid_points</strong> &#8211; number of grid points N</li>
+<li><strong>t_max</strong> – end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> – number of grid points N</li>
 </ul>
 </td>
 </tr>
@@ -431,8 +431,8 @@ stationary stochastic processes which allows <span class="math">\(\alpha(t_i+\De
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
-<li><strong>num_grid_points</strong> &#8211; number of grid points N (needs to be odd)</li>
+<li><strong>t_max</strong> – end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> – number of grid points N (needs to be odd)</li>
 </ul>
 </td>
 </tr>
@@ -460,8 +460,8 @@ stationary stochastic processes which allows <span class="math">\(\alpha(t_i+\De
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
-<li><strong>num_grid_points</strong> &#8211; number of grid points N (needs to be (4k+1) where k is an integer greater 0)</li>
+<li><strong>t_max</strong> – end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> – number of grid points N (needs to be (4k+1) where k is an integer greater 0)</li>
 </ul>
 </td>
 </tr>
@@ -496,8 +496,8 @@ by expanding the function in terms of Legendre Polynomials.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
-<li><strong>num_grid_points</strong> &#8211; number of grid points N</li>
+<li><strong>t_max</strong> – end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> – number of grid points N</li>
 </ul>
 </td>
 </tr>
@@ -517,14 +517,14 @@ transform the integral over a finite interval <span class="math">\(x \in [-1, 1]
 \[x = \tanh(\pi/2 \sinh(t))\]</div>
 <p>to a integral over the entire real axis <span class="math">\(t \in [-\infty,\infty]\)</span> but where the new
 transformed integrand decay rapidly such that a simply midpoint rule performs very well.</p>
-<p>inspired by &#8216;Tanh-Sinh High-Precision Quadrature - David H. Bailey&#8217;</p>
+<p>inspired by ‘Tanh-Sinh High-Precision Quadrature - David H. Bailey’</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>t_max</strong> &#8211; end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
-<li><strong>num_grid_points</strong> &#8211; number of grid points N (needs to be odd)</li>
+<li><strong>t_max</strong> – end of the interval for the time grid <span class="math">\([0,t_\mathrm{max}]\)</span></li>
+<li><strong>num_grid_points</strong> – number of grid points N (needs to be odd)</li>
 </ul>
 </td>
 </tr>
@@ -547,7 +547,7 @@ scaled such that <span class="math">\(x_{-(N-1)/2} = 0\)</span> and <span class=
 
 <dl class="function">
 <dt id="stocproc.method_kle.auto_ng">
-<code class="descclassname">stocproc.method_kle.</code><code class="descname">auto_ng</code><span class="sig-paren">(</span><em>corr</em>, <em>t_max</em>, <em>ngfac=2</em>, <em>meth=&lt;function get_mid_point_weights_times&gt;</em>, <em>tol=0.001</em>, <em>diff_method='full'</em>, <em>dm_random_samples=10000</em>, <em>ret_eigvals=False</em>, <em>relative_difference=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#auto_ng"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.auto_ng" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">stocproc.method_kle.</code><code class="descname">auto_ng</code><span class="sig-paren">(</span><em>corr</em>, <em>t_max</em>, <em>ngfac=2</em>, <em>meth=&lt;function get_mid_point_weights_times&gt;</em>, <em>tol=0.001</em>, <em>diff_method=’full’</em>, <em>dm_random_samples=10000</em>, <em>ret_eigvals=False</em>, <em>relative_difference=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stocproc/method_kle.html#auto_ng"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stocproc.method_kle.auto_ng" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase the number of gridpoints until the desired accuracy is met</p>
 <p>This function increases the number of grid points of the discrete Fredholm equation exponentially until
 a given accuracy is met. The accuracy is determined from the deviation of the approximated
@@ -559,20 +559,20 @@ auto correlation of the Karhunen-Loève expansion from the given reference auto 
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>corr</strong> &#8211; the auto correlation function</li>
-<li><strong>t_max</strong> &#8211; specifies the interval [0, t_max] for which the stochastic process can be evaluated</li>
-<li><strong>ngfac</strong> &#8211; specifies the fine grid to use for the spline interpolation, the intermediate points are
+<li><strong>corr</strong> – the auto correlation function</li>
+<li><strong>t_max</strong> – specifies the interval [0, t_max] for which the stochastic process can be evaluated</li>
+<li><strong>ngfac</strong> – specifies the fine grid to use for the spline interpolation, the intermediate points are
 calculated using integral interpolation</li>
-<li><strong>meth</strong> &#8211; the method for calculation integration weights and times, a callable or one of the following strings
-&#8216;midpoint&#8217; (&#8216;midp&#8217;), &#8216;trapezoidal&#8217; (&#8216;trapz&#8217;), &#8216;simpson&#8217; (&#8216;simp&#8217;), &#8216;fourpoint&#8217; (&#8216;fp&#8217;),
-&#8216;gauss_legendre&#8217; (&#8216;gl&#8217;), &#8216;tanh_sinh&#8217; (&#8216;ts&#8217;)</li>
-<li><strong>tol</strong> &#8211; defines the success criterion max(abs(corr_exact - corr_reconstr)) &lt; tol</li>
-<li><strong>diff_method</strong> &#8211; either &#8216;full&#8217; or &#8216;random&#8217;, determines the points where the above success criterion is evaluated,
-&#8216;full&#8217;: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
-&#8216;random&#8217;: pick a fixed number of random times t and s within the interval [0, t_max]</li>
-<li><strong>dm_random_samples</strong> &#8211; the number of random times used for diff_method &#8216;random&#8217;</li>
-<li><strong>ret_eigvals</strong> &#8211; if True, return also the eigen values</li>
-<li><strong>relative_difference</strong> &#8211; if True, use relative difference instead of absolute</li>
+<li><strong>meth</strong> – the method for calculation integration weights and times, a callable or one of the following strings
+‘midpoint’ (‘midp’), ‘trapezoidal’ (‘trapz’), ‘simpson’ (‘simp’), ‘fourpoint’ (‘fp’),
+‘gauss_legendre’ (‘gl’), ‘tanh_sinh’ (‘ts’)</li>
+<li><strong>tol</strong> – defines the success criterion max(abs(corr_exact - corr_reconstr)) &lt; tol</li>
+<li><strong>diff_method</strong> – either ‘full’ or ‘random’, determines the points where the above success criterion is evaluated,
+‘full’: full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
+‘random’: pick a fixed number of random times t and s within the interval [0, t_max]</li>
+<li><strong>dm_random_samples</strong> – the number of random times used for diff_method ‘random’</li>
+<li><strong>ret_eigvals</strong> – if True, return also the eigen values</li>
+<li><strong>relative_difference</strong> – if True, use relative difference instead of absolute</li>
 </ul>
 </td>
 </tr>
@@ -603,7 +603,7 @@ usefull to set ngfac to 1 which will skip the integral interpolation</p>
 </li>
 <li><p class="first">Use the eigenfunction on the fine grid to setup a cubic spline interpolation.</p>
 </li>
-<li><p class="first">Use the spline interpolation to estimate the deviation <span class="math">\(\Delta(n)\)</span>. When using diff_method = &#8216;full&#8217;
+<li><p class="first">Use the spline interpolation to estimate the deviation <span class="math">\(\Delta(n)\)</span>. When using diff_method = ‘full’
 the maximization is performed over all <span class="math">\(t'_i, s'_j\)</span> where <span class="math">\(t'_i = (t_i + t_{i+1})/2\)</span> and
 <span class="math">\(s'_i = (s_i + s_{i+1})/2\)</span> with <span class="math">\(i,j = 0, \, ...\, , ng_\mathrm{fine}-2\)</span>. It is expected that
 the interpolation error is maximal when beeing in between the reference points.</p>
@@ -611,7 +611,7 @@ the interpolation error is maximal when beeing in between the reference points.<
 <li><p class="first">Now calculate the deviation <span class="math">\(\Delta(n)\)</span> for sequential n starting at n=0. Stop if
 <span class="math">\(\Delta(n) &lt; tol\)</span>. If the deviation does not drop below tol for all <span class="math">\(0 \leq n &lt; ng-1\)</span> increase
 ng as follows <span class="math">\(ng = 2*ng-1\)</span> and start over at 1). (This update scheme for ng asured that ng is odd
-which is needed for the &#8216;simpson&#8217; and &#8216;fourpoint&#8217; integration weights)</p>
+which is needed for the ‘simpson’ and ‘fourpoint’ integration weights)</p>
 </li>
 </ol>
 </dd>
