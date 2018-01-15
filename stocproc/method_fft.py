@@ -445,6 +445,7 @@ def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, ft_ref, opt_b_only, 
             a -= delta/2
     else:
         dt_new = dt
+        dx_new = dx
 
     if dt_new*(N-1) < t_max:
         log.info("increase N to match dt_new*(N-1) < t_max")
