@@ -126,7 +126,7 @@ def fourier_integral_midpoint(integrand, a, b, N):
     #log.debug("integrate over [{:.3e},{:.3e}] using {} points".format(a,b,N))
     delta_x = (b-a)/N
     delta_k = 2*np.pi/(b-a)
-    yl = integrand(np.linspace(a+delta_x/2, b+delta_x/2, N, endpoint=False))  
+    yl = integrand(np.linspace(a+delta_x/2, b+delta_x/2, N, endpoint=False))
     fft_vals = np_rfft(yl)
     tau = np.arange(len(fft_vals))*delta_k
     #log.debug("yields d_x={:.3e}, d_k={:.3e} kmax={:.3e}".format(delta_x, delta_k, tau[-1]))

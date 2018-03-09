@@ -473,6 +473,7 @@ class StocProc_TanhSinh(_absStocProc):
                                                                             h=h,
                                                                             kmax=k)
             d = np.abs(num_FT - bcf_ref(tau)) / np.abs(bcf_ref(0))
+            print("fb", fb, "d", d)
             if fb == 'ok':
                 k += kstep
             else:
@@ -506,7 +507,7 @@ class StocProc_TanhSinh(_absStocProc):
             h=h,
             kmax=k)
         d = np.max(np.abs(num_FT - bcf_ref(tau)) / np.abs(bcf_ref(0)))
-        assert d < intgr_tol
+        assert d < intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
 
         wk = [method_fft.wk(h, ki) for ki in range(1, k+1)]
         wk = np.hstack((wk[::-1], [method_fft.wk(h, 0)], wk))
