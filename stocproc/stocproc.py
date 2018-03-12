@@ -454,68 +454,55 @@ class StocProc_TanhSinh(_absStocProc):
         else:
             raise NotImplementedError
 
-        N = int(np.ceil(t_max/dt_tol))
+        N = int(np.ceil(t_max/dt_tol))+1
         log.info("yields N = {}".format(N))
 
         wmax = method_fft.find_integral_boundary(spectral_density, tol=intgr_tol/4, ref_val=1, max_val=1e6, x0=0.777)
+        log.info("wmax:{}".format(wmax))
 
-        h = 0.1
-        k = 15
-        kstep = 5
-        conv_fac = 1
-        old_d = None
-        log.info("find h and kmax for TanhSinh integration ...")
-        while True:
-            tau = np.asarray([t_max])
-            num_FT, fb = method_fft.fourier_integral_TanhSinh_with_feedback(integrand=lambda w: spectral_density(w) / np.pi,
-                                                                            w_max=wmax,
-                                                                            tau=tau,
-                                                                            h=h,
-                                                                            kmax=k)
-            d = np.abs(num_FT - bcf_ref(tau)) / np.abs(bcf_ref(0))
-            print("fb", fb, "d", d)
-            if fb == 'ok':
-                k += kstep
-            else:
-                log.info("lowest diff with h {:.3e}: {:.3e} < tol ({:.3e}) -> new h {:.3e}".format(h, d[0], intgr_tol, h/2))
-                h /= 2
-                k = 15
-                kstep *= 2
-
-                if old_d is None:
-                    old_d = d[0]
-                else:
-                    if old_d < conv_fac * d[0]:
-                        wmax *= 1.5
-                        log.info("convergence factor of {} not met -> inc wmax to {}".format(conv_fac, wmax))
-                        h = 0.1
-                        k = 15
-                        kstep = 5
-                        old_d = None
-                    else:
-                        old_d = d[0]
-
-            if d < intgr_tol:
-                log.info("intgration tolerance met with h {} and kmax {}".format(h, k))
-                break
+        tau = np.linspace(0, t_max, 35)
+        n = 16
+        d = intgr_tol+1
+        while d > intgr_tol:
+            n *= 2
+            I = method_fft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
+                                                     x_max=wmax,
+                                                     n=n,
+                                                     tau_l=tau)
+            bcf_ref_t = bcf_ref(tau)
+            d = np.abs(bcf_ref_t-I)/abs(bcf_ref_t[0])
+            d = np.max(d)
+            print("n:{} d:{} tol:{}".format(n, d, intgr_tol))
 
         tau = np.linspace(0, (N-1)*dt_tol, N)
-        num_FT = method_fft.fourier_integral_TanhSinh(
-            integrand=lambda w: spectral_density(w) / np.pi,
-            w_max=wmax,
-            tau=tau,
-            h=h,
-            kmax=k)
-        d = np.max(np.abs(num_FT - bcf_ref(tau)) / np.abs(bcf_ref(0)))
-        assert d < intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
+        log.info("perform numeric check of entire time axis [{},{}] n:{}".format(0, (N-1)*dt_tol, N))
+        num_FT = method_fft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
+                                                      x_max=wmax,
+                                                      n=n,
+                                                      tau_l=tau)
 
-        wk = [method_fft.wk(h, ki) for ki in range(1, k+1)]
-        wk = np.hstack((wk[::-1], [method_fft.wk(h, 0)], wk))
+        bcf_ref_t = bcf_ref(tau)
+        d = np.max(np.abs(num_FT - bcf_ref_t) / np.abs(bcf_ref_t[0]))
+        if d > intgr_tol:
+            log.error("numeric check over entire time axis failed")
+            import matplotlib.pyplot as plt
+            plt.plot(tau, num_FT.real, label="ts intr bcf real")
+            plt.plot(tau, num_FT.imag, label="ts intr bcf imag")
 
-        yk = np.asarray([method_fft.yk(h, ki) for ki in range(1, k+1)])
-        tmp1 = wmax/2
-        self.omega_k = np.hstack( (yk[::-1] * tmp1, tmp1, (2 - yk) * tmp1))
-        self.fl = np.sqrt(tmp1*wk*spectral_density(self.omega_k)/np.pi)
+            plt.plot(tau, bcf_ref_t.real, label="bcf ref real")
+            plt.plot(tau, bcf_ref_t.imag, label="bcf ref imag")
+
+            plt.figure()
+            d_tau = np.abs(num_FT - bcf_ref_t) / np.abs(bcf_ref_t[0])
+            plt.plot(tau, d_tau)
+            plt.yscale('log')
+
+            plt.show()
+
+        assert d <= intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
+        yk, wk = method_fft.get_x_w_and_dt(n, wmax)
+        self.omega_k = yk
+        self.fl = np.sqrt(wk*spectral_density(self.omega_k)/np.pi)
 
         super().__init__(t_max=t_max,
                          num_grid_points=N,
@@ -543,11 +530,26 @@ class StocProc_TanhSinh(_absStocProc):
         .. math::
             Z(t_l) = sum_k \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k e^{-\i \omega_k t_l}
         """
-        z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
-        for i, ti in enumerate(self.t):
-            z[i] = np.sum(self.fl*y*np.exp(-1j*self.omega_k*ti))
+        # z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
+        # for i, ti in enumerate(self.t):
+        #     z[i] = np.sum(self.fl*y*np.exp(-1j*self.omega_k*ti))
 
+        tmp1 = self.fl * y
+        tmp2 = -1j * self.omega_k
+        z = np.fromiter(map(lambda ti: np.sum(tmp1 * np.exp(tmp2 * ti)), self.t), dtype=np.complex128)
         return z
+
+    def calc_z_map(self, y):
+        r"""calculate
+
+        .. math::
+            Z(t_l) = sum_k \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k e^{-\i \omega_k t_l}
+        """
+        # z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
+        tmp1 = self.fl * y
+        tmp2 = -1j * self.omega_k
+        z = map(lambda ti: tmp1 * np.exp(tmp2 * ti), self.t)
+        return np.asarray(z)
 
     def get_num_y(self):
         return len(self.fl)

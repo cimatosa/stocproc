@@ -138,55 +138,69 @@ def wk(h, k):
 def yk(h, k):
     return float(1 / (mpmath.exp(mpmath.pi / 2 * mpmath.sinh(k * h)) * mpmath.cosh(mpmath.pi / 2 * mpmath.sinh(k * h))))
 
-def fourier_integral_TanhSinh(integrand, w_max, tau, h, kmax):
-    I, feed_back = fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax)
+# def fourier_integral_TanhSinh(integrand, w_max, tau, h, kmax):
+#     I, feed_back = fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax)
+#     return I
+
+def get_x_w_and_dt(n, x_max):
+    t_l, d_t = np.linspace(-3, 3, n, retstep=True)
+    s_t = np.sinh(t_l) * np.pi / 2
+    x = x_max / 2 / (np.exp(s_t) * np.cosh(s_t))
+    w = x_max / 2 * d_t * np.pi * np.cosh(t_l) / 2 / np.cosh(s_t) ** 2
+    return x, w
+
+
+def fourier_integral_TanhSinh(f, x_max, n, tau_l):
+    _intgr = lambda x, tau: f(x)*np.exp(-1j*x*tau)
+    x, w = get_x_w_and_dt(n, x_max)
+    I = np.asarray([np.sum(_intgr(x, tau) * w) for tau in tau_l])
     return I
 
-def fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax):
-    """
-    
-    integrate from [0, w_max] the function
-    integrand*exp(-1j*w*ti) for ti = dt*n, n in [0, N]
-    
-    w = w_max/2 (x + 1)     # maps the integral from [-1,1] to the integral [a, b]
-    
-    weights_k = (0.5 pi cosh(kh)/(cosh(0.5 pi sinh(kh))**2) = weights_minus_k
-    x_k = 1-y_k = -x_minus_k  
-    y_k = 1/( exp(pi/2 sinh(kh)) cosh(pi/2 np.sinh(kh)))
-    
-    I = sum_k weights_k * (b-a)/2 * (integrand(w(x_k)) + integrand(w(x_minus_k))) 
-    
-    :param integrand: 
-    :param a: 
-    :param b: 
-    :param dt: 
-    :param N: 
-    :return: 
-    """
-    k_list = np.arange(kmax+1)
-    weights_k = [wk(h, ki) for ki in k_list]
-    y_k = [yk(h, ki) for ki in k_list]
-    tmp1 = w_max/2
-    I = []
-    feed_back = "ok"
-    for ti in tau:
-        r = weights_k[0] * integrand(tmp1) * np.exp(-1j * tmp1 * ti)
-        for i in range(1, kmax+1):
-            if (y_k[i] * tmp1) == 0:
-                log.debug("y_k is 0")
-                feed_back = "max kmax reached"
-                break
-
-            r_tmp = weights_k[i] * (  integrand(y_k[i] * tmp1)     * np.exp(-1j*y_k[i]     * tmp1*ti)
-                                    + integrand((2-y_k[i]) * tmp1) * np.exp(-1j*(2-y_k[i]) * tmp1*ti))
-            if np.isnan(r_tmp):
-                log.debug("integrand yields nan at {} or {}".format(y_k[i] * tmp1, (2-y_k[i]) * tmp1))
-                feed_back = "integrand nan"
-                break
-            r += r_tmp
-        I.append(tmp1*r)
-
-    return np.asarray(I), feed_back
+# def fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax):
+#     """
+#
+#     integrate from [0, w_max] the function
+#     integrand*exp(-1j*w*ti) for ti = dt*n, n in [0, N]
+#
+#     w = w_max/2 (x + 1)     # maps the integral from [-1,1] to the integral [a, b]
+#
+#     weights_k = (0.5 pi cosh(kh)/(cosh(0.5 pi sinh(kh))**2) = weights_minus_k
+#     x_k = 1-y_k = -x_minus_k
+#     y_k = 1/( exp(pi/2 sinh(kh)) cosh(pi/2 np.sinh(kh)))
+#
+#     I = sum_k weights_k * (b-a)/2 * (integrand(w(x_k)) + integrand(w(x_minus_k)))
+#
+#     :param integrand:
+#     :param a:
+#     :param b:
+#     :param dt:
+#     :param N:
+#     :return:
+#     """
+#     k_list = np.arange(kmax+1)
+#     weights_k = [wk(h, ki) for ki in k_list]
+#     y_k = [yk(h, ki) for ki in k_list]
+#     tmp1 = w_max/2
+#     I = []
+#     feed_back = "ok"
+#     for ti in tau:
+#         r = weights_k[0] * integrand(tmp1) * np.exp(-1j * tmp1 * ti)
+#         for i in range(1, kmax+1):
+#             if (y_k[i] * tmp1) == 0:
+#                 log.debug("y_k is 0")
+#                 feed_back = "max kmax reached"
+#                 break
+#
+#             r_tmp = weights_k[i] * (  integrand(y_k[i] * tmp1)     * np.exp(-1j*y_k[i]     * tmp1*ti)
+#                                     + integrand((2-y_k[i]) * tmp1) * np.exp(-1j*(2-y_k[i]) * tmp1*ti))
+#             if np.isnan(r_tmp):
+#                 log.debug("integrand yields nan at {} or {}".format(y_k[i] * tmp1, (2-y_k[i]) * tmp1))
+#                 feed_back = "integrand nan"
+#                 break
+#             r += r_tmp
+#         I.append(tmp1*r)
+#
+#     return np.asarray(I), feed_back
 
 
 
@@ -391,7 +405,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
         ft_intp_n /= ft_ref_0
 
         d = diff_method(ft_intp_n, ft_ref_n)
-        log.info("acc interp N {} dt {:.2e} -> diff {:.2e}".format(N, sub_sampl*tau[1], d))
+        log.info("acc interp N {} dt {:.2e} -> diff {:.2e}".format(N+1, sub_sampl*tau[1], d))
         if d < tol:
             return t_max/(N/sub_sampl)
         N*=2
