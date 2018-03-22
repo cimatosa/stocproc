@@ -1,8 +1,6 @@
 """
     The method_fft module provides convenient function to
     setup a stochastic process generator using fft method
-
-
 """
 from __future__ import division, print_function
 
