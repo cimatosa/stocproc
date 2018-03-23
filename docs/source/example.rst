@@ -1,5 +1,5 @@
-Example
-=======
+Full Example
+============
 
 This example sets up a generator for stochastic processes with exponential
 auto correlation. A single process is shown as well as the reconstruction

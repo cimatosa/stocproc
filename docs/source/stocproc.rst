@@ -1,1 +1,0 @@
-.. automodule:: stocproc.stocproc
