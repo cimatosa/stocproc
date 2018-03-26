@@ -217,7 +217,7 @@ class StocProc_KLE(_abcStocProc):
     
     def __init__(self, alpha, t_max, tol=1e-2, ng_fac=4, meth='fourpoint', diff_method='full', dm_random_samples=10**4,
         seed=None, align_eig_vec=False, scale=1):
-        """
+        r"""
         :param r_tau: the idesired auto correlation function of a single parameter tau
         :param t_max: specifies the time interval [0, t_max] for which the processes in generated
         :param tol: maximal deviation of the auto correlation function of the sampled processes from
@@ -342,8 +342,8 @@ class StocProc_FFT(_abcStocProc):
 
     This is ensured by automatically determining the number of sumands N and the integral
     boundaries :math:`\omega_\mathrm{min}` and :math:`\omega_\mathrm{max}` such that
-    discrete Fourier transform of the spectral density matches the desired auto correlation function
-    within the tolerance intgr_tol for all discrete :math:`t_l \in [0, t_{max}]`.
+    discrete Fourier transform of the spectral density matches the preset auto correlation function
+    within the tolerance `intgr_tol` for all discrete :math:`t_l \in [0, t_{max}]`.
 
     As the time continuous process is generated via cubic spline interpolation, the deviation
     due to the interpolation is controlled by the parameter ``intpl_tol``. The maximum time step :math:`\Delta t`
@@ -354,7 +354,7 @@ class StocProc_FFT(_abcStocProc):
     criterion from the interpolation is met.
 
     See :py:func:`stocproc.method_ft.calc_ab_N_dx_dt` for implementation details on how the
-    tolerance criterion are met. Since the pre calculation may become time consuming the :py:class:`StocProc_FFT`
+    tolerance criterion is met. Since the pre calculation may become time consuming the :py:class:`StocProc_FFT`
     class can be pickled and unpickled. To identify a particular instance a unique key is formed by the tuple
     ``(alpha, t_max, intgr_tol, intpl_tol)``.
     It is advisable to use :py:func:`get_key` with keyword arguments to generate such a tuple.
@@ -450,7 +450,7 @@ class StocProc_FFT(_abcStocProc):
 
     def get_num_y(self):
         r"""The number of independent random variables :math:`Y_m` is given by the number of discrete nodes
-        used by the Fast Fourier Transform algorithm. 
+        used by the Fast Fourier Transform algorithm.
         """
         return len(self.yl)
 

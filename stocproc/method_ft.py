@@ -410,11 +410,32 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
 
 
 def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, ft_ref, opt_b_only, diff_method=_absDiff):
+    r"""
+    Calculate the parameters for FFT method such that the error tolerance is met.
+
+    Free parameters are:
+
+        - :math:`\omega_{max}`: the upper bound of the Fourier integral. This parameter has to be large enough
+
+
+    In particular two criterion have to be met.
+
+    1)
+
+    :param integrand:
+    :param intgr_tol:
+    :param intpl_tol:
+    :param t_max:
+    :param ft_ref:
+    :param opt_b_only:
+    :param diff_method:
+    :return:
+    """
     log.info("get_dt_for_accurate_interpolation, please wait ...")
 
     try:
         c = find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
-                                                       intgr_tol, 1, 1e6, 0.777)
+                                   intgr_tol, 1, 1e6, 0.777)
     except RuntimeError:
         c = t_max
 

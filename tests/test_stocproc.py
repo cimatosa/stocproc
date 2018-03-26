@@ -120,7 +120,7 @@ def test_stochastic_process_KLE_correlation_function(plot=False):
     t_max = 15
     num_samples = 2000
     tol = 3e-2
-    stp = sp.StocProc_KLE(tol=1e-2, r_tau=corr, t_max=t_max, ng_fac=4, seed=0)
+    stp = sp.StocProc_KLE(tol=1e-2, alpha=corr, t_max=t_max, ng_fac=4, seed=0)
     stocproc_metatest(stp, num_samples, tol, corr, plot)
 
 
@@ -136,7 +136,7 @@ def test_stochastic_process_FFT_correlation_function(plot=False):
     t_max = 15
     num_samples = 2000
     tol = 3e-2
-    stp = sp.StocProc_FFT(spectral_density=spectral_density, t_max=t_max, bcf_ref=corr, intgr_tol=1e-2, intpl_tol=1e-2,
+    stp = sp.StocProc_FFT(spectral_density=spectral_density, t_max=t_max, alpha=corr, intgr_tol=1e-2, intpl_tol=1e-2,
                           seed=0)
     stocproc_metatest(stp, num_samples, tol, corr, plot)
 
@@ -147,7 +147,7 @@ def test_stocproc_dump_load():
     ##  STOCPROC KLE  ##
     ####################
     t0 = time.time()
-    stp = sp.StocProc_KLE(tol=1e-2, r_tau=corr, t_max=t_max, ng_fac=4, seed=0)
+    stp = sp.StocProc_KLE(tol=1e-2, alpha=corr, t_max=t_max, ng_fac=4, seed=0)
     t1 = time.time()
     dt1 = t1 - t0
     stp.new_process()
@@ -224,16 +224,16 @@ def test_many(plot=False):
     stp = sp.StocProc_FFT(sd, t_max, ac, negative_frequencies=True, seed=0, intgr_tol=5e-3, intpl_tol=5e-3)
     stocproc_metatest(stp, num_samples, tol, ac, plot)
 
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
+    stp = sp.StocProc_KLE(tol=5e-3, alpha=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='simp')
     stocproc_metatest(stp, num_samples, tol, ac, plot)
 
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
+    stp = sp.StocProc_KLE(tol=5e-3, alpha=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='simp')
     stocproc_metatest(stp, num_samples, tol, ac, plot)
 
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
+    stp = sp.StocProc_KLE(tol=5e-3, alpha=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='full', meth='fp')
     stocproc_metatest(stp, num_samples, tol, ac, plot)
 
-    stp = sp.StocProc_KLE(tol=5e-3, r_tau=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
+    stp = sp.StocProc_KLE(tol=5e-3, alpha=ac, t_max=t_max, ng_fac=1, seed=0, diff_method='random', meth='fp')
     stocproc_metatest(stp, num_samples, tol, ac, plot)
 
 def test_pickle_scale():

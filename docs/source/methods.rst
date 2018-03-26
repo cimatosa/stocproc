@@ -35,6 +35,24 @@ For complex valued Gaussian distributed and independent random variables :math:`
 obeys the required statistic. Note, the upper integral limit :math:`T` sets the time interval for which the
 stochastic process :math:`z(t) \; t \in [0,T]` is defined.
 
+In principal the sum is infinite. Nonetheless, a finite subset of summands can be found to yield a very good
+approximation of the preset auto correlations functions.
+Secondly when solving the Fredholm equation numerically, the integral is approximated in terms of a sum with
+integration weights :math:`w_i`,
+which in turn yields a matrix Eigenvalue problem with discrete "Eigenfunctions"
+([NumericalRecipes]_ Chap. 19.1).
+Comparing the preset auto correlation function with the approximate auto correlation function
+using a finite set of :math:`N` discrete Eigenfunctions
+
+.. math:: \sum_{n=1}^N \lambda_n u_n(t) u_n^\ast(s)
+
+where :math:`u_n(t)` is the interpolated discrete Eigenfunction ([NumericalRecipes]_ eq. 19.1.3)
+
+.. math:: u_n(t) = \sum_i \frac{w_i}{\lambda_n} \alpha(t-s_i) u_{n,i}
+
+allows for an error estimation.
+
+
 The KLE approach is implemented by the class :py:class:`stocproc.StocProc_KLE`.
 It is numerically feasible if :math:`T` is not too large in comparision to a typical decay time of the
 auto correlation function.
@@ -69,6 +87,12 @@ For complex valued Gaussian distributed and independent random variables :math:`
 
 obeys the required statistics up to an accuracy of the integral discretization.
 
+To ensure efficient evaluation of the stochastic process the continuous time property is realized only approximately
+by interpolating a pre calculated discrete time process.
+However, the error caused by the cubic spline interpolation can be explicitly controlled
+(usually by the `intpl_tol` parameter). Error values of one percent and below are easily achievable.
+
+
 Fast Fourier Transform (FFT)
 ````````````````````````````
 
@@ -80,3 +104,6 @@ TanhSinh Intgeration (TanhSinh)
 
 For spectral densities :math:`J(\omega)` with a singularity at :math:`\omega=0` the TanhSinh integration
 scheme is more suitable. Such an implementation and its details can be found at :py:class:`stocproc.StocProc_TanhSinh`.
+
+
+.. [NumericalRecipes] Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P., 2007. Numerical Recipes 3rd Edition: The Art of Scientific Computing, Auflage: 3. ed. Cambridge University Press, Cambridge, UK ; New York.

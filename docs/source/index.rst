@@ -2,13 +2,17 @@ StocProc
 ========
 
 The StocProc module is a Python3 module allowing to sample
-Gaussian stochastic processes which are wide-sense stationary,
+Gaussian stochastic processes :math:`z(t)` which are wide-sense stationary,
 continuous in time and complex valued. In particular for a given auto correlation function
-:math:`\alpha(\tau)` the stochastic process :math:`z(t)` obeys.
+:math:`\alpha(\tau)` the stochastic process obeys:
 
 .. math:: \langle z(t) \rangle = 0 \qquad \langle z(t)z(s) \rangle = 0 \qquad \langle z(t)z^\ast(s) \rangle = \alpha(t-s)
 
 Here :math:`\langle \cdot \rangle` denotes the ensemble average.
+
+The so far implemented methods (KLE, FFT, TanhSinh) to generate such processes provide an error control mechanism
+which ensures that the auto correlation function of the numerically generated stochastic processes does correspond
+to the preset auto correlation function :math:`\alpha(\tau)`.
 
 
 Example
@@ -35,9 +39,9 @@ and sample a single realization.
     print("setup process generator")
     stp = sp.StocProc_FFT(spectral_density = lsd,
                           t_max = t_max,
-                          bcf_ref = exp_ac,
-                          intgr_tol=1e-2,
-                          intpl_tol=1e-2):
+                          alpha = exp_ac,
+                          intgr_tol=1e-2,       # integration error control parameter
+                          intpl_tol=1e-2):      # interpolation error control parameter
 
     print("generate single process")
     stp.new_process()

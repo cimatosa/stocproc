@@ -15,8 +15,8 @@ and the classes implementing the ``_abcStocProc`` interface.
    StocProc_KLE
    StocProc_TS
 
-Function on the mudule level
-----------------------------
+Function on mudule level
+------------------------
 
 .. autofunction:: stocproc.loggin_setup
 .. autofunction:: stocproc.version
