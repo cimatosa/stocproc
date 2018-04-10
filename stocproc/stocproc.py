@@ -459,15 +459,15 @@ class StocProc_TanhSinh(_abcStocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral  
     """
 
-    def __init__(self, spectral_density, t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2,
+    def __init__(self, spectral_density, t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2,
                  seed=None, negative_frequencies=False, scale=1):
-        self.key = bcf_ref, t_max, intgr_tol, intpl_tol
+        self.key = alpha, t_max, intgr_tol, intpl_tol
 
         if not negative_frequencies:
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
             try:
-                ft_ref = lambda tau: bcf_ref(tau) * np.pi
+                ft_ref = lambda tau: alpha(tau) * np.pi
                 c = method_ft.find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
                                                       intgr_tol, 1, 1e6, 0.777)
             except RuntimeError:
@@ -475,15 +475,16 @@ class StocProc_TanhSinh(_abcStocProc):
 
             c = min(c, t_max)
             dt_tol = method_ft.get_dt_for_accurate_interpolation(t_max=c,
-                                                                  tol=intpl_tol,
-                                                                  ft_ref=ft_ref)
+                                                                 tol=intpl_tol,
+                                                                 ft_ref=ft_ref)
             log.info("requires dt < {:.3e}".format(dt_tol))
         else:
             raise NotImplementedError
 
         N = int(np.ceil(t_max/dt_tol))+1
-        log.info("yields N = {}".format(N))
+        log.info("yields N = {} (time domain)".format(N))
 
+        log.info("find accurate discretisation in frequency domain")
         wmax = method_ft.find_integral_boundary(spectral_density, tol=intgr_tol/4, ref_val=1, max_val=1e6, x0=0.777)
         log.info("wmax:{}".format(wmax))
 
@@ -493,22 +494,22 @@ class StocProc_TanhSinh(_abcStocProc):
         while d > intgr_tol:
             n *= 2
             I = method_ft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
-                                                     x_max=wmax,
-                                                     n=n,
-                                                     tau_l=tau)
-            bcf_ref_t = bcf_ref(tau)
+                                                    x_max=wmax,
+                                                    n=n,
+                                                    tau_l=tau)
+            bcf_ref_t = alpha(tau)
             d = np.abs(bcf_ref_t-I)/abs(bcf_ref_t[0])
             d = np.max(d)
             print("n:{} d:{} tol:{}".format(n, d, intgr_tol))
 
         tau = np.linspace(0, (N-1)*dt_tol, N)
-        log.info("perform numeric check of entire time axis [{},{}] n:{}".format(0, (N-1)*dt_tol, N))
+        log.info("perform numeric check of entire time axis [{},{}] N:{}".format(0, (N-1)*dt_tol, N))
         num_FT = method_ft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
-                                                      x_max=wmax,
-                                                      n=n,
-                                                      tau_l=tau)
+                                                     x_max=wmax,
+                                                     n=n,
+                                                     tau_l=tau)
 
-        bcf_ref_t = bcf_ref(tau)
+        bcf_ref_t = alpha(tau)
         d = np.max(np.abs(num_FT - bcf_ref_t) / np.abs(bcf_ref_t[0]))
         if d > intgr_tol:
             log.error("numeric check over entire time axis failed")
@@ -538,8 +539,8 @@ class StocProc_TanhSinh(_abcStocProc):
 
 
     @staticmethod
-    def get_key(t_max, bcf_ref, intgr_tol=1e-2, intpl_tol=1e-2):
-        return bcf_ref, t_max, intgr_tol, intpl_tol
+    def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
+        return alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return self.fl, self.omega_k, self.num_grid_points, self.t_max, self._seed, self.scale, self.key

@@ -344,6 +344,7 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
     N_0 = 10
     i = 0
     while True:
+        d_old = None
         for j in range(0, i+1):
             J_w_min = 10**(-(tol_0 + i-j))
             N = 2**(N_0 + j)
@@ -360,6 +361,12 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
             ft_ref_tau = ft_ref(tau[idx])
             d = diff_method(ft_ref_tau, ft_tau[idx])
             log.info("J_w_min:{:.2e} N {} yields: interval [{:.2e},{:.2e}] diff {:.2e}".format(J_w_min, N, a_, b_, d))
+            if d_old is not None and d > d_old:
+                log.info("increasing N while shrinking the interval does lower the error -> try next level")
+                break
+            else:
+                d_old = d
+
             if d < tol:
                 log.info("return, cause tol of {} was reached".format(tol))
                 return d, N, a_, b_
@@ -411,12 +418,24 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
 
 def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, ft_ref, opt_b_only, diff_method=_absDiff):
     r"""
-    Calculate the parameters for FFT method such that the error tolerance is met.
+    Calculate the parameters for the FFT method such that the error tolerance is met.
 
     Free parameters are:
 
-        - :math:`\omega_{max}`: the upper bound of the Fourier integral. This parameter has to be large enough
+        - :math:`\omega_{max}` (here also called b):
+          the improper Fourier integral has to be approximated by a definite integral with upper
+          bound :math:`\omega_{max}`
+        - :math:`\omega_{min}` (here also called a):
+          if `opt_b_only` is `False` also the lower bound has to be chosen such that the
+          improper Fourier integral is well approximated. if `opt_b_only` is `True` the lower bound is
+          fixed at zero.
+        - :math:`N`: the number of nodes used to numerically evaluate the definite integral from
+          :math:`\omega_{min}` to :math:`\omega_{max}`. Increasing :math:`N` lowers the error
+          of the numeric integration scheme.
 
+    Since :math:`\Delta \omega` is determined by the above parameters
+    :math:`\Delta \omega = (\omega_{max}-\omega_{min})/(N-1)`, also the time grid with spacing
+    :math:`\Delta t =  2\pi/(N \Delta\omega)` is fixed by the relation imposed by FFT algorithm.
 
     In particular two criterion have to be met.
 
