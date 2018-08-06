@@ -90,6 +90,7 @@ class _abcStocProc(abc.ABC):
         self._one_over_sqrt_2 = 1/np.sqrt(2)
         self._proc_cnt = 0
         self.scale = scale
+        assert not np.isnan(scale)
         self.sqrt_scale = np.sqrt(self.scale)
         log.debug("init StocProc with t_max {} and {} grid points".format(t_max, num_grid_points))
 
