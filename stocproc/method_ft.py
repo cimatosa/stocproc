@@ -140,17 +140,41 @@ def yk(h, k):
 #     I, feed_back = fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax)
 #     return I
 
-def get_x_w_and_dt(n, x_max):
-    t_l, d_t = np.linspace(-3, 3, n, retstep=True)
+def get_t_max_for_singularity_ts(f, a, b, tol):
+    """
+        chose tmax such that |w_(tmax) I(g(tmax))| < tol
+    """
+    sc = (b-a)/2
+    t_max = 3
+
+    while t_max < 6:
+
+        s_tmax = np.sinh(t_max) * np.pi / 2
+        g_tmax = 1 / (np.exp(s_tmax) * np.cosh(s_tmax))
+        w_tmax = np.pi * np.cosh(t_max) / 2 / np.cosh(s_tmax) ** 2
+        f_x = f(a + sc*g_tmax)
+        tmp = abs(sc * f_x * w_tmax)
+        if tmp < tol:
+            #print("for t_max {} (boundary at singulatigy) error condition fulfilled (err est {} < tol {})".format(t_max, tmp, tol))
+            return t_max
+        else:
+            #print("for t_max {} (boundary at singulatigy) got err est {} >= tol {} -> increase t_max".format(t_max, tmp, tol))
+            pass
+
+        t_max += 0.5
+
+
+def get_x_w_and_dt(n, x_max, t_max):
+    t_l, d_t = np.linspace(-3, t_max, n, retstep=True)
     s_t = np.sinh(t_l) * np.pi / 2
     x = x_max / 2 / (np.exp(s_t) * np.cosh(s_t))
     w = x_max / 2 * d_t * np.pi * np.cosh(t_l) / 2 / np.cosh(s_t) ** 2
     return x, w
 
 
-def fourier_integral_TanhSinh(f, x_max, n, tau_l):
+def fourier_integral_TanhSinh(f, x_max, n, tau_l, t_max_ts):
     _intgr = lambda x, tau: f(x)*np.exp(-1j*x*tau)
-    x, w = get_x_w_and_dt(n, x_max)
+    x, w = get_x_w_and_dt(n, x_max, t_max_ts)
     I = np.asarray([np.sum(_intgr(x, tau) * w) for tau in tau_l])
     return I
 

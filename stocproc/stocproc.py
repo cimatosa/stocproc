@@ -486,8 +486,11 @@ class StocProc_TanhSinh(_abcStocProc):
         log.info("yields N = {} (time domain)".format(N))
 
         log.info("find accurate discretisation in frequency domain")
-        wmax = method_ft.find_integral_boundary(spectral_density, tol=intgr_tol/4, ref_val=1, max_val=1e6, x0=0.777)
+        wmax = method_ft.find_integral_boundary(spectral_density, tol=intgr_tol/10, ref_val=1, max_val=1e6, x0=0.777)
         log.info("wmax:{}".format(wmax))
+
+        t_max_ts = method_ft.get_t_max_for_singularity_ts(lambda w: spectral_density(w)/np.pi,
+                                                          0, wmax, intgr_tol)
 
         tau = np.linspace(0, t_max, 35)
         n = 16
@@ -497,8 +500,10 @@ class StocProc_TanhSinh(_abcStocProc):
             I = method_ft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
                                                     x_max=wmax,
                                                     n=n,
-                                                    tau_l=tau)
+                                                    tau_l=tau,
+                                                    t_max_ts = t_max_ts)
             bcf_ref_t = alpha(tau)
+
             d = np.abs(bcf_ref_t-I)/abs(bcf_ref_t[0])
             d = np.max(d)
             print("n:{} d:{} tol:{}".format(n, d, intgr_tol))
@@ -508,7 +513,8 @@ class StocProc_TanhSinh(_abcStocProc):
         num_FT = method_ft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
                                                      x_max=wmax,
                                                      n=n,
-                                                     tau_l=tau)
+                                                     tau_l=tau,
+                                                     t_max_ts=t_max_ts)
 
         bcf_ref_t = alpha(tau)
         d = np.max(np.abs(num_FT - bcf_ref_t) / np.abs(bcf_ref_t[0]))
@@ -529,7 +535,7 @@ class StocProc_TanhSinh(_abcStocProc):
             plt.show()
 
         assert d <= intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
-        yk, wk = method_ft.get_x_w_and_dt(n, wmax)
+        yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
         self.omega_k = yk
         self.fl = np.sqrt(wk*spectral_density(self.omega_k)/np.pi)
 
