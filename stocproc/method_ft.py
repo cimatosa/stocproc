@@ -365,7 +365,8 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
 
 
     tol_0 = 2
-    N_0 = 10
+    #N_0 = 10
+    N_0 = 5
     i = 0
     while True:
         d_old = None
@@ -420,7 +421,8 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, t_max, tol, ft_ref, opt_b
 
 
 def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
-    N = 32
+    #N = 32
+    N = 4
     sub_sampl = 2
     
     while True:
