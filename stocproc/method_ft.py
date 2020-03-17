@@ -7,8 +7,10 @@ from __future__ import division, print_function
 #from .tools import ComplexInterpolatedUnivariateSpline
 #from functools import lru_cache
 import fcSpline
+from functools import partial
 import logging
 import mpmath
+from multiprocessing import Pool
 import numpy as np
 from numpy.fft import rfft as np_rfft
 from scipy.integrate import quad
@@ -55,20 +57,22 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
         #                               max_val=max_val,
         #                               x0=-x0)
         x_old = ref_val
+        scale = 0.5
+        n = 1
         while True:
             _i += 1
             if _i > _max_num_iteration:
                 raise RuntimeError("max number of iteration reached")
-            x = ref_val - x0
+            x = ref_val*(scale**n)
             try:
                 I_x = integrand(x)
                 assert I_x is not np.nan
             except Exception as e:
                 raise RuntimeError("evaluation of integrand failed due to {}".format(e))
-            log.debug("x0: {:.2e} -> x: {:.2e} -> I_x: {:.2e}".format(x0, x, I_x))
+            log.debug("x_old: {:.2e} -> x: {:.2e} -> I_x: {:.2e}".format(x_old, x, I_x))
             if I_x > tol:
                 break
-            x0 *= 1.3
+            n += 1
             x_old = x
         a = brentq(lambda x: integrand(x) - tol, x_old, x)
         log.debug("found x_tol: {:.2e} I(x): {:.2}".format(float(a), float(integrand(a))))
@@ -171,11 +175,17 @@ def get_x_w_and_dt(n, x_max, t_max):
     w = x_max / 2 * d_t * np.pi * np.cosh(t_l) / 2 / np.cosh(s_t) ** 2
     return x, w
 
+def _fourier_sum(tau, x, w, f):
+    return np.sum(f(x)*np.exp(-1j*x*tau) * w)
+
 
 def fourier_integral_TanhSinh(f, x_max, n, tau_l, t_max_ts):
-    _intgr = lambda x, tau: f(x)*np.exp(-1j*x*tau)
     x, w = get_x_w_and_dt(n, x_max, t_max_ts)
-    I = np.asarray([np.sum(_intgr(x, tau) * w) for tau in tau_l])
+    _f = partial(_fourier_sum, x=x, w=w, f=f)
+    with Pool() as pool:
+        I = pool.map(_f, tau_l)
+
+    I = np.asarray(I)
     return I
 
 # def fourier_integral_TanhSinh_with_feedback(integrand, w_max, tau, h, kmax):
@@ -404,6 +414,7 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, t_max, tol, ft_ref, opt_b
 
     """
     """
+
     if opt_b_only:
         I0 = quad(integrand, 0, np.inf)[0]
     else:
@@ -421,25 +432,38 @@ def get_N_a_b_for_accurate_fourier_integral(integrand, t_max, tol, ft_ref, opt_b
 
 
 def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
-    #N = 32
-    N = 4
-    sub_sampl = 2
-    
+    N = 16
+
+    tau = np.linspace(0, t_max, N + 1)
+    ft_ref_n_old = ft_ref(tau)
+    ft_ref_0 = abs(ft_ref(0))
+
     while True:
-        tau = np.linspace(0, t_max, N+1)
-        ft_ref_n = ft_ref(tau)
-        ft_intp = fcSpline.FCS(x_low = 0, x_high=t_max, y=ft_ref_n[::sub_sampl])
-        ft_intp_n = ft_intp(tau)
+        N *= 2
 
-        ft_ref_0 = abs(ft_ref(0))
-        ft_ref_n /= ft_ref_0
-        ft_intp_n /= ft_ref_0
+        tau = np.linspace(0, t_max, N + 1)
+        ft_ref_n = np.empty(shape=(N+1, ), dtype=np.complex128)
 
-        d = diff_method(ft_intp_n, ft_ref_n)
-        log.info("acc interp N {} dt {:.2e} -> diff {:.2e}".format(N+1, sub_sampl*tau[1], d))
+        ft_ref_n[::2] = ft_ref_n_old
+        with Pool() as pool:
+            ft_ref_n_new = np.asarray(pool.map(ft_ref, tau[1::2]))
+        ft_ref_n[1::2] = ft_ref_n_new
+
+        ft_intp = fcSpline.FCS(x_low = 0, x_high=t_max, y=ft_ref_n_old)
+        with Pool() as pool:
+            ft_intp_n_new = np.asarray(pool.map(ft_intp, tau[1::2]))
+
+
+        ft_ref_n_new /= ft_ref_0
+        ft_intp_n_new /= ft_ref_0
+
+        d = diff_method(ft_intp_n_new, ft_ref_n_new)
+        log.info("acc interp N {} dt {:.2e} -> diff {:.2e}".format(N+1, 2*tau[1], d))
         if d < tol:
-            return t_max/(N/sub_sampl)
-        N*=2
+            return t_max/(N/2)
+
+        ft_ref_n_old = ft_ref_n
+
 
 
 def calc_ab_N_dx_dt(integrand, intgr_tol, intpl_tol, t_max, ft_ref, opt_b_only, diff_method=_absDiff):

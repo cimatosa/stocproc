@@ -1,4 +1,5 @@
 import abc
+from functools import partial
 import numpy as np
 import time
 
@@ -260,7 +261,7 @@ class StocProc_KLE(_abcStocProc):
         if align_eig_vec:
             method_kle.align_eig_vec(sqrt_lambda_ui_fine)
 
-        state = sqrt_lambda_ui_fine, t, seed, scale, key
+        state = sqrt_lambda_ui_fine, t_max, len(t), seed, scale, key
         self.__setstate__(state)
 
     @staticmethod
@@ -281,9 +282,9 @@ class StocProc_KLE(_abcStocProc):
         return self.sqrt_lambda_ui_fine, self.t, self._seed, self.scale, self.key
 
     def __setstate__(self, state):
-        sqrt_lambda_ui_fine, t, seed, scale, self.key = state
+        sqrt_lambda_ui_fine, t_max, num_grid_points,  seed, scale, self.key = state
         num_ev, ng = sqrt_lambda_ui_fine.shape
-        super().__init__(t_axis=t, seed=seed, scale=scale)
+        super().__init__(t_max = t_max, num_grid_points=num_grid_points, seed=seed, scale=scale)
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
@@ -374,14 +375,16 @@ class StocProc_FFT(_abcStocProc):
     def __init__(self, spectral_density, t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2,
                  seed=None, negative_frequencies=False, scale=1):
         self.key = self.get_key(alpha=alpha, t_max=t_max, intgr_tol=intgr_tol, intpl_tol=intpl_tol)
-                
+
+        ft_ref = partial(alpha_times_pi, alpha=alpha)
+
         if not negative_frequencies: 
             log.info("non neg freq only")
             a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(integrand = spectral_density,
                                                         intgr_tol = intgr_tol,
                                                         intpl_tol = intpl_tol,
                                                         t_max     = t_max,
-                                                        ft_ref    = lambda tau:alpha(tau)*np.pi,
+                                                        ft_ref    = ft_ref,
                                                         opt_b_only= True)
         else:
             log.info("use neg freq")
@@ -389,7 +392,7 @@ class StocProc_FFT(_abcStocProc):
                                                         intgr_tol = intgr_tol,
                                                         intpl_tol = intpl_tol,
                                                         t_max     = t_max,
-                                                        ft_ref    = lambda tau:alpha(tau)*np.pi,
+                                                        ft_ref    = ft_ref,
                                                         opt_b_only= False)
 
         d = abs(2*np.pi - N*dx*dt)
@@ -468,7 +471,7 @@ class StocProc_TanhSinh(_abcStocProc):
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
             try:
-                ft_ref = lambda tau: alpha(tau) * np.pi
+                ft_ref = partial(alpha_times_pi, alpha=alpha)
                 c = method_ft.find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
                                                       intgr_tol, 1, 1e6, 0.777)
             except RuntimeError:
@@ -489,7 +492,9 @@ class StocProc_TanhSinh(_abcStocProc):
         wmax = method_ft.find_integral_boundary(spectral_density, tol=intgr_tol/10, ref_val=1, max_val=1e6, x0=0.777)
         log.info("wmax:{}".format(wmax))
 
-        t_max_ts = method_ft.get_t_max_for_singularity_ts(lambda w: spectral_density(w)/np.pi,
+        sd_over_pi = partial(SD_over_pi, J=spectral_density)
+
+        t_max_ts = method_ft.get_t_max_for_singularity_ts(sd_over_pi,
                                                           0, wmax, intgr_tol)
 
         tau = np.linspace(0, t_max, 35)
@@ -497,7 +502,7 @@ class StocProc_TanhSinh(_abcStocProc):
         d = intgr_tol+1
         while d > intgr_tol:
             n *= 2
-            I = method_ft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
+            I = method_ft.fourier_integral_TanhSinh(f = sd_over_pi,
                                                     x_max=wmax,
                                                     n=n,
                                                     tau_l=tau,
@@ -510,7 +515,7 @@ class StocProc_TanhSinh(_abcStocProc):
 
         tau = np.linspace(0, (N-1)*dt_tol, N)
         log.info("perform numeric check of entire time axis [{},{}] N:{}".format(0, (N-1)*dt_tol, N))
-        num_FT = method_ft.fourier_integral_TanhSinh(f = lambda w: spectral_density(w)/np.pi,
+        num_FT = method_ft.fourier_integral_TanhSinh(f = sd_over_pi,
                                                      x_max=wmax,
                                                      n=n,
                                                      tau_l=tau,
@@ -535,6 +540,8 @@ class StocProc_TanhSinh(_abcStocProc):
             plt.show()
 
         assert d <= intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
+        print("done!")
+
         yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
         self.omega_k = yk
         self.fl = np.sqrt(wk*spectral_density(self.omega_k)/np.pi)
@@ -543,7 +550,6 @@ class StocProc_TanhSinh(_abcStocProc):
                          num_grid_points=N,
                          seed=seed,
                          scale=scale)
-
 
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
@@ -588,3 +594,13 @@ class StocProc_TanhSinh(_abcStocProc):
 
     def get_num_y(self):
         return len(self.fl)
+
+
+
+
+def alpha_times_pi(tau, alpha):
+    return alpha(tau) * np.pi
+
+
+def SD_over_pi(w, J):
+    return J(w) / np.pi
