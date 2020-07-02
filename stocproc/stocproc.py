@@ -279,7 +279,7 @@ class StocProc_KLE(_abcStocProc):
         return self.key
 
     def __getstate__(self):
-        return self.sqrt_lambda_ui_fine, self.t, self._seed, self.scale, self.key
+        return self.sqrt_lambda_ui_fine, self.t_max, self.num_grid_points, self._seed, self.scale, self.key
 
     def __setstate__(self, state):
         sqrt_lambda_ui_fine, t_max, num_grid_points,  seed, scale, self.key = state
