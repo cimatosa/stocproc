@@ -1,13 +1,12 @@
 from setuptools import setup
 from Cython.Build import cythonize
 import numpy as np
-from stocproc import version_full
 
 author      = u"Richard Hartmann"
 authors     = [author]
 description = 'Generate continuous time stationary stochastic processes from a given auto correlation function.'
 name        = 'stocproc'
-version = version_full()
+version = '1.0.0'
 
 if __name__ == "__main__":
     setup(
