@@ -29,7 +29,7 @@ if __name__ == "__main__":
             'Topic :: Utilities',
             'Intended Audience :: Researcher'],
         platforms=['ALL'],
-        install_requires=['fcSpline>=0.1'],
+        install_requires=['fcSpline>=0.1', 'numpy>=1.20', 'cython>=0.29', 'scipy>=1.7.1'],
         dependency_links=['https://raw.githubusercontent.com/cimatosa/fcSpline/master/egg/fcSpline-0.1-py3.4-linux-x86_64.egg'],
         ext_modules = cythonize(["stocproc/stocproc_c.pyx"]),
         include_dirs = [np.get_include()],
