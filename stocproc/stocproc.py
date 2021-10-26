@@ -8,13 +8,19 @@ from . import method_ft
 import fcSpline
 
 import logging
+
 log = logging.getLogger(__name__)
 
 sh = logging.StreamHandler()
-sh.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
+sh.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
 
-def loggin_setup(sh_level = logging.INFO, sp_log_level = logging.INFO,
-                 kle_log_level = logging.INFO, ft_log_level = logging.INFO):
+
+def loggin_setup(
+    sh_level=logging.INFO,
+    sp_log_level=logging.INFO,
+    kle_log_level=logging.INFO,
+    ft_log_level=logging.INFO,
+):
     """
     controls the logging levels
 
@@ -37,7 +43,9 @@ def loggin_setup(sh_level = logging.INFO, sp_log_level = logging.INFO,
     method_ft.log.addHandler(sh)
     method_ft.log.setLevel(ft_log_level)
 
+
 loggin_setup()
+
 
 class _abcStocProc(abc.ABC):
     r"""
@@ -78,6 +86,7 @@ class _abcStocProc(abc.ABC):
     Otherwise a ``RuntimeError`` is raised.
 
     """
+
     def __init__(self, t_max=None, num_grid_points=None, seed=None, scale=1):
         self.t_max = t_max
         self.num_grid_points = num_grid_points
@@ -88,12 +97,16 @@ class _abcStocProc(abc.ABC):
         self._seed = seed
         if seed is not None:
             np.random.seed(seed)
-        self._one_over_sqrt_2 = 1/np.sqrt(2)
+        self._one_over_sqrt_2 = 1 / np.sqrt(2)
         self._proc_cnt = 0
         self.scale = scale
         assert not np.isnan(scale)
         self.sqrt_scale = np.sqrt(self.scale)
-        log.debug("init StocProc with t_max {} and {} grid points".format(t_max, num_grid_points))
+        log.debug(
+            "init StocProc with t_max {} and {} grid points".format(
+                t_max, num_grid_points
+            )
+        )
 
     def __call__(self, t=None):
         r"""Evaluates the stochastic process.
@@ -104,7 +117,9 @@ class _abcStocProc(abc.ABC):
         If ``t`` is ``None`` the discrete process :math:`z_n` is returned.
         """
         if self._z is None:
-            raise RuntimeError("StocProc has NO random data, call 'new_process' to generate a new random process")
+            raise RuntimeError(
+                "StocProc has NO random data, call 'new_process' to generate a new random process"
+            )
 
         if t is None:
             return self._z
@@ -122,7 +137,7 @@ class _abcStocProc(abc.ABC):
         :return: the discrete time stochastic process :math:`z_n`, array of complex numbers
         """
         pass
-    
+
     def _calc_scaled_z(self, y):
         r"""scaled the discrete process z with sqrt(scale), such that <z_i z^ast_j> = scale bcf(i,j)"""
         return self.sqrt_scale * self.calc_z(y)
@@ -134,16 +149,16 @@ class _abcStocProc(abc.ABC):
         An implementation needs to return the number :math:`M` of random variables :math:`Y_m` required as
         input for :py:func:`calc_z`.
         """
-        pass        
-    
+        pass
+
     def get_time(self):
         r"""Returns the times :math:`t_n` for which the discrete time stochastic process may be evaluated."""
         return self.t
-    
+
     def get_z(self):
         r"""Returns the discrete time stochastic process :math:`z_n = z(t_n)`."""
         return self._z
-    
+
     def new_process(self, y=None, seed=None):
         r"""Generate a new realization of the stochastic process.
 
@@ -163,18 +178,28 @@ class _abcStocProc(abc.ABC):
             log.info("use fixed seed ({}) for new process".format(seed))
             np.random.seed(seed)
         if y is None:
-            #random complex normal samples
-            y = np.random.normal(scale=self._one_over_sqrt_2, size = 2*self.get_num_y()).view(np.complex)
+            # random complex normal samples
+            y = np.random.normal(
+                scale=self._one_over_sqrt_2, size=2 * self.get_num_y()
+            ).view(np.complex)
         else:
             if len(y) != self.get_num_y():
-                raise RuntimeError("the length of 'y' ({}) needs to be {}".format(len(y), self.get_num_y()))
+                raise RuntimeError(
+                    "the length of 'y' ({}) needs to be {}".format(
+                        len(y), self.get_num_y()
+                    )
+                )
 
         self._z = self._calc_scaled_z(y)
-        log.debug("proc_cnt:{} new process generated [{:.2e}s]".format(self._proc_cnt, time.time() - t0))
+        log.debug(
+            "proc_cnt:{} new process generated [{:.2e}s]".format(
+                self._proc_cnt, time.time() - t0
+            )
+        )
         t0 = time.time()
         self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
         log.debug("created interpolator [{:.2e}s]".format(time.time() - t0))
-        
+
     def set_scale(self, scale):
         r"""
         Set a scalar pre factor for the auto correlation function
@@ -186,39 +211,50 @@ class _abcStocProc(abc.ABC):
 
 class StocProc_KLE(_abcStocProc):
     r"""
-        A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
-        The idea is that any stochastic process can be expressed in terms of the KLE
+    A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
+    The idea is that any stochastic process can be expressed in terms of the KLE
 
-        .. math:: Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)
+    .. math:: Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)
 
-        where :math:`Y_i` and independent complex valued Gaussian random variables with variance one
-        (:math:`\langle Y_i Y_j \rangle = \delta_{ij}`) and :math:`\lambda_i`, :math:`u_i(t)` are
-        eigenvalues / eigenfunctions of the following homogeneous Fredholm equation
+    where :math:`Y_i` and independent complex valued Gaussian random variables with variance one
+    (:math:`\langle Y_i Y_j \rangle = \delta_{ij}`) and :math:`\lambda_i`, :math:`u_i(t)` are
+    eigenvalues / eigenfunctions of the following homogeneous Fredholm equation
 
-        .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)
+    .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)
 
-        for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation of the
-        stocastic processes :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.
+    for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation of the
+    stocastic processes :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.
 
-        For the numeric implementation the integral equation will be discretized
-        (see :py:func:`stocproc.method_kle.solve_hom_fredholm` for details) which leads to a regular matrix
-        eigenvalue problem.
-        The accuracy of the generated  process in terms of its auto correlation function depends on
-        the quality of the eigenvalues and eigenfunction and thus of the number of discritization points.
-        Further for a given threshold there is only a finite number of eigenvalues above that threshold,
-        provided that the number of discritization points is large enough.
+    For the numeric implementation the integral equation will be discretized
+    (see :py:func:`stocproc.method_kle.solve_hom_fredholm` for details) which leads to a regular matrix
+    eigenvalue problem.
+    The accuracy of the generated  process in terms of its auto correlation function depends on
+    the quality of the eigenvalues and eigenfunction and thus of the number of discritization points.
+    Further for a given threshold there is only a finite number of eigenvalues above that threshold,
+    provided that the number of discritization points is large enough.
 
-        Now the property of representing the integral kernel in terms of the eigenfunction
+    Now the property of representing the integral kernel in terms of the eigenfunction
 
-        .. math :: R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s)
+    .. math :: R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s)
 
-        is used to find the number of discritization points and the number of used eigenfunctions such that
-        the sum represents the kernel up to a given tolerance (see :py:func:`stocproc.method_kle.auto_ng`
-        for details).
+    is used to find the number of discritization points and the number of used eigenfunctions such that
+    the sum represents the kernel up to a given tolerance (see :py:func:`stocproc.method_kle.auto_ng`
+    for details).
     """
-    
-    def __init__(self, alpha, t_max, tol=1e-2, ng_fac=4, meth='fourpoint', diff_method='full', dm_random_samples=10**4,
-        seed=None, align_eig_vec=False, scale=1):
+
+    def __init__(
+        self,
+        alpha,
+        t_max,
+        tol=1e-2,
+        ng_fac=4,
+        meth="fourpoint",
+        diff_method="full",
+        dm_random_samples=10 ** 4,
+        seed=None,
+        align_eig_vec=False,
+        scale=1,
+    ):
         r"""
         :param r_tau: the idesired auto correlation function of a single parameter tau
         :param t_max: specifies the time interval [0, t_max] for which the processes in generated
@@ -248,14 +284,16 @@ class StocProc_KLE(_abcStocProc):
            diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
         """
         key = alpha, t_max, tol
-        
-        sqrt_lambda_ui_fine, t = method_kle.auto_ng(corr=alpha,
-                                                    t_max=t_max,
-                                                    ngfac=ng_fac,
-                                                    meth=meth,
-                                                    tol=tol,
-                                                    diff_method=diff_method,
-                                                    dm_random_samples=dm_random_samples)
+
+        sqrt_lambda_ui_fine, t = method_kle.auto_ng(
+            corr=alpha,
+            t_max=t_max,
+            ngfac=ng_fac,
+            meth=meth,
+            tol=tol,
+            diff_method=diff_method,
+            dm_random_samples=dm_random_samples,
+        )
 
         # inplace alignment such that re(ui(0)) >= 0 and im(ui(0)) = 0
         if align_eig_vec:
@@ -267,7 +305,6 @@ class StocProc_KLE(_abcStocProc):
     @staticmethod
     def get_key(r_tau, t_max, tol=1e-2):
         return r_tau, t_max, tol
-        
 
     # def get_key(self):
     #     """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
@@ -279,12 +316,21 @@ class StocProc_KLE(_abcStocProc):
         return self.key
 
     def __getstate__(self):
-        return self.sqrt_lambda_ui_fine, self.t_max, self.num_grid_points, self._seed, self.scale, self.key
+        return (
+            self.sqrt_lambda_ui_fine,
+            self.t_max,
+            self.num_grid_points,
+            self._seed,
+            self.scale,
+            self.key,
+        )
 
     def __setstate__(self, state):
         sqrt_lambda_ui_fine, t_max, num_grid_points, seed, scale, self.key = state
         num_ev, ng = sqrt_lambda_ui_fine.shape
-        super().__init__(t_max = t_max, num_grid_points=num_grid_points, seed=seed, scale=scale)
+        super().__init__(
+            t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
+        )
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
@@ -372,55 +418,74 @@ class StocProc_FFT(_abcStocProc):
        find a negative :math:`\omega_\mathrm{min}` appropriately just like :math:`\omega_\mathrm{max}`
 
     """
-    def __init__(self, spectral_density, t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2,
-                 seed=None, negative_frequencies=False, scale=1):
-        self.key = self.get_key(alpha=alpha, t_max=t_max, intgr_tol=intgr_tol, intpl_tol=intpl_tol)
+
+    def __init__(
+        self,
+        spectral_density,
+        t_max,
+        alpha,
+        intgr_tol=1e-2,
+        intpl_tol=1e-2,
+        seed=None,
+        negative_frequencies=False,
+        scale=1,
+    ):
+        self.key = self.get_key(
+            alpha=alpha, t_max=t_max, intgr_tol=intgr_tol, intpl_tol=intpl_tol
+        )
 
         ft_ref = partial(alpha_times_pi, alpha=alpha)
 
-        if not negative_frequencies: 
+        if not negative_frequencies:
             log.info("non neg freq only")
-            a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(integrand = spectral_density,
-                                                        intgr_tol = intgr_tol,
-                                                        intpl_tol = intpl_tol,
-                                                        t_max     = t_max,
-                                                        ft_ref    = ft_ref,
-                                                        opt_b_only= True)
+            a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(
+                integrand=spectral_density,
+                intgr_tol=intgr_tol,
+                intpl_tol=intpl_tol,
+                t_max=t_max,
+                ft_ref=ft_ref,
+                opt_b_only=True,
+            )
         else:
             log.info("use neg freq")
-            a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(integrand = spectral_density,
-                                                        intgr_tol = intgr_tol,
-                                                        intpl_tol = intpl_tol,
-                                                        t_max     = t_max,
-                                                        ft_ref    = ft_ref,
-                                                        opt_b_only= False)
+            a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(
+                integrand=spectral_density,
+                intgr_tol=intgr_tol,
+                intpl_tol=intpl_tol,
+                t_max=t_max,
+                ft_ref=ft_ref,
+                opt_b_only=False,
+            )
 
-        d = abs(2*np.pi - N*dx*dt)
+        d = abs(2 * np.pi - N * dx * dt)
         if d >= 1e-12:
-            log.fatal('method_ft.calc_ab_N_dx_dt returned inconsistent data!')
-            raise RuntimeError('d = {:.3e} < 1e-12 FAILED!'.format(d))
+            log.fatal("method_ft.calc_ab_N_dx_dt returned inconsistent data!")
+            raise RuntimeError("d = {:.3e} < 1e-12 FAILED!".format(d))
 
-        log.info("Fourier Integral Boundaries: [{:.3e}, {:.3e}]".format(a,b))
+        log.info("Fourier Integral Boundaries: [{:.3e}, {:.3e}]".format(a, b))
         log.info("Number of Nodes            : {}".format(N))
         log.info("yields dx                  : {:.3e}".format(dx))
         log.info("yields dt                  : {:.3e}".format(dt))
-        log.info("yields t_max               : {:.3e}".format( (N-1)*dt))
+        log.info("yields t_max               : {:.3e}".format((N - 1) * dt))
 
-        num_grid_points = int(np.ceil(t_max/dt))+1
+        num_grid_points = int(np.ceil(t_max / dt)) + 1
 
         if num_grid_points > N:
             log.fatal("num_grid_points and number of points used for FFT inconsistent!")
-            raise RuntimeError("num_grid_points = {} <= N_DFT = {}  FAILED!".format(num_grid_points, N))
+            raise RuntimeError(
+                "num_grid_points = {} <= N_DFT = {}  FAILED!".format(num_grid_points, N)
+            )
 
-        t_max = (num_grid_points-1)*dt
-        super().__init__(t_max           = t_max, 
-                         num_grid_points = num_grid_points, 
-                         seed            = seed,
-                         scale           = scale)
-        
-        self.yl = spectral_density(dx*np.arange(N) + a + dx/2) * dx / np.pi
+        t_max = (num_grid_points - 1) * dt
+        super().__init__(
+            t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
+        )
+
+        self.yl = spectral_density(dx * np.arange(N) + a + dx / 2) * dx / np.pi
         self.yl = np.sqrt(self.yl)
-        self.omega_min_correction = np.exp(-1j*(a+dx/2)*self.t)   #self.t is from the parent class
+        self.omega_min_correction = np.exp(
+            -1j * (a + dx / 2) * self.t
+        )  # self.t is from the parent class
 
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
@@ -431,15 +496,30 @@ class StocProc_FFT(_abcStocProc):
         return alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
-        return self.yl, self.num_grid_points, self.omega_min_correction, self.t_max, self._seed, self.scale, self.key
+        return (
+            self.yl,
+            self.num_grid_points,
+            self.omega_min_correction,
+            self.t_max,
+            self._seed,
+            self.scale,
+            self.key,
+        )
 
     def __setstate__(self, state):
-        self.yl, num_grid_points, self.omega_min_correction, t_max, seed, scale, self.key = state
-        super().__init__(t_max           = t_max,
-                         num_grid_points = num_grid_points,
-                         seed            = seed,
-                         scale           = scale)
-            
+        (
+            self.yl,
+            num_grid_points,
+            self.omega_min_correction,
+            t_max,
+            seed,
+            scale,
+            self.key,
+        ) = state
+        super().__init__(
+            t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
+        )
+
     def calc_z(self, y):
         r"""Calculate the discrete time stochastic process using FFT algorithm
 
@@ -449,7 +529,7 @@ class StocProc_FFT(_abcStocProc):
         and return values :math:`z_n` with :math:`t_n <= t_\mathrm{max}`.
         """
         z_fft = np.fft.fft(self.yl * y)
-        z = z_fft[0:self.num_grid_points] * self.omega_min_correction
+        z = z_fft[0 : self.num_grid_points] * self.omega_min_correction
         return z
 
     def get_num_y(self):
@@ -460,11 +540,19 @@ class StocProc_FFT(_abcStocProc):
 
 
 class StocProc_TanhSinh(_abcStocProc):
-    r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral  
-    """
+    r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
 
-    def __init__(self, spectral_density, t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2,
-                 seed=None, negative_frequencies=False, scale=1):
+    def __init__(
+        self,
+        spectral_density,
+        t_max,
+        alpha,
+        intgr_tol=1e-2,
+        intpl_tol=1e-2,
+        seed=None,
+        negative_frequencies=False,
+        scale=1,
+    ):
         self.key = alpha, t_max, intgr_tol, intpl_tol
 
         if not negative_frequencies:
@@ -472,60 +560,69 @@ class StocProc_TanhSinh(_abcStocProc):
             log.info("get_dt_for_accurate_interpolation, please wait ...")
             try:
                 ft_ref = partial(alpha_times_pi, alpha=alpha)
-                c = method_ft.find_integral_boundary(lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
-                                                      intgr_tol, 1, 1e6, 0.777)
+                c = method_ft.find_integral_boundary(
+                    lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
+                    intgr_tol,
+                    1,
+                    1e6,
+                    0.777,
+                )
             except RuntimeError:
                 c = t_max
 
             c = min(c, t_max)
-            dt_tol = method_ft.get_dt_for_accurate_interpolation(t_max=c,
-                                                                 tol=intpl_tol,
-                                                                 ft_ref=ft_ref)
+            dt_tol = method_ft.get_dt_for_accurate_interpolation(
+                t_max=c, tol=intpl_tol, ft_ref=ft_ref
+            )
             log.info("requires dt < {:.3e}".format(dt_tol))
         else:
             raise NotImplementedError
 
-        N = int(np.ceil(t_max/dt_tol))+1
+        N = int(np.ceil(t_max / dt_tol)) + 1
         log.info("yields N = {} (time domain)".format(N))
 
         log.info("find accurate discretisation in frequency domain")
-        wmax = method_ft.find_integral_boundary(spectral_density, tol=intgr_tol/10, ref_val=1, max_val=1e6, x0=0.777)
+        wmax = method_ft.find_integral_boundary(
+            spectral_density, tol=intgr_tol / 10, ref_val=1, max_val=1e6, x0=0.777
+        )
         log.info("wmax:{}".format(wmax))
 
         sd_over_pi = partial(SD_over_pi, J=spectral_density)
 
-        t_max_ts = method_ft.get_t_max_for_singularity_ts(sd_over_pi,
-                                                          0, wmax, intgr_tol)
+        t_max_ts = method_ft.get_t_max_for_singularity_ts(
+            sd_over_pi, 0, wmax, intgr_tol
+        )
 
         tau = np.linspace(0, t_max, 35)
         n = 16
-        d = intgr_tol+1
+        d = intgr_tol + 1
         while d > intgr_tol:
             n *= 2
-            I = method_ft.fourier_integral_TanhSinh(f = sd_over_pi,
-                                                    x_max=wmax,
-                                                    n=n,
-                                                    tau_l=tau,
-                                                    t_max_ts = t_max_ts)
+            I = method_ft.fourier_integral_TanhSinh(
+                f=sd_over_pi, x_max=wmax, n=n, tau_l=tau, t_max_ts=t_max_ts
+            )
             bcf_ref_t = alpha(tau)
 
-            d = np.abs(bcf_ref_t-I)/abs(bcf_ref_t[0])
+            d = np.abs(bcf_ref_t - I) / abs(bcf_ref_t[0])
             d = np.max(d)
             print("n:{} d:{} tol:{}".format(n, d, intgr_tol))
 
-        tau = np.linspace(0, (N-1)*dt_tol, N)
-        log.info("perform numeric check of entire time axis [{},{}] N:{}".format(0, (N-1)*dt_tol, N))
-        num_FT = method_ft.fourier_integral_TanhSinh(f = sd_over_pi,
-                                                     x_max=wmax,
-                                                     n=n,
-                                                     tau_l=tau,
-                                                     t_max_ts=t_max_ts)
+        tau = np.linspace(0, (N - 1) * dt_tol, N)
+        log.info(
+            "perform numeric check of entire time axis [{},{}] N:{}".format(
+                0, (N - 1) * dt_tol, N
+            )
+        )
+        num_FT = method_ft.fourier_integral_TanhSinh(
+            f=sd_over_pi, x_max=wmax, n=n, tau_l=tau, t_max_ts=t_max_ts
+        )
 
         bcf_ref_t = alpha(tau)
         d = np.max(np.abs(num_FT - bcf_ref_t) / np.abs(bcf_ref_t[0]))
         if d > intgr_tol:
             log.error("numeric check over entire time axis failed")
             import matplotlib.pyplot as plt
+
             plt.plot(tau, num_FT.real, label="ts intr bcf real")
             plt.plot(tau, num_FT.imag, label="ts intr bcf imag")
 
@@ -535,7 +632,7 @@ class StocProc_TanhSinh(_abcStocProc):
             plt.figure()
             d_tau = np.abs(num_FT - bcf_ref_t) / np.abs(bcf_ref_t[0])
             plt.plot(tau, d_tau)
-            plt.yscale('log')
+            plt.yscale("log")
 
             plt.show()
 
@@ -544,30 +641,34 @@ class StocProc_TanhSinh(_abcStocProc):
 
         yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
         self.omega_k = yk
-        self.fl = np.sqrt(wk*spectral_density(self.omega_k)/np.pi)
+        self.fl = np.sqrt(wk * spectral_density(self.omega_k) / np.pi)
 
-        super().__init__(t_max=t_max,
-                         num_grid_points=N,
-                         seed=seed,
-                         scale=scale)
+        super().__init__(t_max=t_max, num_grid_points=N, seed=seed, scale=scale)
 
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
         return alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
-        return self.fl, self.omega_k, self.num_grid_points, self.t_max, self._seed, self.scale, self.key
+        return (
+            self.fl,
+            self.omega_k,
+            self.num_grid_points,
+            self.t_max,
+            self._seed,
+            self.scale,
+            self.key,
+        )
 
     def __setstate__(self, state):
         self.fl, self.omega_k, num_grid_points, t_max, seed, scale, self.key = state
-        super().__init__(t_max=t_max,
-                         num_grid_points=num_grid_points,
-                         seed=seed,
-                         scale=scale)
+        super().__init__(
+            t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
+        )
 
     def calc_z(self, y):
         r"""calculate
-    
+
         .. math::
             Z(t_l) = sum_k \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k e^{-\i \omega_k t_l}
         """
@@ -577,7 +678,10 @@ class StocProc_TanhSinh(_abcStocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z = np.fromiter(map(lambda ti: np.sum(tmp1 * np.exp(tmp2 * ti)), self.t), dtype=np.complex128)
+        z = np.fromiter(
+            map(lambda ti: np.sum(tmp1 * np.exp(tmp2 * ti)), self.t),
+            dtype=np.complex128,
+        )
         return z
 
     def calc_z_map(self, y):
@@ -594,8 +698,6 @@ class StocProc_TanhSinh(_abcStocProc):
 
     def get_num_y(self):
         return len(self.fl)
-
-
 
 
 def alpha_times_pi(tau, alpha):
