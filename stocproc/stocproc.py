@@ -47,7 +47,7 @@ def loggin_setup(
 loggin_setup()
 
 
-class _abcStocProc(abc.ABC):
+class StocProc(abc.ABC):
     r"""
     Interface definition for stochastic process implementations
 
@@ -209,7 +209,7 @@ class _abcStocProc(abc.ABC):
         self.sqrt_scale = np.sqrt(scale)
 
 
-class StocProc_KLE(_abcStocProc):
+class StocProc_KLE(StocProc):
     r"""
     A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
     The idea is that any stochastic process can be expressed in terms of the KLE
@@ -345,7 +345,7 @@ class StocProc_KLE(_abcStocProc):
         return self.num_ev
 
 
-class StocProc_FFT(_abcStocProc):
+class StocProc_FFT(StocProc):
     r"""Generate Stochastic Processes using the Fast Fourier Transform (FFT) method
 
     This method uses the relation of the auto correlation function ``alpha`` to the non negative real valued
@@ -539,7 +539,7 @@ class StocProc_FFT(_abcStocProc):
         return len(self.yl)
 
 
-class StocProc_TanhSinh(_abcStocProc):
+class StocProc_TanhSinh(StocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
 
     def __init__(
