@@ -15,7 +15,7 @@ sh = logging.StreamHandler()
 sh.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
 
 
-def loggin_setup(
+def logging_setup(
     sh_level=logging.INFO,
     sp_log_level=logging.INFO,
     kle_log_level=logging.INFO,
@@ -44,7 +44,7 @@ def loggin_setup(
     method_ft.log.setLevel(ft_log_level)
 
 
-loggin_setup()
+logging_setup()
 
 
 class StocProc(abc.ABC):
