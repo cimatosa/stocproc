@@ -1,12 +1,12 @@
 API documentation
 =================
 
-The ``_abcStocProc`` interface definition
+The ``StocProc`` interface definition
 
 .. toctree::
    StocProc_ABC
 
-and the classes implementing the ``_abcStocProc`` interface.
+and the classes implementing the ``StocProc`` interface.
 
 .. toctree::
    :maxdepth: 3

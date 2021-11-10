@@ -51,7 +51,7 @@ class StocProc(abc.ABC):
     r"""
     Interface definition for stochastic process implementations
 
-    A new implementation for a stochastic process generator should subclass :py:class:`_abcStocProc` and
+    A new implementation for a stochastic process generator should subclass :py:class:`StocProc` and
     overwrite :py:func:`calc_z` and :py:func:`get_num_y`.
 
     Depending on the equally spaced times :math:`t_n = n \frac{t_{max}}{N-1}` with :math:`n = 0 \dots N-1`
@@ -63,7 +63,7 @@ class StocProc(abc.ABC):
     :py:func:`get_num_y` needs to return the number :math:`M` of random variables :math:`Y_m` required as
     input for :py:func:`calc_z`.
 
-    Having implemented :py:func:`calc_z` and :py:func:`get_num_y` the :py:class:`_abcStocProc` provides
+    Having implemented :py:func:`calc_z` and :py:func:`get_num_y` the :py:class:`StocProc` provides
     convenient functions such as:
 
         - :py:func:`__call__`: evaluate the stochastic process for any time within the interval
