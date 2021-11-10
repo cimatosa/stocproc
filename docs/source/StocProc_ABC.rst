@@ -2,7 +2,7 @@ Abstract Stochastic Process Class
 ---------------------------------
 
 .. py:currentmodule:: stocproc.stocproc
-.. autoclass:: stocproc.stocproc._abcStocProc
+.. autoclass:: stocproc.stocproc.StocProc
     :members:
 
     .. automethod:: __call__

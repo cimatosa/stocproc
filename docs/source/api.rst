@@ -1,12 +1,12 @@
 API documentation
 =================
 
-The ``_abcStocProc`` interface definition
+The ``StocProc`` interface definition
 
 .. toctree::
    StocProc_ABC
 
-and the classes implementing the ``_abcStocProc`` interface.
+and the classes implementing the ``StocProc`` interface.
 
 .. toctree::
    :maxdepth: 3
@@ -18,7 +18,7 @@ and the classes implementing the ``_abcStocProc`` interface.
 Function on mudule level
 ------------------------
 
-.. autofunction:: stocproc.loggin_setup
+.. autofunction:: stocproc.logging_setup
 .. autofunction:: stocproc.version
 .. autofunction:: stocproc.version_full
 
