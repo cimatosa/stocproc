@@ -18,7 +18,7 @@ and the classes implementing the ``StocProc`` interface.
 Function on mudule level
 ------------------------
 
-.. autofunction:: stocproc.loggin_setup
+.. autofunction:: stocproc.logging_setup
 .. autofunction:: stocproc.version
 .. autofunction:: stocproc.version_full
 
