@@ -159,7 +159,6 @@ class StocProc(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
     def calc_z_dot(self, y):
         r"""*abstract method*
 
