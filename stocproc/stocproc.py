@@ -170,7 +170,8 @@ class StocProc(abc.ABC):
         :return: the derivative of the discrete time stochastic process :math:`z_n`,
                  array of complex numbers
         """
-        pass
+
+        raise NotImplementedError("Derivative not implemented for this method.")
 
     def _calc_scaled_z(self, y):
         r"""
