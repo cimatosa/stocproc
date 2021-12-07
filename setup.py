@@ -6,7 +6,7 @@ author = u"Richard Hartmann"
 authors = [author]
 description = "Generate continuous time stationary stochastic processes from a given auto correlation function."
 name = "stocproc"
-version = "1.0.0"
+version = "1.0.1"
 
 if __name__ == "__main__":
     setup(
@@ -35,7 +35,6 @@ if __name__ == "__main__":
             "numpy>=1.20",
             "scipy>=1.6",
             "mpmath>=1.2.0",
-            "cython",
         ],
         dependency_links=[
             "https://raw.githubusercontent.com/cimatosa/fcSpline/master/egg/fcSpline-0.1-py3.4-linux-x86_64.egg"
