@@ -29,12 +29,17 @@
 
          fcSplinePkg = fcSpline.defaultPackage.${system};
 
-         stocproc = (mach-nix-wrapper.buildPythonPackage {
+         stocproc = (mach-nix-wrapper.buildPythonPackage rec {
            src = ./.;
+           requirements = ''
+            numpy>=1.20
+            scipy>=1.6
+            mpmath>=1.2.0
+            cython
+            '';
            pname = "stocproc";
            version = "1.0.1";
-           requirements = builtins.readFile ./requirements.txt;
-           packagesExtra = [fcSplinePkg];
+           propagatedBuildInputs = [fcSplinePkg];
          });
 
          pythonShell = mach-nix-wrapper.mkPythonShell {
