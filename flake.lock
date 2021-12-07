@@ -7,11 +7,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1638892486,
-        "narHash": "sha256-ANITlGYoZdojaH66wFr1N7JcAs9zuwYlj7m1soWt3js=",
+        "lastModified": 1638901147,
+        "narHash": "sha256-Vk6B3uYU+gAz2Vw//alCepa8Iwva6dWT002v8HX1Rrk=",
         "owner": "vale981",
         "repo": "fcSpline",
-        "rev": "006c24cb2a9428618eb59a957daf3b5e18387775",
+        "rev": "fb28080c8d48235194cf682c2628c22bfab6b555",
         "type": "github"
       },
       "original": {
