@@ -639,7 +639,6 @@ class StocProc_TanhSinh(StocProc):
         calc_deriv=True,
     ):
         self.key = alpha, t_max, intgr_tol, intpl_tol
-        print("IHIONTSHIOENx")
         if not negative_frequencies:
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
