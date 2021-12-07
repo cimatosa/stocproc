@@ -159,7 +159,6 @@ class StocProc(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
     def calc_z_dot(self, y):
         r"""*abstract method*
 
@@ -171,7 +170,8 @@ class StocProc(abc.ABC):
         :return: the derivative of the discrete time stochastic process :math:`z_n`,
                  array of complex numbers
         """
-        pass
+
+        raise NotImplementedError("Derivative not implemented for this method.")
 
     def _calc_scaled_z(self, y):
         r"""
@@ -636,9 +636,9 @@ class StocProc_TanhSinh(StocProc):
         seed=None,
         negative_frequencies=False,
         scale=1,
+        calc_deriv=True,
     ):
         self.key = alpha, t_max, intgr_tol, intpl_tol
-
         if not negative_frequencies:
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
@@ -727,7 +727,13 @@ class StocProc_TanhSinh(StocProc):
         self.omega_k = yk
         self.fl = np.sqrt(wk * spectral_density(self.omega_k) / np.pi)
 
-        super().__init__(t_max=t_max, num_grid_points=N, seed=seed, scale=scale)
+        super().__init__(
+            t_max=t_max,
+            num_grid_points=N,
+            seed=seed,
+            scale=scale,
+            calc_deriv=calc_deriv,
+        )
 
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
@@ -742,12 +748,26 @@ class StocProc_TanhSinh(StocProc):
             self._seed,
             self.scale,
             self.key,
+            self.calc_deriv,
         )
 
     def __setstate__(self, state):
-        self.fl, self.omega_k, num_grid_points, t_max, seed, scale, self.key = state
+        (
+            self.fl,
+            self.omega_k,
+            num_grid_points,
+            t_max,
+            seed,
+            scale,
+            self.key,
+            calc_deriv,
+        ) = state
         super().__init__(
-            t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
+            t_max=t_max,
+            num_grid_points=num_grid_points,
+            seed=seed,
+            scale=scale,
+            calc_deriv=calc_deriv,
         )
 
     def calc_z(self, y):
@@ -762,11 +782,27 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z = np.fromiter(
-            map(lambda ti: np.sum(tmp1 * np.exp(tmp2 * ti)), self.t),
-            dtype=np.complex128,
-        )
+        z = np.sum(tmp1[None, :] * np.exp(tmp2[None, :] * self.t[:, None]), axis=1)
+
         return z
+
+    def calc_z_dot(self, y: np.ndarray) -> np.ndarray:
+        r"""calculate the derivative
+
+        .. math::
+            Z(t_l) = sum_k \sqrt{\frac{w_k J(\omega_k)}{\pi}} (-\i \omega_k) Y_k e^{-\i \omega_k t_l}
+        """
+        # z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
+        # for i, ti in enumerate(self.t):
+        #     z[i] = np.sum(self.fl*y*np.exp(-1j*self.omega_k*ti))
+
+        tmp1 = self.fl * y
+        tmp2 = -1j * self.omega_k
+        z_dot = np.sum(
+            (tmp1 * tmp2)[None, :] * np.exp(tmp2[None, :] * self.t[:, None]), axis=1
+        )
+
+        return z_dot
 
     def calc_z_map(self, y):
         r"""calculate
