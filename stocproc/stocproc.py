@@ -636,7 +636,7 @@ class StocProc_TanhSinh(StocProc):
         seed=None,
         negative_frequencies=False,
         scale=1,
-        calc_deriv=True,
+        calc_deriv=False,
     ):
         self.key = alpha, t_max, intgr_tol, intpl_tol
         if not negative_frequencies:
