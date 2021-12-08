@@ -2,7 +2,7 @@ from scipy.integrate import quad
 from scipy.optimize import bisect
 
 from functools import partial
-from .stocproc_c import auto_correlation as auto_correlation_c
+#from .stocproc_c import auto_correlation as auto_correlation_c
 import sys
 import os
 from warnings import warn
