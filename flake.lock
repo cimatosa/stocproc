@@ -7,11 +7,11 @@
         "poetry2nix": "poetry2nix"
       },
       "locked": {
-        "lastModified": 1638999471,
-        "narHash": "sha256-9sO0Xt9ugukyWaVjhd2kgrdYtPrEIrPU6S2219O8VIg=",
+        "lastModified": 1639000563,
+        "narHash": "sha256-xjIhtpR0XAIGR3tap7tMj1uQnlGpafuv3orUQ2UxE9M=",
         "owner": "vale981",
         "repo": "fcSpline",
-        "rev": "991683bca9161248fff0f0bc7ac8af245cfddf48",
+        "rev": "bd614e2ebd58be8338315c3b0d0999ff0afabff2",
         "type": "github"
       },
       "original": {
