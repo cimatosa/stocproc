@@ -17,7 +17,7 @@
 
           (final: prev:
             let overrides = prev.poetry2nix.overrides.withDefaults
-              (self: super: { });
+              (self: super: { fcspline = fcSpline.defaultPackage.${system}; });
             in
             {
               ${name} = (prev.poetry2nix.mkPoetryApplication {
