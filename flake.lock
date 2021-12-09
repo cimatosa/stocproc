@@ -207,11 +207,11 @@
         "poetry2nix": "poetry2nix_2"
       },
       "locked": {
-        "lastModified": 1639048342,
-        "narHash": "sha256-yCXljSLi+NbnCH3xjXpnAU2sSpVwOADxApKoq2V505Y=",
+        "lastModified": 1639052540,
+        "narHash": "sha256-xe9YsBNBAHtoIeEQpB1wYAVZjAgNp7y5UT7X0Dz2aBw=",
         "owner": "vale981",
         "repo": "hiro-flake-utils",
-        "rev": "f16b44df6316d72ebc5c96cf8af8833dccf3114d",
+        "rev": "a0d6150bc8a4a2a4af78b66b5aa3342f8a9e71b4",
         "type": "github"
       },
       "original": {
