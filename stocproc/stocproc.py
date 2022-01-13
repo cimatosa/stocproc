@@ -95,7 +95,6 @@ class StocProc(abc.ABC):
         self.t_max = t_max
         self.num_grid_points = num_grid_points
         self.t = np.linspace(0, t_max, num_grid_points)
-        self.key = "generic"
         self._z = None
         self._interpolator = None
         self._interpolator_dot = None
@@ -113,6 +112,10 @@ class StocProc(abc.ABC):
                 t_max, num_grid_points
             )
         )
+
+    @abc.abstractproperty
+    def key(self):
+        pass
 
     def __call__(self, t=None):
         r"""Evaluates the stochastic process.
