@@ -92,6 +92,7 @@ class StocProc(abc.ABC):
     def __init__(
         self, t_max=None, num_grid_points=None, seed=None, scale=1, calc_deriv=False
     ):
+        assert self.key
         self.t_max = t_max
         self.num_grid_points = num_grid_points
         self.t = np.linspace(0, t_max, num_grid_points)
@@ -112,10 +113,6 @@ class StocProc(abc.ABC):
                 t_max, num_grid_points
             )
         )
-
-    @abc.abstractproperty
-    def key(self):
-        pass
 
     def __call__(self, t=None):
         r"""Evaluates the stochastic process.
