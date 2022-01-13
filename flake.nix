@@ -10,6 +10,7 @@
   outputs = { self, utils, nixpkgs, ... }:
     (utils.lib.poetry2nixWrapper nixpkgs {
       name = "stocproc";
+      shellPackages = pkgs: with pkgs; [ pyright ];
       poetryArgs = {
         projectDir = ./.;
       };

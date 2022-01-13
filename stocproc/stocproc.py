@@ -359,7 +359,7 @@ class StocProc_KLE(StocProc):
 
     @staticmethod
     def get_key(r_tau, t_max, tol=1e-2):
-        return r_tau, t_max, tol
+        return "kle", r_tau, t_max, tol
 
     # def get_key(self):
     #     """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
@@ -382,6 +382,7 @@ class StocProc_KLE(StocProc):
 
     def __setstate__(self, state):
         sqrt_lambda_ui_fine, t_max, num_grid_points, seed, scale, self.key = state
+        self.key = ("kle", *self.key)
         num_ev, ng = sqrt_lambda_ui_fine.shape
         super().__init__(
             t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
@@ -556,7 +557,7 @@ class StocProc_FFT(StocProc):
         Returns the tuple ``(alpha, t_max, intgr_tol, intpl_tol)`` which uniquely identifies a particular
         :py:class:`StocProc_FFT` instance
         """
-        return alpha, t_max, intgr_tol, intpl_tol
+        return "fft", alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return (
@@ -638,7 +639,7 @@ class StocProc_TanhSinh(StocProc):
         scale=1,
         calc_deriv=False,
     ):
-        self.key = alpha, t_max, intgr_tol, intpl_tol
+        self.key = "ts", alpha, t_max, intgr_tol, intpl_tol
         if not negative_frequencies:
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
@@ -737,7 +738,7 @@ class StocProc_TanhSinh(StocProc):
 
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
-        return alpha, t_max, intgr_tol, intpl_tol
+        return "ts", alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return (
