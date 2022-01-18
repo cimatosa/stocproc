@@ -114,6 +114,9 @@ class StocProc(abc.ABC):
             )
         )
 
+    def __bfkey__(self):
+        return self.key
+
     def __call__(self, t=None):
         r"""Evaluates the stochastic process.
 
@@ -366,9 +369,6 @@ class StocProc_KLE(StocProc):
     #     the StocProc class.
     #     """
     #     return self.key
-
-    def __bfkey__(self):
-        return self.key
 
     def __getstate__(self):
         return (
