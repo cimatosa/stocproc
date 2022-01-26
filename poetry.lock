@@ -68,7 +68,7 @@ scipy = "^1.7.3"
 type = "git"
 url = "https://github.com/vale981/fcSpline"
 reference = "master"
-resolved_reference = "ce8bf7c715bda164987ce8f67b6cfc46e96622ac"
+resolved_reference = "d10ecf2045c5aa8f2a9982ea66109b8c6f0433ca"
 
 [[package]]
 name = "mpmath"
