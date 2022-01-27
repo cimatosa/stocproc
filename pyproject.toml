@@ -1,7 +1,7 @@
 [tool.poetry]
 description = "Generate continuous time stationary stochastic processes from a given auto correlation function."
 name = "stocproc"
-version = "1.0.3"
+version = "1.0.4"
 authors = ["Richard Hartmann <richard.hartmann@tu-dresden.de>"]
 license = "BSD (3 clause)"
 classifiers = [
