@@ -68,7 +68,7 @@ scipy = "^1.7.3"
 type = "git"
 url = "https://github.com/vale981/fcSpline"
 reference = "master"
-resolved_reference = "d10ecf2045c5aa8f2a9982ea66109b8c6f0433ca"
+resolved_reference = "c979361a3e7d3d0eb7f16b99cb58b424156fd788"
 
 [[package]]
 name = "mpmath"
@@ -148,7 +148,7 @@ python-versions = ">=3.6"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.9,<3.11"
-content-hash = "979721bee90031dd60188ca34a606455f0f65e0a7ab655415772c946250ce316"
+content-hash = "592df49b40b8af6ed22690d9e20d62c603498d892df56ccabf9d7869eacb5e1d"
 
 [metadata.files]
 black = [
