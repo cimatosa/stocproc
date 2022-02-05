@@ -533,12 +533,13 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
 
         pool = Pool()
         try:
-            ft_ref_n_new = np.asarray(pool.map(ft_ref, tau[1::2]))
+            ft_ref_n_new = pool.map(ft_ref, tau[1::2])
+
         finally:
             pool.close()
             pool.join()
 
-        ft_ref_n[1::2] = ft_ref_n_new
+        ft_ref_n[1::2] = np.array(ft_ref_n_new)
 
         ft_intp = fcSpline.FCS(x_low=0, x_high=t_max, y=ft_ref_n_old)
 
