@@ -875,28 +875,28 @@ class Cholesky(StocProc):
 
         if not cutoff_sol.success:
             raise RuntimeError(
-                f"Could not find a suitable cutoff time. Scipy says '{cutoff_sol.message}."
+                f"Could not find a suitable cutoff time. Scipy says '{cutoff_sol.message}'."
             )
 
         self.t_chol = np.linspace(
             0,
             cutoff_sol.x[0] * 2,
-            int(((cutoff_sol.x[0]) / intpl_tol) + 1) * 2 + 1,
+            int(((cutoff_sol.x[0]) / intpl_tol) + 1) * 2,
             dtype=np.float128,
         )
 
         mat, tol = self.stable_cholesky(alpha, self.t_chol, max_iterations)
-
+        log.info(f"Achieved a deviation of {tol} in the cholesky decomposition.")
         if mat is None or tol > chol_tol:
             raise RuntimeError(
                 f"The tolerance of {chol_tol} could not be reached. We got as far as {tol}."
             )
 
-        self.chol_matrix: NDArray[np.complex128] = mat[1:, 1:]
+        self.chol_matrix: NDArray[np.complex128] = mat
         if calc_deriv:
-            self.chol_deriv = np.gradient(mat, self.t, axis=0)[1:, 1:]
+            self.chol_deriv = np.gradient(mat, self.t, axis=0)
 
-        self.t_chol = self.t_chol[1:]
+        self.t_chol = self.t_chol
 
         self.chunk_size = len(self.t_chol) // 2
 
@@ -905,7 +905,6 @@ class Cholesky(StocProc):
         )
 
         self.num_chunks = int(len(self.t) / self.chunk_size) + 1
-        breakpoint()
 
     @staticmethod
     def stable_cholesky(
@@ -921,7 +920,7 @@ class Cholesky(StocProc):
         L = None
         reversed = False
         for _ in range(max_iterations):
-            log.info(f"Trying ε={eps}.")
+            log.debug(f"Trying ε={eps}.")
             try:
                 L = scipy.linalg.cholesky(Σ + eps * eye, lower=True, check_finite=False)
 
@@ -935,7 +934,7 @@ class Cholesky(StocProc):
                     eps = starteps or np.finfo(np.float64).eps * 4
                 else:
                     eps = eps * 2
-                    reverse = True
+                    reversed = True
 
         return L, (np.max(np.abs((L @ L.T.conj() - Σ) / Σ)) if L is not None else -1)
 
