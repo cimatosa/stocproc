@@ -533,7 +533,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
 
         pool = Pool()
         try:
-            ft_ref_n_new = pool.map(ft_ref, tau[1::2])
+            ft_ref_n_new = np.asarray(pool.map(ft_ref, tau[1::2]))
 
         finally:
             pool.close()
