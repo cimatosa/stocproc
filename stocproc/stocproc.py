@@ -787,7 +787,9 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z = np.sum(tmp1[None, :] * np.exp(tmp2[None, :] * self.t[:, None]), axis=1)
+        z = np.fromiter(
+            (np.sum(tmp1 * np.exp(tmp2 * t)) for t in self.t), dtype=tmp2.dtype
+        )
 
         return z
 
@@ -803,8 +805,10 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z_dot = np.sum(
-            (tmp1 * tmp2)[None, :] * np.exp(tmp2[None, :] * self.t[:, None]), axis=1
+
+        pre = tmp1 * tmp2
+        z_dot = np.fromiter(
+            (np.sum(pre * np.exp(tmp2 * t)) for t in self.t), dtype=tmp2.dtype
         )
 
         return z_dot
