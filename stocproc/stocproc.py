@@ -694,7 +694,7 @@ class StocProc_TanhSinh(StocProc):
 
             d = np.abs(bcf_ref_t - I) / abs(bcf_ref_t[0])
             d = np.max(d)
-            print("n:{} d:{} tol:{}".format(n, d, intgr_tol))
+            log.info("n:{} d:{} tol:{}".format(n, d, intgr_tol))
 
         tau = np.linspace(0, (N - 1) * dt_tol, N)
         log.info(
@@ -726,7 +726,7 @@ class StocProc_TanhSinh(StocProc):
             plt.show()
 
         assert d <= intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
-        print("done!")
+        log.info("done!")
 
         yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
         self.omega_k = yk
