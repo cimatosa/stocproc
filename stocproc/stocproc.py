@@ -7,6 +7,10 @@ from collections.abc import Callable
 import scipy.linalg
 import scipy.optimize
 import time
+import pickle
+import hashlib
+import pathlib
+import tempfile
 
 from . import method_kle
 from . import method_ft
@@ -57,7 +61,9 @@ class StocProc(abc.ABC):
     Interface definition for stochastic process implementations
 
     A new implementation for a stochastic process generator should subclass :py:class:`StocProc` and
-    overwrite :py:func:`calc_z` and :py:func:`get_num_y`.
+    overwrite :py:func:`calc_z` and :py:func:`get_num_y`, as well as :any:`__post_init__` for initialization.
+    If the class variable :any:`_use_cach` is set to :any:`True`, then the implementation will be cached.
+    For this to work, the :any:`__getstate__` and :any:`__setstate__` methods should be properly implemented.
 
     Depending on the equally spaced times :math:`t_n = n \frac{t_{max}}{N-1}` with :math:`n = 0 \dots N-1`
     (:math:`N` = number of grid points),
@@ -86,17 +92,33 @@ class StocProc(abc.ABC):
     :param t_axis: an explicit definition of times t_k (may be non equidistant)
     :param scale: passes ``scale`` to :py:func:`set_scale`
     :param calc_deriv: whether to calculate the derivative of the stochastic process
+    :param invalidate_cache: ignore whether the instance has been cached and overwrite the cache
 
     Note: :py:func:`new_process` is **not** called on init. If you want to evaluate a particular
     realization of the stocastic process, a new sample needs to be drawn by calling :py:func:`new_process`.
     Otherwise a ``RuntimeError`` is raised.
 
     """
+    _use_cache = False
 
-    def __init__(
+    def __init__(self, *args, **kwargs):
+        if hasattr(self, "_from_cache"):
+            return
+
+        if "invalidate_cache" in kwargs:
+            del kwargs["invalidate_cache"]
+
+        self.__post_init__(*args, **kwargs)
+
+        if not hasattr(self, "_from_cache") and hasattr(self, "_cache_path"):
+            with open(self._cache_path, "wb") as f:
+                pickle.dump(self, f)
+
+    def setup(
         self, t_max=None, num_grid_points=None, seed=None, scale=1, calc_deriv=False
     ):
-        assert self.key
+        self._set_up = True
+        assert hasattr(self, "key")
         self.t_max = t_max
         self.num_grid_points = num_grid_points
         self.t = np.linspace(0, t_max, num_grid_points)
@@ -118,8 +140,50 @@ class StocProc(abc.ABC):
             )
         )
 
-    def __bfkey__(self):
-        return self.key
+    def __new__(cls, *args, **kwargs):
+        if cls._use_cache:
+            name = hashlib.sha256(pickle.dumps((args, kwargs))).hexdigest()
+            cache_path = (
+                pathlib.Path(tempfile.gettempdir())
+                / "stocproc"
+                / f"{cls.__name__}_{name}.pickle"
+            )
+            cache_path.parent.mkdir(exist_ok=True, parents=True)
+
+            if (
+                cache_path.exists()
+                and not "unpickle" in args
+                and not "invalidate_cache" in kwargs
+            ):
+                with open(cache_path, "rb") as f:
+                    instance = pickle.load(f)
+                    log.info("Loaded instance from cache.")
+
+                instance._from_cache = True
+                return instance
+
+            instance = super().__new__(cls)
+            instance._cache_path = cache_path
+
+            return instance
+
+        return super().__new__(cls)
+
+    def __getnewargs_ex__(self):
+        return ("unpickle",), {}
+
+    def __init_subclass__(cls):
+        if StocProc.__init__ is not cls.__init__:
+            raise Exception(
+                f"Do not override {cls}.__init__ but use {cls}.__post_init__."
+            )
+
+    @abc.abstractmethod
+    def __post_init__(self, *args, **kwargs):
+        """Like ``__init__`` but for setting up child classes.
+        Implementations should call :any:`setup`.
+        """
+        pass
 
     def __call__(self, t=None):
         r"""Evaluates the stochastic process.
@@ -219,6 +283,9 @@ class StocProc(abc.ABC):
         If ``y`` is ``None`` draw new random numbers to generate the new realization. Otherwise use ``y`` as input to
         generate the new realization.
         """
+        assert (
+            self._set_up
+        ), "The `setup` method has to be called from implementing classes."
         t0 = time.time()
 
         # clean up old data
@@ -304,7 +371,7 @@ class StocProc_KLE(StocProc):
     for details).
     """
 
-    def __init__(
+    def __post_init__(
         self,
         alpha,
         t_max,
@@ -388,7 +455,7 @@ class StocProc_KLE(StocProc):
         sqrt_lambda_ui_fine, t_max, num_grid_points, seed, scale, self.key = state
         self.key = ("kle", *self.key)
         num_ev, ng = sqrt_lambda_ui_fine.shape
-        super().__init__(
+        super().setup(
             t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
         )
         self.num_ev = num_ev
@@ -479,7 +546,9 @@ class StocProc_FFT(StocProc):
 
     """
 
-    def __init__(
+    _use_cache = True
+
+    def __post_init__(
         self,
         spectral_density,
         t_max,
@@ -538,14 +607,13 @@ class StocProc_FFT(StocProc):
             )
 
         t_max = (num_grid_points - 1) * dt
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=num_grid_points,
             seed=seed,
             scale=scale,
             calc_deriv=calc_deriv,
         )
-
         self.omega_min = a + dx / 2
         self.omega_k = dx * np.arange(N) + self.omega_min
         self.yl = spectral_density(self.omega_k) * dx / np.pi
@@ -590,7 +658,7 @@ class StocProc_FFT(StocProc):
             self.key,
             calc_deriv,
         ) = state
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=num_grid_points,
             seed=seed,
@@ -630,8 +698,9 @@ class StocProc_FFT(StocProc):
 
 class StocProc_TanhSinh(StocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
+    _use_cache = True
 
-    def __init__(
+    def __post_init__(
         self,
         spectral_density,
         t_max,
@@ -644,6 +713,7 @@ class StocProc_TanhSinh(StocProc):
         calc_deriv=False,
     ):
         self.key = "ts", alpha, t_max, intgr_tol, intpl_tol
+
         if not negative_frequencies:
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
@@ -683,6 +753,7 @@ class StocProc_TanhSinh(StocProc):
         )
 
         tau = np.linspace(0, t_max, 35)
+
         n = 16
         d = intgr_tol + 1
         while d > intgr_tol:
@@ -731,8 +802,7 @@ class StocProc_TanhSinh(StocProc):
         yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
         self.omega_k = yk
         self.fl = np.sqrt(wk * spectral_density(self.omega_k) / np.pi)
-
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=N,
             seed=seed,
@@ -767,7 +837,8 @@ class StocProc_TanhSinh(StocProc):
             self.key,
             calc_deriv,
         ) = state
-        super().__init__(
+
+        super().setup(
             t_max=t_max,
             num_grid_points=num_grid_points,
             seed=seed,
@@ -835,7 +906,7 @@ BCF = Callable[[NDArray[np.floating]], NDArray[np.complex128]]
 class Cholesky(StocProc):
     r"""Generate Stochastic Processes using the cholesky decomposition."""
 
-    def __init__(
+    def __post_init__(
         self,
         t_max: float,
         alpha: BCF,
@@ -865,7 +936,7 @@ class Cholesky(StocProc):
         self.t: NDArray[np.float128] = np.linspace(0, t_max, steps, dtype=np.float128)
         """The times at which the stochastic process will be sampled."""
 
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=len(self.t),
             seed=seed,
