@@ -362,7 +362,7 @@ def _f_opt_for_SLSQP_minimizer(
     ft_ref_tau = ft_ref(tau[idx])
     d = diff_method(ft_ref_tau, ft_tau[idx])
     _f_opt_cache[key] = d, a_, b_
-    log.info("f_opt tol {} -> d {}".format(tol, d))
+    log.debug("f_opt tol {} -> d {}".format(tol, d))
     return np.log10(d)
 
 
@@ -397,7 +397,7 @@ def _f_opt(x, integrand, a, b, N, t_max, ft_ref, diff_method, b_only):
     idx = np.where(tau <= t_max)
     ft_ref_tau = ft_ref(tau[idx])
     d = diff_method(ft_ref_tau, ft_tau[idx])
-    log.info("f_opt interval [{:.3e},{:.3e}] -> d {}".format(a_, b_, d))
+    log.debug("f_opt interval [{:.3e},{:.3e}] -> d {}".format(a_, b_, d))
     return d, a_, b_
 
 
@@ -407,7 +407,7 @@ def opt_integral_boundaries_use_SLSQP_minimizer(
     """
     this is very slow
     """
-    log.info(
+    log.debug(
         "optimize integral boundary N:{} [{:.3e},{:.3e}], please wait ...".format(
             N, a, b
         )
@@ -428,10 +428,10 @@ def opt_integral_boundaries_use_SLSQP_minimizer(
     )
     d, a_, b_ = _f_opt_cache[float(r.x)]
     if a_ is None or b_ is None:
-        log.info("optimization with N {} failed".format(N))
+        log.debug("optimization with N {} failed".format(N))
         return d, a, b
 
-    log.info(
+    log.debug(
         "optimization with N {} yields max rd {:.3e} and new boundaries [{:.2e},{:.2e}]".format(
             N, d, a_, b_
         )
@@ -468,13 +468,13 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
             idx = np.where(tau <= t_max)
             ft_ref_tau = ft_ref(tau[idx])
             d = diff_method(ft_ref_tau, ft_tau[idx])
-            log.info(
+            log.debug(
                 "J_w_min:{:.2e} N {} yields: interval [{:.2e},{:.2e}] diff {:.2e}".format(
                     J_w_min, N, a_, b_, d
                 )
             )
             if d_old is not None and d > d_old:
-                log.info(
+                log.debug(
                     "increasing N while shrinking the interval does lower the error -> try next level"
                 )
                 break
@@ -482,7 +482,7 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
                 d_old = d
 
             if d < tol:
-                log.info("return, cause tol of {} was reached".format(tol))
+                log.debug("return, cause tol of {} was reached".format(tol))
                 return d, N, a_, b_
         i += 1
 
@@ -554,7 +554,7 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
         ft_intp_n_new /= ft_ref_0
 
         d = diff_method(ft_intp_n_new, ft_ref_n_new)
-        log.info(
+        log.debug(
             "acc interp N {} dt {:.2e} -> diff {:.2e}".format(N + 1, 2 * tau[1], d)
         )
         if d < tol:
@@ -599,7 +599,7 @@ def calc_ab_N_dx_dt(
     :param diff_method:
     :return:
     """
-    log.info("get_dt_for_accurate_interpolation, please wait ...")
+    log.debug("get_dt_for_accurate_interpolation, please wait ...")
 
     try:
         c = find_integral_boundary(
@@ -617,9 +617,9 @@ def calc_ab_N_dx_dt(
         t_max=c, tol=intpl_tol, ft_ref=ft_ref, diff_method=diff_method
     )
 
-    log.info("requires dt < {:.3e}".format(dt_tol))
+    log.debug("requires dt < {:.3e}".format(dt_tol))
 
-    log.info("get_N_a_b_for_accurate_fourier_integral, please wait ...")
+    log.debug("get_N_a_b_for_accurate_fourier_integral, please wait ...")
     N, a, b = get_N_a_b_for_accurate_fourier_integral(
         integrand,
         t_max=t_max,
@@ -629,7 +629,7 @@ def calc_ab_N_dx_dt(
         diff_method=diff_method,
     )
     dx = (b - a) / N
-    log.info("requires dx < {:.3e}".format(dx))
+    log.debug("requires dx < {:.3e}".format(dx))
 
     dt = 2 * np.pi / dx / N
     if dt > dt_tol:
@@ -654,7 +654,7 @@ def calc_ab_N_dx_dt(
         dx_new = dx
 
     if dt_new * (N - 1) < t_max:
-        log.info("increase N to match dt_new*(N-1) < t_max")
+        log.debug("increase N to match dt_new*(N-1) < t_max")
         N_tmp = t_max / dt_new + 1
         N = 2 ** int(np.ceil(np.log2(N_tmp)))
         dx_new = 2 * np.pi / N / dt_new
