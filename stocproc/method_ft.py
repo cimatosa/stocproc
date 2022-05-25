@@ -47,6 +47,10 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     _max_num_iteration = 100
     _i = 0
     x0 = float(x0)
+
+    while integrand(ref_val) == 0:
+        ref_val += 1
+
     I_ref = integrand(ref_val)
     log.debug("find_integral_boundary")
     log.debug("I_ref: {:.2e} at ref_val: {:.2e}".format(I_ref, ref_val))
