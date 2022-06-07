@@ -48,7 +48,7 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     _i = 0
     x0 = float(x0)
 
-    while integrand(ref_val) == 0:
+    while integrand(ref_val) < 1e-2:
         ref_val += 1
 
     I_ref = integrand(ref_val)
