@@ -49,9 +49,11 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
     x0 = float(x0)
 
     while integrand(ref_val) < 1e-2:
-        ref_val += 1
+        ref_val += 0.1
 
+    ref_val = minimize(lambda x: -abs(integrand(x)), x0=ref_val).x[0]
     I_ref = integrand(ref_val)
+
     log.debug("find_integral_boundary")
     log.debug("I_ref: {:.2e} at ref_val: {:.2e}".format(I_ref, ref_val))
     if I_ref < tol:
