@@ -2,7 +2,15 @@ import abc
 from functools import partial
 from typing import Optional
 import numpy as np
+from numpy.typing import NDArray
+from collections.abc import Callable
+import scipy.linalg
+import scipy.optimize
 import time
+import pickle
+import hashlib
+import pathlib
+import tempfile
 
 from . import method_kle
 from . import method_ft
@@ -53,7 +61,9 @@ class StocProc(abc.ABC):
     Interface definition for stochastic process implementations
 
     A new implementation for a stochastic process generator should subclass :py:class:`StocProc` and
-    overwrite :py:func:`calc_z` and :py:func:`get_num_y`.
+    overwrite :py:func:`calc_z` and :py:func:`get_num_y`, as well as :any:`__post_init__` for initialization.
+    If the class variable :any:`_use_cach` is set to :any:`True`, then the implementation will be cached.
+    For this to work, the :any:`__getstate__` and :any:`__setstate__` methods should be properly implemented.
 
     Depending on the equally spaced times :math:`t_n = n \frac{t_{max}}{N-1}` with :math:`n = 0 \dots N-1`
     (:math:`N` = number of grid points),
@@ -82,20 +92,36 @@ class StocProc(abc.ABC):
     :param t_axis: an explicit definition of times t_k (may be non equidistant)
     :param scale: passes ``scale`` to :py:func:`set_scale`
     :param calc_deriv: whether to calculate the derivative of the stochastic process
+    :param invalidate_cache: ignore whether the instance has been cached and overwrite the cache
 
     Note: :py:func:`new_process` is **not** called on init. If you want to evaluate a particular
     realization of the stocastic process, a new sample needs to be drawn by calling :py:func:`new_process`.
     Otherwise a ``RuntimeError`` is raised.
 
     """
+    _use_cache = False
 
-    def __init__(
+    def __init__(self, *args, **kwargs):
+        if hasattr(self, "_from_cache"):
+            return
+
+        if "invalidate_cache" in kwargs:
+            del kwargs["invalidate_cache"]
+
+        self.__post_init__(*args, **kwargs)
+
+        if not hasattr(self, "_from_cache") and hasattr(self, "_cache_path"):
+            with open(self._cache_path, "wb") as f:
+                pickle.dump(self, f)
+
+    def setup(
         self, t_max=None, num_grid_points=None, seed=None, scale=1, calc_deriv=False
     ):
+        self._set_up = True
+        assert hasattr(self, "key")
         self.t_max = t_max
         self.num_grid_points = num_grid_points
         self.t = np.linspace(0, t_max, num_grid_points)
-
         self._z = None
         self._interpolator = None
         self._interpolator_dot = None
@@ -113,6 +139,51 @@ class StocProc(abc.ABC):
                 t_max, num_grid_points
             )
         )
+
+    def __new__(cls, *args, **kwargs):
+        if cls._use_cache:
+            name = hashlib.sha256(pickle.dumps((args, kwargs))).hexdigest()
+            cache_path = (
+                pathlib.Path(tempfile.gettempdir())
+                / "stocproc"
+                / f"{cls.__name__}_{name}.pickle"
+            )
+            cache_path.parent.mkdir(exist_ok=True, parents=True)
+
+            if (
+                cache_path.exists()
+                and not "unpickle" in args
+                and not "invalidate_cache" in kwargs
+            ):
+                with open(cache_path, "rb") as f:
+                    instance = pickle.load(f)
+                    log.info("Loaded instance from cache.")
+
+                instance._from_cache = True
+                return instance
+
+            instance = super().__new__(cls)
+            instance._cache_path = cache_path
+
+            return instance
+
+        return super().__new__(cls)
+
+    def __getnewargs_ex__(self):
+        return ("unpickle",), {}
+
+    def __init_subclass__(cls):
+        if StocProc.__init__ is not cls.__init__:
+            raise Exception(
+                f"Do not override {cls}.__init__ but use {cls}.__post_init__."
+            )
+
+    @abc.abstractmethod
+    def __post_init__(self, *args, **kwargs):
+        """Like ``__init__`` but for setting up child classes.
+        Implementations should call :any:`setup`.
+        """
+        pass
 
     def __call__(self, t=None):
         r"""Evaluates the stochastic process.
@@ -212,6 +283,9 @@ class StocProc(abc.ABC):
         If ``y`` is ``None`` draw new random numbers to generate the new realization. Otherwise use ``y`` as input to
         generate the new realization.
         """
+        assert (
+            self._set_up
+        ), "The `setup` method has to be called from implementing classes."
         t0 = time.time()
 
         # clean up old data
@@ -297,7 +371,7 @@ class StocProc_KLE(StocProc):
     for details).
     """
 
-    def __init__(
+    def __post_init__(
         self,
         alpha,
         t_max,
@@ -359,16 +433,13 @@ class StocProc_KLE(StocProc):
 
     @staticmethod
     def get_key(r_tau, t_max, tol=1e-2):
-        return r_tau, t_max, tol
+        return "kle", r_tau, t_max, tol
 
     # def get_key(self):
     #     """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
     #     the StocProc class.
     #     """
     #     return self.key
-
-    def __bfkey__(self):
-        return self.key
 
     def __getstate__(self):
         return (
@@ -382,8 +453,9 @@ class StocProc_KLE(StocProc):
 
     def __setstate__(self, state):
         sqrt_lambda_ui_fine, t_max, num_grid_points, seed, scale, self.key = state
+        self.key = ("kle", *self.key)
         num_ev, ng = sqrt_lambda_ui_fine.shape
-        super().__init__(
+        super().setup(
             t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
         )
         self.num_ev = num_ev
@@ -474,7 +546,9 @@ class StocProc_FFT(StocProc):
 
     """
 
-    def __init__(
+    _use_cache = True
+
+    def __post_init__(
         self,
         spectral_density,
         t_max,
@@ -533,14 +607,13 @@ class StocProc_FFT(StocProc):
             )
 
         t_max = (num_grid_points - 1) * dt
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=num_grid_points,
             seed=seed,
             scale=scale,
             calc_deriv=calc_deriv,
         )
-
         self.omega_min = a + dx / 2
         self.omega_k = dx * np.arange(N) + self.omega_min
         self.yl = spectral_density(self.omega_k) * dx / np.pi
@@ -556,7 +629,7 @@ class StocProc_FFT(StocProc):
         Returns the tuple ``(alpha, t_max, intgr_tol, intpl_tol)`` which uniquely identifies a particular
         :py:class:`StocProc_FFT` instance
         """
-        return alpha, t_max, intgr_tol, intpl_tol
+        return "fft", alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return (
@@ -585,7 +658,7 @@ class StocProc_FFT(StocProc):
             self.key,
             calc_deriv,
         ) = state
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=num_grid_points,
             seed=seed,
@@ -625,8 +698,9 @@ class StocProc_FFT(StocProc):
 
 class StocProc_TanhSinh(StocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
+    _use_cache = True
 
-    def __init__(
+    def __post_init__(
         self,
         spectral_density,
         t_max,
@@ -636,9 +710,10 @@ class StocProc_TanhSinh(StocProc):
         seed=None,
         negative_frequencies=False,
         scale=1,
-        calc_deriv=True,
+        calc_deriv=False,
     ):
-        self.key = alpha, t_max, intgr_tol, intpl_tol
+        self.key = "ts", alpha, t_max, intgr_tol, intpl_tol
+
         if not negative_frequencies:
             log.info("non neg freq only")
             log.info("get_dt_for_accurate_interpolation, please wait ...")
@@ -678,6 +753,7 @@ class StocProc_TanhSinh(StocProc):
         )
 
         tau = np.linspace(0, t_max, 35)
+
         n = 16
         d = intgr_tol + 1
         while d > intgr_tol:
@@ -689,10 +765,10 @@ class StocProc_TanhSinh(StocProc):
 
             d = np.abs(bcf_ref_t - I) / abs(bcf_ref_t[0])
             d = np.max(d)
-            print("n:{} d:{} tol:{}".format(n, d, intgr_tol))
+            log.debug("n:{} d:{} tol:{}".format(n, d, intgr_tol))
 
         tau = np.linspace(0, (N - 1) * dt_tol, N)
-        log.info(
+        log.debug(
             "perform numeric check of entire time axis [{},{}] N:{}".format(
                 0, (N - 1) * dt_tol, N
             )
@@ -721,13 +797,12 @@ class StocProc_TanhSinh(StocProc):
             plt.show()
 
         assert d <= intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
-        print("done!")
+        log.debug("done!")
 
         yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
         self.omega_k = yk
         self.fl = np.sqrt(wk * spectral_density(self.omega_k) / np.pi)
-
-        super().__init__(
+        super().setup(
             t_max=t_max,
             num_grid_points=N,
             seed=seed,
@@ -737,7 +812,7 @@ class StocProc_TanhSinh(StocProc):
 
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
-        return alpha, t_max, intgr_tol, intpl_tol
+        return "ts", alpha, t_max, intgr_tol, intpl_tol
 
     def __getstate__(self):
         return (
@@ -762,7 +837,8 @@ class StocProc_TanhSinh(StocProc):
             self.key,
             calc_deriv,
         ) = state
-        super().__init__(
+
+        super().setup(
             t_max=t_max,
             num_grid_points=num_grid_points,
             seed=seed,
@@ -782,7 +858,9 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z = np.sum(tmp1[None, :] * np.exp(tmp2[None, :] * self.t[:, None]), axis=1)
+        z = np.fromiter(
+            (np.sum(tmp1 * np.exp(tmp2 * t)) for t in self.t), dtype=tmp2.dtype
+        )
 
         return z
 
@@ -798,8 +876,10 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z_dot = np.sum(
-            (tmp1 * tmp2)[None, :] * np.exp(tmp2[None, :] * self.t[:, None]), axis=1
+
+        pre = tmp1 * tmp2
+        z_dot = np.fromiter(
+            (np.sum(pre * np.exp(tmp2 * t)) for t in self.t), dtype=tmp2.dtype
         )
 
         return z_dot
@@ -818,6 +898,163 @@ class StocProc_TanhSinh(StocProc):
 
     def get_num_y(self):
         return len(self.fl)
+
+
+BCF = Callable[[NDArray[np.floating]], NDArray[np.complex128]]
+
+
+class Cholesky(StocProc):
+    r"""Generate Stochastic Processes using the cholesky decomposition."""
+
+    def __post_init__(
+        self,
+        t_max: float,
+        alpha: BCF,
+        intgr_tol=1e-2,
+        intpl_tol=1e-2,
+        chol_tol=1e-2,
+        correlation_cutoff=1e-3,
+        seed=None,
+        scale=1,
+        calc_deriv: bool = False,
+        max_iterations: int = 10,
+    ):
+        del intgr_tol  # not used for now
+        self.key = (
+            "chol",
+            alpha,
+            t_max,
+            intpl_tol,
+            chol_tol,
+            correlation_cutoff,
+            calc_deriv,
+            max_iterations,
+        )
+
+        steps = int(t_max / intpl_tol) + 1
+
+        self.t: NDArray[np.float128] = np.linspace(0, t_max, steps, dtype=np.float128)
+        """The times at which the stochastic process will be sampled."""
+
+        super().setup(
+            t_max=t_max,
+            num_grid_points=len(self.t),
+            seed=seed,
+            scale=scale,
+            calc_deriv=calc_deriv,
+        )
+
+        cutoff_sol = scipy.optimize.root(
+            lambda t: np.abs(alpha(t)) - correlation_cutoff, x0=[0.001]
+        )
+
+        if not cutoff_sol.success:
+            raise RuntimeError(
+                f"Could not find a suitable cutoff time. Scipy says '{cutoff_sol.message}'."
+            )
+
+        self.t_chol = np.linspace(
+            0,
+            cutoff_sol.x[0] * 2,
+            int(((cutoff_sol.x[0]) / intpl_tol) + 1) * 2,
+            dtype=np.float128,
+        )
+
+        mat, tol = self.stable_cholesky(alpha, self.t_chol, max_iterations)
+        log.info(f"Achieved a deviation of {tol} in the cholesky decomposition.")
+        if mat is None or tol > chol_tol:
+            raise RuntimeError(
+                f"The tolerance of {chol_tol} could not be reached. We got as far as {tol}."
+            )
+
+        self.chol_matrix: NDArray[np.complex128] = mat
+        if calc_deriv:
+            self.chol_deriv = np.gradient(mat, self.t, axis=0)
+
+        self.t_chol = self.t_chol
+
+        self.chunk_size = len(self.t_chol) // 2
+
+        self.patch_matrix: NDArray[np.complex128] = scipy.linalg.inv(
+            self.chol_matrix[: self.chunk_size, : self.chunk_size]
+        )
+
+        self.num_chunks = int(len(self.t) / self.chunk_size) + 1
+
+    @staticmethod
+    def stable_cholesky(
+        α: BCF, t, max_iterations: int = 100, starteps: Optional[float] = None
+    ):
+        t = np.asarray(t)
+        tt, ss = np.meshgrid(t, t, sparse=False)
+        Σ = α(np.array(tt - ss))
+        eye = np.eye(len(t))
+
+        eps: float = 0.0
+
+        L = None
+        reversed = False
+        for _ in range(max_iterations):
+            log.debug(f"Trying ε={eps}.")
+            try:
+                L = scipy.linalg.cholesky(Σ + eps * eye, lower=True, check_finite=False)
+
+                if eps == 0 or reversed:
+                    break
+
+                eps /= 2
+
+            except scipy.linalg.LinAlgError as _:
+                if eps == 0:
+                    eps = starteps or np.finfo(np.float64).eps * 4
+                else:
+                    eps = eps * 2
+                    reversed = True
+
+        return L, (np.max(np.abs((L @ L.T.conj() - Σ) / Σ)) if L is not None else -1)
+
+    def calc_z(self, y: NDArray[np.complex128]):
+        assert y.shape == (self.get_num_y(),)
+
+        res = np.empty(self.chunk_size * self.num_chunks, dtype=np.complex128)
+        y = np.pad(y, (0, len(res) - len(y)), "constant")
+
+        offset = len(self.t_chol)
+
+        res[0:offset] = self.chol_matrix @ y[:offset]
+        y_curr = np.empty(self.chunk_size * 2, dtype=np.complex128)
+        last_values = res[offset // 2 : offset]
+
+        for i in range(self.num_chunks - 2):
+            next_offset = offset + self.chunk_size
+
+            y_curr[0 : self.chunk_size] = self.patch_matrix @ last_values
+            y_curr[self.chunk_size : self.chunk_size * 2] = y[offset:next_offset]
+
+            res[offset:next_offset] = (self.chol_matrix @ y_curr)[
+                self.chunk_size : self.chunk_size * 2
+            ]
+
+            last_values = res[offset:next_offset]
+            offset = next_offset
+
+        return res[0 : len(self.t)]
+
+    def calc_z_dot(self, y: np.ndarray) -> np.ndarray:
+        r"""Calculate the discrete time stochastic process derivative using FFT algorithm
+        and return values :math:`\dot{z}_n` with :math:`t_n <= t_\mathrm{max}`.
+        """
+
+        z_dot_fft = np.fft.fft(-1j * self.omega_k * self.yl * y)
+        z_dot = z_dot_fft[0 : self.num_grid_points] * self.omega_min_correction
+        return z_dot
+
+    def get_num_y(self):
+        r"""The number of independent random variables :math:`Y_m` is given by the number of discrete nodes
+        used by the Fast Fourier Transform algorithm.
+        """
+
+        return len(self.t)
 
 
 def alpha_times_pi(tau, alpha):
