@@ -264,6 +264,22 @@ def test_pickle_scale():
     stp_prime = pickle.loads(stp_dump)
     assert stp_prime.scale == 0.56
 
+def Lor_SD(w, eta, gamma, w0):
+    return eta * gamma / (gamma ** 2 + (w0 - w) ** 2)
+
+def Lor_BCF(tau, eta, gamma, w0):
+    return eta * np.exp(-gamma * np.abs(tau) - 1.0j * w0 * tau)
+
+def test_Lorentian():
+    """
+        see if problems with weak coupling Lorenzians have been cured
+    """
+
+    n, g, w0 = 0.01, 1, 5
+    t_max = 5
+    sd = functools.partial(Lor_SD, eta=n, gamma=g, w0=w0)
+    corr = functools.partial(Lor_BCF, eta=n, gamma=g, w0=w0)
+    stp = sp.StocProc_FFT(spectral_density=sd, t_max=t_max, alpha=corr, intgr_tol=1e-2, intpl_tol=1e-2, seed=0, negative_frequencies=True)
 
 
 
@@ -275,6 +291,7 @@ if __name__ == "__main__":
     # test_stocproc_dump_load()
 
     # test_many(plot=False)
-    test_pickle_scale()
+    #test_pickle_scale()
+    test_Lorentian()
     pass
 
