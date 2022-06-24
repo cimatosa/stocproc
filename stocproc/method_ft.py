@@ -52,7 +52,7 @@ def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
         ref_val += 0.01
 
     ref_val = minimize(
-        lambda x: -abs(integrand(x)), x0=ref_val, bounds=[(0, np.inf)]
+        lambda x: -abs(integrand(x)), x0=ref_val, bounds=[(0.01, np.inf)]
     ).x[0]
     I_ref = integrand(ref_val)
 
