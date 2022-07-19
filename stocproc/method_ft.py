@@ -502,9 +502,14 @@ def get_N_a_b_for_accurate_fourier_integral(
     """ """
 
     if opt_b_only:
-        I0 = quad(integrand, 0, np.inf)[0]
+        # sometimes the integrand is zero for a while...
+        x0 = 0
+        while integrand(x0 + 0.1) == 0:
+            x0 += 0.1
+        I0 = quad(integrand, x0, np.inf)[0]
     else:
         I0 = quad(integrand, -np.inf, np.inf)[0]
+
     ft_ref_0 = ft_ref(0)
     rd = np.abs(ft_ref_0 - I0) / np.abs(ft_ref_0)
     log.debug("ft_ref check yields rd {:.3e}".format(rd))
