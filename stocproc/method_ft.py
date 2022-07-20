@@ -536,44 +536,39 @@ def get_dt_for_accurate_interpolation(t_max, tol, ft_ref, diff_method=_absDiff):
     ft_ref_n_old = ft_ref(tau)
     ft_ref_0 = abs(ft_ref(0))
 
-    while True:
-        N *= 2
+    pool = Pool()
+    try:
+        while True:
+            N *= 2
 
-        tau = np.linspace(0, t_max, N + 1)
-        ft_ref_n = np.empty(shape=(N + 1,), dtype=np.complex128)
+            tau = np.linspace(0, t_max, N + 1)
+            ft_ref_n = np.empty(shape=(N + 1,), dtype=np.complex128)
 
-        ft_ref_n[::2] = ft_ref_n_old
+            ft_ref_n[::2] = ft_ref_n_old
 
-        pool = Pool()
-        try:
             ft_ref_n_new = np.asarray(pool.map(ft_ref, tau[1::2]))
 
-        finally:
-            pool.close()
-            pool.join()
+            ft_ref_n[1::2] = np.array(ft_ref_n_new)
 
-        ft_ref_n[1::2] = np.array(ft_ref_n_new)
+            ft_intp = fcSpline.FCS(x_low=0, x_high=t_max, y=ft_ref_n_old)
 
-        ft_intp = fcSpline.FCS(x_low=0, x_high=t_max, y=ft_ref_n_old)
-
-        pool = Pool()
-        try:
             ft_intp_n_new = np.asarray(pool.map(ft_intp, tau[1::2]))
-        finally:
-            pool.close()
-            pool.join()
 
-        ft_ref_n_new /= ft_ref_0
-        ft_intp_n_new /= ft_ref_0
+            ft_ref_n_new /= ft_ref_0
+            ft_intp_n_new /= ft_ref_0
 
-        d = diff_method(ft_intp_n_new, ft_ref_n_new)
-        log.debug(
-            "acc interp N {} dt {:.2e} -> diff {:.2e}".format(N + 1, 2 * tau[1], d)
-        )
-        if d < tol:
-            return t_max / (N / 2)
+            d = diff_method(ft_intp_n_new, ft_ref_n_new)
+            log.debug(
+                "acc interp N {} dt {:.2e} -> diff {:.2e}".format(N + 1, 2 * tau[1], d)
+            )
+            if d < tol:
+                return t_max / (N / 2)
 
-        ft_ref_n_old = ft_ref_n
+            ft_ref_n_old = ft_ref_n
+
+    finally:
+        pool.close()
+        pool.join()
 
 
 def calc_ab_N_dx_dt(
