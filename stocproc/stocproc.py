@@ -435,11 +435,8 @@ class StocProc_KLE(StocProc):
     def get_key(r_tau, t_max, tol=1e-2):
         return "kle", r_tau, t_max, tol
 
-    # def get_key(self):
-    #     """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
-    #     the StocProc class.
-    #     """
-    #     return self.key
+    def __bfkey__(self):
+        return self.key
 
     def __getstate__(self):
         return (
@@ -631,6 +628,9 @@ class StocProc_FFT(StocProc):
         """
         return "fft", alpha, t_max, intgr_tol, intpl_tol
 
+    def __bfkey__(self):
+        return self.key
+
     def __getstate__(self):
         return (
             self.yl,
@@ -813,6 +813,9 @@ class StocProc_TanhSinh(StocProc):
     @staticmethod
     def get_key(t_max, alpha, intgr_tol=1e-2, intpl_tol=1e-2):
         return "ts", alpha, t_max, intgr_tol, intpl_tol
+
+    def __bfkey__(self):
+        return self.key
 
     def __getstate__(self):
         return (
