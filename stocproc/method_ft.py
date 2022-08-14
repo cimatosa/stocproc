@@ -316,7 +316,9 @@ def fourier_integral_simps(integrand, a, b, N):
     return tau, delta_x * np.exp(-1j * tau * a) * fft_vals
 
 
-def _relDiff(xRef, x):
+def _relDiff(xRef, x, norm=1):
+    del norm
+
     diff = np.abs(xRef - x)
     norm_xRef = np.abs(xRef)
     with warnings.catch_warnings():
@@ -327,8 +329,8 @@ def _relDiff(xRef, x):
     return res
 
 
-def _absDiff(xRef, x):
-    return np.max(np.abs(xRef - x))
+def _absDiff(xRef, x, norm=1):
+    return np.max(np.abs(xRef - x)) / norm
 
 
 def _f_opt_for_SLSQP_minimizer(
@@ -453,6 +455,7 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
     # N_0 = 10
     N_0 = 5
     i = 0
+    norm = ft_ref(0).real
     while True:
         d_old = None
         for j in range(0, i + 1):
@@ -475,7 +478,7 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
             tau, ft_tau = fourier_integral_midpoint(integrand, a_, b_, N)
             idx = np.where(tau <= t_max)
             ft_ref_tau = ft_ref(tau[idx])
-            d = diff_method(ft_ref_tau, ft_tau[idx])
+            d = diff_method(ft_ref_tau, ft_tau[idx], norm)
             log.debug(
                 "J_w_min:{:.2e} N {} yields: interval [{:.2e},{:.2e}] diff {:.2e}".format(
                     J_w_min, N, a_, b_, d
@@ -488,6 +491,7 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
                 break
             else:
                 d_old = d
+                log.debug(f"d={d}, tol={tol}")
 
             if d < tol:
                 log.debug("return, cause tol of {} was reached".format(tol))
