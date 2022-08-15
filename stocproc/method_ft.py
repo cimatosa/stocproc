@@ -24,6 +24,7 @@ import warnings
 MAX_FLOAT = sys.float_info.max
 log = logging.getLogger(__name__)
 
+from .config import USE_NORMALIZED_DIFF
 
 class FTReferenceError(Exception):
     pass
@@ -330,7 +331,11 @@ def _relDiff(xRef, x, norm=1):
 
 
 def _absDiff(xRef, x, norm=1):
-    return np.max(np.abs(xRef - x)) / norm
+    diff = np.max(np.abs(xRef - x))
+    if USE_NORMALIZED_DIFF:
+        return diff / norm
+    else:
+        return diff
 
 
 def _f_opt_for_SLSQP_minimizer(
