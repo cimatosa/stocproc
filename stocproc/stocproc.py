@@ -290,7 +290,9 @@ class StocProc(abc.ABC):
 
         # clean up old data
         del self._interpolator
+        self._interpolator = None
         del self._z
+        self._z = None
 
         self._proc_cnt += 1
         if seed != None:
