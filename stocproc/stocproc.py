@@ -861,9 +861,14 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
-        z = np.fromiter(
-            (np.sum(tmp1 * np.exp(tmp2 * t)) for t in self.t), dtype=tmp2.dtype
-        )
+        exp_fac = np.exp(tmp2 * self.t[1])
+
+        z = np.empty(len(self.t), dtype=tmp2.dtype)
+        last = tmp1.astype(tmp2.dtype)
+
+        for i in range(len(self.t)):
+            z[i] = np.sum(last)
+            last *= exp_fac
 
         return z
 
@@ -879,11 +884,17 @@ class StocProc_TanhSinh(StocProc):
 
         tmp1 = self.fl * y
         tmp2 = -1j * self.omega_k
+        exp_fac = np.exp(tmp2 * self.t[1])
 
         pre = tmp1 * tmp2
-        z_dot = np.fromiter(
-            (np.sum(pre * np.exp(tmp2 * t)) for t in self.t), dtype=tmp2.dtype
-        )
+
+        z_dot = np.empty(len(self.t), dtype=tmp2.dtype)
+        last = pre
+
+        for i in range(len(self.t)):
+            z_dot[i] = np.sum(last)
+            last *= exp_fac
+
 
         return z_dot
 
