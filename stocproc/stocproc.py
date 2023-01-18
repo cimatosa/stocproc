@@ -298,9 +298,10 @@ class StocProc(abc.ABC):
             np.random.seed(seed)
         if y is None:
             # random complex normal samples
-            y = np.random.normal(
-                scale=self._one_over_sqrt_2, size=2 * self.get_num_y()
-            ).view(np.complex)
+            y = np.random.normal(scale=self._one_over_sqrt_2, size=2 * self.get_num_y())
+            if y.dtype != np.float64:
+                raise RuntimeError(f"Expect that numpy.random.normal returns with dtype float64, but it is {y.dtype}")
+            y = y.view(np.complex128)
         else:
             if len(y) != self.get_num_y():
                 raise RuntimeError(

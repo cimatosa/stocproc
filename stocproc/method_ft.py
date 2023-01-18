@@ -2,10 +2,7 @@
     The method_fft module provides convenient function to
     setup a stochastic process generator using fft method
 """
-from __future__ import division, print_function
 
-# from .tools import ComplexInterpolatedUnivariateSpline
-# from functools import lru_cache
 import fcSpline
 from functools import partial
 import logging
@@ -18,6 +15,7 @@ from scipy.optimize import brentq
 from scipy.optimize import basinhopping
 from scipy.optimize import minimize
 import sys
+from typing import Callable
 import warnings
 
 # warnings.simplefilter('error')
@@ -25,96 +23,74 @@ MAX_FLOAT = sys.float_info.max
 log = logging.getLogger(__name__)
 
 
+
 class FTReferenceError(Exception):
     pass
 
 
-def find_integral_boundary(integrand, tol, ref_val, max_val, x0):
+def find_integral_boundary(
+        integrand: Callable[[float], float],
+        tol: float,
+        ref_val: float,
+        direction: str,
+        max_num_iteration: int = 100) -> float:
     """
-    searches for the point x_0 where integrand(x_tol) = tol
+    searches for the point x_tol where for the integrand f(x_tol) = tol holds
 
-    it is assumed that integrand(x) decays monotonic for all x > (ref_val+x0)
-    if x0 is positive (x < (ref_val+x0) if x0 is negative)
+    If direction is 'right', search for x_tol >= ref_val, i.e., right of ref_val.
+    If direction is 'left', search for x_tol <= ref_val, i.e., left of ref_val.
 
-    if x0 > 0: returns x_tol > ref_val (searches right of ref_val)
-    if x0 < 0: returns x_tol < ref_val (searches left of ref_val)
+    It is assumed that f(x) decays monotonically for all |x| > |x_tol|.
 
-    raise an error whenever
-        |x-ref_val|   > max_val or
-        1/|x-ref_val| > max_val
-    this assured that the function does not search forever
+    Note that if f(ref_val) is already smaller than tol a RuntimeError is raised.
+
+    Parameters:
+        integrand: the real valued function f(x) for which to find the bound
+        tol: a small value which defines the bound x_tol by f(x_tol) = tol
+        ref_val: the initial value for starting the boundary search
+        direction: if 'left', search left of ref_value, if 'right' search right
+        max_num_iteration: allows to pose a failure condition for ill posed problems
     """
-    _max_num_iteration = 100
-    _i = 0
-    x0 = float(x0)
+    i = 0
+    if direction.lower() == 'right':
+        x_step = 1
+    elif direction.lower() == 'left':
+        x_step = -1
+    else:
+        raise ValueError("direction must be either 'right' or 'left'")
 
-    while integrand(ref_val) < 1e-2:
-        ref_val += 0.01
-
-    ref_val = minimize(
-        lambda x: -abs(integrand(x)), x0=ref_val, bounds=[(0, np.inf)]
-    ).x[0]
     I_ref = integrand(ref_val)
 
     log.debug("find_integral_boundary")
-    log.debug("I_ref: {:.2e} at ref_val: {:.2e}".format(I_ref, ref_val))
+    log.debug(f"I_ref: {I_ref:.2e} at ref_val: {ref_val:.2e}")
+
     if I_ref < tol:
-        log.debug("I_ref < tol: {:.2e}".format(tol))
-        # return find_integral_boundary(integrand = lambda x: 1/integrand(x),
-        #                               tol = 1/tol,
-        #                               ref_val=ref_val,
-        #                               max_val=max_val,
-        #                               x0=-x0)
-        x_old = ref_val
-        scale = 0.5
-        n = 1
-        while True:
-            _i += 1
-            if _i > _max_num_iteration:
-                raise RuntimeError("max number of iteration reached")
-            x = ref_val * (scale ** n)
-            try:
-                I_x = integrand(x)
-                assert I_x is not np.nan
-            except Exception as e:
-                raise RuntimeError("evaluation of integrand failed due to {}".format(e))
-            log.debug("x_old: {:.2e} -> x: {:.2e} -> I_x: {:.2e}".format(x_old, x, I_x))
-            if I_x > tol:
-                break
-            n += 1
-            x_old = x
-        a = brentq(lambda x: integrand(x) - tol, x_old, x)
-        log.debug(
-            "found x_tol: {:.2e} I(x): {:.2}".format(float(a), float(integrand(a)))
-        )
-        log.debug("done!")
-        return a
-    elif I_ref > tol:
-        log.debug("I_ref > tol: {:.2e}".format(tol))
-        x_old = ref_val
-        while True:
-            _i += 1
-            if _i > _max_num_iteration:
-                raise RuntimeError("max number of iteration reached")
-            x = ref_val + x0
-            try:
-                I_x = integrand(x)
-                assert I_x is not np.nan
-            except Exception as e:
-                raise RuntimeError("evaluation of integrand failed due to {}".format(e))
-            log.debug("x0: {:.2e} -> x: {:.2e} -> I_x: {:.2e}".format(x0, x, I_x))
-            if I_x < tol:
-                break
-            x0 *= 1.3
-            x_old = x
-        a = brentq(lambda x: integrand(x) - tol, x_old, x)
-        log.debug("found x_tol: {:.2e} I(x): {:.2}".format(a, integrand(a)))
-        log.debug("done!")
-        return a
-    else:  # I_ref == tol
-        log.debug("I_ref = tol: {:.2e}".format(tol))
+        log.debug(f"I_ref < tol: {tol:.2e}")
+        raise RuntimeError(f"I_ref={I_ref:.2e} must not be smaller than tol: {tol:.2e}")
+
+    if I_ref == tol:
+        log.debug(f"I_ref = tol: {tol:.2e}")
         log.debug("done!")
         return ref_val
+
+    log.debug(f"I_ref > tol: {tol:.2e}")
+    x = ref_val
+    while True:
+        i += 1
+        if i > max_num_iteration:
+            raise RuntimeError(f"max number of iteration {max_num_iteration} reached")
+        x_old = x
+        x = ref_val + x_step
+        I_x = integrand(x)
+        log.debug(f"x_step: {x_step:.2e} -> x: {x:.2e} -> I_x: {I_x:.2e}")
+        if I_x < tol:
+            break
+        x_step *= 1.3
+    x_tol = brentq(lambda _x: integrand(_x) - tol, x_old, x)
+    I_x_tol = integrand(x_tol)
+    log.debug(f"found x_tol: {x_tol:.2e} I(x): {I_x_tol:.2}")
+    log.debug("done!")
+    return x_tol
 
 
 def find_integral_boundary_auto(

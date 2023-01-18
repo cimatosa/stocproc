@@ -7,42 +7,55 @@ sys.path.insert(0, str(p.parent.parent))
 import math
 import logging
 import numpy as np
+import pytest
 import scipy.integrate as sp_int
 from scipy.special import gamma as gamma_func
 import stocproc as sp
 from stocproc import method_ft
+
+sp.logging_setup(
+    sh_level=logging.DEBUG,
+    sp_log_level=logging.DEBUG,
+    kle_log_level=logging.DEBUG,
+    ft_log_level=logging.DEBUG
+)
 
 try:
     import matplotlib.pyplot as plt
 except ImportError:
     print("matplotlib not found -> any plotting will crash")
 
-def test_find_integral_boundary():
+def test_find_integral_boundary(caplog):
+    caplog.set_level(logging.DEBUG)
+    #sp.stocproc.method_ft.log
+
     def f(x):
-        return np.exp(-(x)**2)
-    
+        return np.exp(-x**2)
+
     tol = 1e-10
-    b = sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, x0=+1, max_val=1e6)
-    a = sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, x0=-1, max_val=1e6)
-    assert a != b
+
+    with pytest.raises(ValueError):
+        sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, direction='somethings')
+
+    a = sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, direction='right')
+    b = sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, direction='left')
+    assert a > b
     assert abs(f(a)-tol) < 1e-14
     assert abs(f(b)-tol) < 1e-14
     
-    b = sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, x0=b+5, max_val=1e6)
-    a = sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=0, x0=a-5, max_val=1e6)
-    assert a != b
-    assert abs(f(a)-tol) < 1e-14
-    assert abs(f(b)-tol) < 1e-14    
+    sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=a+1)
+    sp.method_ft.find_integral_boundary(integrand=f, tol=tol, ref_val=)
+
     
     def f2(x):
-        return np.exp(-(x)**2)*x**2
+        return np.exp(-x**2)*x**2
     
     tol = 1e-10
     b = sp.method_ft.find_integral_boundary(integrand=f2, tol=tol, ref_val=1, x0=+1, max_val=1e6)
     a = sp.method_ft.find_integral_boundary(integrand=f2, tol=tol, ref_val=-1, x0=-1, max_val=1e6)
     assert a != b
-    assert abs(f2(a) -tol) < 1e-14
-    assert abs(f2(b)-tol) < 1e-14
+    assert abs(f2(a) - tol) < 1e-14
+    assert abs(f2(b) - tol) < 1e-14
     
     b = sp.method_ft.find_integral_boundary(integrand=f2, tol=tol, ref_val=1, x0=b+5, max_val=1e6)
     a = sp.method_ft.find_integral_boundary(integrand=f2, tol=tol, ref_val=-1, x0=a-5, max_val=1e6)
