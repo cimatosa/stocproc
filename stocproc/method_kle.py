@@ -228,7 +228,8 @@ def get_four_point_weights_times(t_max, num_grid_points):
 
 
 def get_gauss_legendre_weights_times(t_max, num_grid_points):
-    """Returns the weights and grid points for numeric integration via **Gauss integration**
+    r"""
+    Returns the weights and grid points for numeric integration via **Gauss integration**
     by expanding the function in terms of Legendre Polynomials.
 
     :param t_max: end of the interval for the time grid :math:`[0,t_\mathrm{max}]`
@@ -277,7 +278,7 @@ def get_tanh_sinh_weights_times(t_max, num_grid_points):
         d = -1.012504470475915
         if N < 4:
             raise ValueError("only tested for N >= 4")
-        return a * N ** b + c * N ** d
+        return a * N**b + c * N**d
 
     h = get_h_of_N(num_grid_points)
     if num_grid_points % 2 != 1:
@@ -347,7 +348,7 @@ def auto_ng(
     meth=get_mid_point_weights_times,
     tol=1e-3,
     diff_method="full",
-    dm_random_samples=10 ** 4,
+    dm_random_samples=10**4,
     ret_eigvals=False,
     relative_difference=False,
 ):
@@ -445,7 +446,7 @@ def auto_ng(
     k = 4
     while True:
         k += 1
-        ng = 2 ** k + 1
+        ng = 2**k + 1
         log.info("check {} grid points".format(ng))
         t, w = meth(t_max, ng)
         is_equi = is_axis_equidistant(t)

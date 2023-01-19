@@ -305,7 +305,9 @@ class StocProc(abc.ABC):
             # random complex normal samples
             y = np.random.normal(scale=self._one_over_sqrt_2, size=2 * self.get_num_y())
             if y.dtype != np.float64:
-                raise RuntimeError(f"Expect that numpy.random.normal returns with dtype float64, but it is {y.dtype}")
+                raise RuntimeError(
+                    f"Expect that numpy.random.normal returns with dtype float64, but it is {y.dtype}"
+                )
             y = y.view(np.complex128)
         else:
             if len(y) != self.get_num_y():
@@ -385,7 +387,7 @@ class StocProc_KLE(StocProc):
         ng_fac=4,
         meth="fourpoint",
         diff_method="full",
-        dm_random_samples=10 ** 4,
+        dm_random_samples=10**4,
         seed=None,
         align_eig_vec=False,
         scale=1,
@@ -574,7 +576,7 @@ class StocProc_FFT(StocProc):
 
         if not negative_frequencies:
             log.info("non neg freq only")
-            a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(
+            a, b, N, dx, dt = method_ft.calc_ab_n_dx_dt(
                 integrand=spectral_density,
                 intgr_tol=intgr_tol,
                 intpl_tol=intpl_tol,
@@ -584,7 +586,7 @@ class StocProc_FFT(StocProc):
             )
         else:
             log.info("use neg freq")
-            a, b, N, dx, dt = method_ft.calc_ab_N_dx_dt(
+            a, b, N, dx, dt = method_ft.calc_ab_n_dx_dt(
                 integrand=spectral_density,
                 intgr_tol=intgr_tol,
                 intpl_tol=intpl_tol,
@@ -764,7 +766,7 @@ class StocProc_TanhSinh(StocProc):
         d = intgr_tol + 1
         while d > intgr_tol:
             n *= 2
-            I = method_ft.fourier_integral_TanhSinh(
+            I = method_ft.fourier_integral_tanhsinh(
                 f=sd_over_pi, x_max=wmax, n=n, tau_l=tau, t_max_ts=t_max_ts
             )
             bcf_ref_t = alpha(tau)
@@ -779,7 +781,7 @@ class StocProc_TanhSinh(StocProc):
                 0, (N - 1) * dt_tol, N
             )
         )
-        num_FT = method_ft.fourier_integral_TanhSinh(
+        num_FT = method_ft.fourier_integral_tanhsinh(
             f=sd_over_pi, x_max=wmax, n=n, tau_l=tau, t_max_ts=t_max_ts
         )
 
@@ -805,7 +807,7 @@ class StocProc_TanhSinh(StocProc):
         assert d <= intgr_tol, "d:{}, intgr_tol:{}".format(d, intgr_tol)
         log.debug("done!")
 
-        yk, wk = method_ft.get_x_w_and_dt(n, wmax, t_max_ts)
+        yk, wk = method_ft.tanhsinh_get_x_and_w(n, wmax, t_max_ts)
         self.omega_k = yk
         self.fl = np.sqrt(wk * spectral_density(self.omega_k) / np.pi)
         super().setup(
