@@ -275,10 +275,11 @@ class StocProc(abc.ABC):
         r"""Returns the discrete time stochastic process :math:`z_n = z(t_n)`."""
         return self._z
 
-    def new_process(self, y=None, seed=None):
+    def new_process(self, y=None, seed=None, rand_skip=None):
         r"""Generate a new realization of the stochastic process.
 
         If ``seed`` is not ``None`` seed the random number generator with ``seed`` before drawing new random numbers.
+        Discard the first ``rand_skip`` samples.
 
         If ``y`` is ``None`` draw new random numbers to generate the new realization. Otherwise use ``y`` as input to
         generate the new realization.
@@ -290,12 +291,16 @@ class StocProc(abc.ABC):
 
         # clean up old data
         del self._interpolator
+        self._interpolator = None
         del self._z
+        self._z = None
 
         self._proc_cnt += 1
         if seed != None:
             log.info("use fixed seed ({}) for new process".format(seed))
             np.random.seed(seed)
+            if rand_skip:
+                np.random.random(rand_skip)
         if y is None:
             # random complex normal samples
             y = np.random.normal(scale=self._one_over_sqrt_2, size=2 * self.get_num_y())
