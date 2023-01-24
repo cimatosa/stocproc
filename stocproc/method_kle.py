@@ -1,14 +1,16 @@
+# python imports
+import logging
+import time
+
+# third party imports
 import numpy as np
 from scipy.linalg import eigh as scipy_eigh
-from scipy.special import gamma
-from scipy.optimize import minimize
-import time
+import fcSpline
+
+# module imports
 from . import stocproc_c
 from . import gquad
 from . import tools
-import fcSpline
-
-import logging
 
 log = logging.getLogger(__name__)
 
