@@ -2,7 +2,7 @@ import sys
 import os
 
 import numpy as np
-from scipy.linalg import eig
+from scipy.linalg import eig, ishermitian
 
 try:
     import matplotlib.pyplot as plt
@@ -60,12 +60,12 @@ def test_weights(plot=False):
 
     tm = 10
     meth = [
-        method_kle.get_mid_point_weights_times,
-        method_kle.get_trapezoidal_weights_times,
-        method_kle.get_simpson_weights_times,
-        method_kle.get_four_point_weights_times,
-        method_kle.get_gauss_legendre_weights_times,
-        method_kle.get_tanh_sinh_weights_times,
+        method_kle.get_nodes_weights_mid_point,
+        method_kle.get_nodes_weights_trapezoidal,
+        method_kle.get_nodes_weights_simpson,
+        method_kle.get_nodes_weights_four_point,
+        method_kle.get_nodes_weights_gauss_legendre,
+        method_kle.get_nodes_weights_tanh_sinh,
     ]
     cols = ["r", "b", "g", "m", "c", "lime"]
     errs = [5e-3, 6e-5, 2e-8, 7e-11, 5e-16, 8e-15]
@@ -73,7 +73,7 @@ def test_weights(plot=False):
 
     ng = 401
     for i, _meth in enumerate(meth):
-        t, w = _meth(t_max=tm, num_grid_points=ng)
+        t, w, _ = _meth(t_max=tm, num_grid_points=ng)
         err = abs(I_exact - np.sum(w * f(t)))
         print(_meth.__name__, err)
         assert err < errs[i], "err={} >= {}".format(err, errs[i])
@@ -84,7 +84,7 @@ def test_weights(plot=False):
             ydata = []
             for k in np.logspace(0, 2.5, 30):
                 ng = 4 * int(k) + 1
-                t, w = _meth(t_max=tm, num_grid_points=ng)
+                t, w, _ = _meth(t_max=tm, num_grid_points=ng)
                 I = np.sum(w * f(t))
                 xdata.append(ng)
                 ydata.append(abs(I - I_exact))
@@ -105,37 +105,43 @@ def test_weights(plot=False):
 
 
 def test_is_axis_equidistant():
-    t, w = method_kle.get_mid_point_weights_times(1, 51)
+    t, w, is_equi = method_kle.get_nodes_weights_mid_point(1, 51)
+    assert is_equi is True
     assert method_kle.is_axis_equidistant(t)
 
-    t, w = method_kle.get_trapezoidal_weights_times(1, 51)
+    t, w, is_equi = method_kle.get_nodes_weights_trapezoidal(1, 51)
+    assert is_equi is True
     assert method_kle.is_axis_equidistant(t)
 
-    t, w = method_kle.get_simpson_weights_times(1, 51)
+    t, w, is_equi = method_kle.get_nodes_weights_simpson(1, 51)
+    assert is_equi is True
     assert method_kle.is_axis_equidistant(t)
 
-    t, w = method_kle.get_four_point_weights_times(1, 53)
+    t, w, is_equi = method_kle.get_nodes_weights_four_point(1, 53)
+    assert is_equi is True
     assert method_kle.is_axis_equidistant(t)
 
-    t, w = method_kle.get_gauss_legendre_weights_times(1, 51)
+    t, w, is_equi = method_kle.get_nodes_weights_gauss_legendre(1, 51)
+    assert is_equi is False
     assert not method_kle.is_axis_equidistant(t)
 
-    t, w = method_kle.get_tanh_sinh_weights_times(1, 51)
+    t, w, is_equi = method_kle.get_nodes_weights_tanh_sinh(1, 51)
+    assert is_equi is False
     assert not method_kle.is_axis_equidistant(t)
 
 
-def test_subdevide_axis():
+def test_subdivide_axis():
     t = [0, 1, 3]
-    tf1 = method_kle.subdevide_axis(t, ngfac=1)
+    tf1 = method_kle.subdivide_axis(t, ng_fac=1)
     assert np.max(np.abs(tf1 - np.asarray([0, 1, 3]))) < 1e-15
-    tf2 = method_kle.subdevide_axis(t, ngfac=2)
+    tf2 = method_kle.subdivide_axis(t, ng_fac=2)
     assert np.max(np.abs(tf2 - np.asarray([0, 0.5, 1, 2, 3]))) < 1e-15
-    tf3 = method_kle.subdevide_axis(t, ngfac=3)
+    tf3 = method_kle.subdivide_axis(t, ng_fac=3)
     assert (
         np.max(np.abs(tf3 - np.asarray([0, 1 / 3, 2 / 3, 1, 1 + 2 / 3, 1 + 4 / 3, 3])))
         < 1e-15
     )
-    tf4 = method_kle.subdevide_axis(t, ngfac=4)
+    tf4 = method_kle.subdivide_axis(t, ng_fac=4)
     assert (
         np.max(np.abs(tf4 - np.asarray([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3])))
         < 1e-15
@@ -149,17 +155,10 @@ def test_analytic_lorentzian_eigenfunctions():
     num = 10
     corr = lambda x: np.exp(-gamma * np.abs(x) - 1j * w * x)
     lef = tools.LorentzianEigenFunctions(tmax, gamma, w, num)
-    t = np.linspace(0, tmax, 55)
+    t = np.linspace(0, tmax, 15)
     for idx in range(num):
         u = lef.get_eigfunc(idx)
-
-        u_kernel_re = np.asarray(
-            [quad(lambda s: np.real(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t]
-        )
-        u_kernel_im = np.asarray(
-            [quad(lambda s: np.imag(corr(ti - s) * u(s)), 0, tmax)[0] for ti in t]
-        )
-        u_kernel = u_kernel_re + 1j * u_kernel_im
+        u_kernel = np.asarray([tools.complex_quad(lambda s: corr(ti-s) * u(s), 0, tmax) for ti in t])
         c = 1 / lef.get_eigval(idx)
         md = np.max(np.abs(u(t) - c * u_kernel))
         assert md < 1e-6
@@ -168,23 +167,33 @@ def test_analytic_lorentzian_eigenfunctions():
         assert abs(1 - norm) < 1e-15
 
 
+def test_calc_acf():
+    t = np.linspace(0, 1, 15)
+    ac_mat = method_kle._calc_corr_matrix(t, lac)
+    ac_ref = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+
+    assert ishermitian(ac_mat)
+    assert np.allclose(ac_mat, ac_ref)
+
+
+
 def test_solve_fredholm():
     """
     here we compare the fredholm eigenvalue problem solver
-    (which maps the non hermetian eigenvalue problem to a hermetian one)
-    with a straigt forward non hermetian eigenvalue solver
+    (which maps the non Hermitian eigenvalue problem to a Hermitian one)
+    with a straight forward non Hermitian eigenvalue solver
     """
     t_max = 15
     corr = lac
     meth = [
-        method_kle.get_mid_point_weights_times,
-        method_kle.get_simpson_weights_times,
-        method_kle.get_four_point_weights_times,
+        method_kle.get_nodes_weights_mid_point,
+        method_kle.get_nodes_weights_simpson,
+        method_kle.get_nodes_weights_four_point,
     ]
     ng = 41
     for _meth in meth:
-        t, w = _meth(t_max, ng)
-        r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+        t, w, is_equi = _meth(t_max, ng)
+        r = method_kle._calc_corr_matrix(t, corr, is_equi)
         _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
         eval, evec = eig(r * w.reshape(1, -1))
         max_imag = np.max(np.abs(np.imag(eval)))
@@ -221,7 +230,7 @@ def test_cython_interpolation():
     t_max = 15
     corr = oac
 
-    meth = method_kle.get_four_point_weights_times
+    meth = method_kle.get_nodes_weights_four_point
 
     def my_intp(ti, corr, w, t, u, lam):
         return np.sum(u * corr(ti - t) * w) / lam
@@ -229,8 +238,8 @@ def test_cython_interpolation():
     k = 40
     ng = 4 * k + 1
 
-    t, w = meth(t_max, ng)
-    r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
+    t, w, is_equi = meth(t_max, ng)
+    r = method_kle._calc_corr_matrix(t, corr, is_equi)
     _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
     method_kle.align_eig_vec(_eig_vec)
 
@@ -270,8 +279,8 @@ def test_solve_fredholm_reconstr_ac():
     t_max = 10
     tol = 2e-10
     for ng in range(11, 500, 30):
-        t, w = sp.method_kle.get_mid_point_weights_times(t_max, ng)
-        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+        t, w, is_equi = sp.method_kle.get_nodes_weights_mid_point(t_max, ng)
+        r = sp.method_kle._calc_corr_matrix(t, lac, is_equi)
         _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
         _eig_vec_ast = np.conj(_eig_vec)  # (N_gp, N_ev)
         tmp = _eig_val.reshape(1, -1) * _eig_vec  # (N_gp, N_ev)
@@ -279,8 +288,8 @@ def test_solve_fredholm_reconstr_ac():
         rd = np.max(np.abs(recs_bcf - r) / np.abs(r))
         assert rd < tol, "rd={} >= {}".format(rd, tol)
 
-        t, w = sp.method_kle.get_simpson_weights_times(t_max, ng)
-        r = lac(t.reshape(-1, 1) - t.reshape(1, -1))
+        t, w, is_equi = sp.method_kle.get_nodes_weights_simpson(t_max, ng)
+        r = sp.method_kle._calc_corr_matrix(t, lac, is_equi)
         _eig_val, _eig_vec = sp.method_kle.solve_hom_fredholm(r, w)
         _eig_vec_ast = np.conj(_eig_vec)  # (N_gp, N_ev)
         tmp = _eig_val.reshape(1, -1) * _eig_vec  # (N_gp, N_ev)
@@ -294,16 +303,16 @@ def test_auto_ng():
     t_max = 8
     ng_fac = 1
     meth = [
-        method_kle.get_mid_point_weights_times,
-        method_kle.get_trapezoidal_weights_times,
-        method_kle.get_simpson_weights_times,
-        method_kle.get_four_point_weights_times,
+        method_kle.get_nodes_weights_mid_point,
+        method_kle.get_nodes_weights_trapezoidal,
+        method_kle.get_nodes_weights_simpson,
+        method_kle.get_nodes_weights_four_point,
     ]
     # method_kle.get_gauss_legendre_weights_times]
     # method_kle.get_tanh_sinh_weights_times]
 
     for _meth in meth:
-        ui, t = method_kle.auto_ng(corr, t_max, ngfac=ng_fac, meth=_meth)
+        ui, t = method_kle.auto_ng(corr, t_max, ng_fac=ng_fac, meth=_meth)
         print(_meth.__name__, ui.shape)
 
 
@@ -311,7 +320,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     test_weights(plot=False)
     test_is_axis_equidistant()
-    test_subdevide_axis()
+    test_subdivide_axis()
     test_analytic_lorentzian_eigenfunctions()
     test_solve_fredholm()
     test_cython_interpolation()

@@ -73,7 +73,7 @@ def show_auto_ng():
     ui, t, ev = method_kle.auto_ng(
         corr, t_max, ngfac=ng_fac, meth=_meth, tol=tol, ret_eigvals=True
     )
-    tsf = method_kle.subdevide_axis(t, 4)
+    tsf = method_kle.subdivide_axis(t, 4)
     lef = tools.LorentzianEigenFunctions(t_max=t_max, gamma=1, w=_WC_, num=800)
     c_all = corr(t_check - s_check)
 
@@ -173,8 +173,8 @@ def show_reconstr_ac():
         r = method_kle._calc_corr_matrix(t, corr, is_equi)
         _eig_vals, _eig_vecs = method_kle.solve_hom_fredholm(r, w)
 
-        tfine = method_kle.subdevide_axis(t, ng_fac)  # setup fine
-        tsfine = method_kle.subdevide_axis(tfine, 2)
+        tfine = method_kle.subdivide_axis(t, ng_fac)  # setup fine
+        tsfine = method_kle.subdivide_axis(tfine, 2)
 
         if is_equi:
             alpha_k = method_kle._calc_corr_min_t_plus_t(
@@ -823,8 +823,8 @@ def show_reconstr_ac_interp():
             r = corr(t.reshape(-1, 1) - t.reshape(1, -1))
             _eig_val, _eig_vec = method_kle.solve_hom_fredholm(r, w)
 
-            tf = method_kle.subdevide_axis(t, ngfac=3)
-            tsf = method_kle.subdevide_axis(tf, ngfac=2)
+            tf = method_kle.subdivide_axis(t, ngfac=3)
+            tsf = method_kle.subdivide_axis(tf, ngfac=2)
 
             diff1 = -corr(t.reshape(-1, 1) - t.reshape(1, -1))
             diff2 = -corr(tf.reshape(-1, 1) - tf.reshape(1, -1))

@@ -229,6 +229,7 @@ def test_SP_TanhSinh():
         print(d)
         assert d < d_tol[j]
 
+
 def test_SP_TanhSinh_dump():
     tmax = 25
     _sp = sp.StocProc_TanhSinh(

@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 # the function may also handle hole numpy NDArrays as input
 FUNCTION_FLOAT_TO_CPLX = Callable[[Union[float, NDArray]], Union[complex, NDArray]]
 
+
 class FTReferenceError(Exception):
     pass
 
@@ -221,22 +222,22 @@ def simpson_weights(n: int) -> NDArray:
         weights for the simpson integration scheme
     """
     w = np.empty(shape=n, dtype=np.float64)
-    n_odd = n if n % 2 == 1 else n-1
+    n_odd = n if n % 2 == 1 else n - 1
 
     # first, use n_odd points "only"
-    w[1:n_odd:2] = 4/3    # points at interval middle
-    w[2:n_odd-1:2] = 2/3  # points connecting two interval (factor 2)
-    w[0] = 1/3            # starting point
-    w[n_odd-1] = 1/3        # end point, in case of odd number of points
+    w[1:n_odd:2] = 4 / 3  # points at interval middle
+    w[2 : n_odd - 1 : 2] = 2 / 3  # points connecting two interval (factor 2)
+    w[0] = 1 / 3  # starting point
+    w[n_odd - 1] = 1 / 3  # end point, in case of odd number of points
 
     # if we have an even number of points,
     # we can still put a quadratic function through the last three points
     # and evaluate the integral from n-1 to n, which yields the
     # following correction
     if n != n_odd:
-        w[-3] -= 1/12
-        w[-2] += 8/12
-        w[-1] = 5/12
+        w[-3] -= 1 / 12
+        w[-2] += 8 / 12
+        w[-1] = 5 / 12
 
     return w
 
@@ -267,7 +268,7 @@ def fourier_integral_simps_fft(
     yl = integrand(a + l * delta_x)
     wl = simpson_weights(n)
 
-    fft_vals = np_rfft(wl*yl)
+    fft_vals = np_rfft(wl * yl)
     tau = np.arange(len(fft_vals)) * delta_k
     return tau, delta_x * np.exp(-1j * tau * a) * fft_vals
 
@@ -296,8 +297,8 @@ def tanhsinh_g_ast_of_t(t: float) -> float:
     Returns:
         g_ast(t)
     """
-    s_t = np.pi/2 * np.sinh(t)
-    return 1/(np.exp(s_t) * np.cosh(s_t))
+    s_t = np.pi / 2 * np.sinh(t)
+    return 1 / (np.exp(s_t) * np.cosh(s_t))
 
 
 def tanhsinh_w_t(t: float) -> float:
@@ -321,16 +322,16 @@ def tanhsinh_w_t(t: float) -> float:
     Returns:
         the "weight" function w(t)
     """
-    s_t = np.sinh(t)*np.pi/2
-    return np.pi*np.cosh(t)/2/np.cosh(s_t)**2
+    s_t = np.sinh(t) * np.pi / 2
+    return np.pi * np.cosh(t) / 2 / np.cosh(s_t) ** 2
 
 
 def tanhsinh_t_max_for_singularity(
-        f: FUNCTION_FLOAT_TO_CPLX,
-        a: float,
-        b: float,
-        tol: float,
-        max_num_iterations: int = 50,
+    f: FUNCTION_FLOAT_TO_CPLX,
+    a: float,
+    b: float,
+    tol: float,
+    max_num_iterations: int = 50,
 ) -> float:
     """
     Numeric integration of a function with a singularity at the boundary 'a' is efficiently
@@ -356,7 +357,9 @@ def tanhsinh_t_max_for_singularity(
         max_num_iterations: maximum number of iteration allowed. If reached, a RuntimeError is raised.
     """
     if a != 0:
-        log.warning("a should be 0 for the tanh-sinh integration scheme to be beneficial!")
+        log.warning(
+            "a should be 0 for the tanh-sinh integration scheme to be beneficial!"
+        )
 
     sc = (b - a) / 2
     t = 3
@@ -368,7 +371,9 @@ def tanhsinh_t_max_for_singularity(
         tmp = abs(sc * f_x * w_t)
         log.debug(f"at t={t} we have |w(t) f(x(t))| = {tmp:.2e}")
         if tmp < tol:
-            log.debug(f"criterion |w(t) f(x(t))| < tol = {tol} was met -> return t_tol={t}")
+            log.debug(
+                f"criterion |w(t) f(x(t))| < tol = {tol} was met -> return t_tol={t}"
+            )
             return t
         t += 0.1
 
@@ -405,11 +410,7 @@ def tanhsinh_x_and_w(n: int, x_max: float, t_max: float) -> tuple[NDArray, NDArr
 
 
 def fourier_integral_tanhsinh_x0_0(
-        f: FUNCTION_FLOAT_TO_CPLX,
-        x_max: float,
-        n: int,
-        tau_l: NDArray,
-        t_max_ts: float
+    f: FUNCTION_FLOAT_TO_CPLX, x_max: float, n: int, tau_l: NDArray, t_max_ts: float
 ) -> NDArray:
     """
     Evaluate the Fourier integral of f(x) for a list of values tau_l,
@@ -441,15 +442,16 @@ def fourier_integral_tanhsinh_x0_0(
     f_x = f(x)
     size_x = n
     size_tau = len(tau_l)
-    return np.einsum('i, i, ij', w, f_x, np.exp(-1j*x.reshape(size_x, -1) * tau_l.reshape(-1, size_tau)))
+    return np.einsum(
+        "i, i, ij",
+        w,
+        f_x,
+        np.exp(-1j * x.reshape(size_x, -1) * tau_l.reshape(-1, size_tau)),
+    )
 
 
 def fourier_integral_tanhsinh(
-        integrand: FUNCTION_FLOAT_TO_CPLX,
-        a: float,
-        b: float,
-        n: int,
-        tau: NDArray
+    integrand: FUNCTION_FLOAT_TO_CPLX, a: float, b: float, n: int, tau: NDArray
 ) -> NDArray:
     """
     Approximates F(t_i) int_a^b dx integrand(x) exp(i x t_i) using the tanh-sinh integration
@@ -472,11 +474,7 @@ def fourier_integral_tanhsinh(
     """
     t_max = tanhsinh_t_max_for_singularity(integrand, a, b, tol=1e-16)
     F_t = fourier_integral_tanhsinh_x0_0(
-        f=lambda x: integrand(x + a),
-        x_max=b-a,
-        n=n,
-        tau_l=tau,
-        t_max_ts=t_max
+        f=lambda x: integrand(x + a), x_max=b - a, n=n, tau_l=tau, t_max_ts=t_max
     )
     return F_t * np.exp(-1j * tau * a)
 
@@ -513,16 +511,16 @@ def _abs_diff(x_ref: NDArray, x: NDArray) -> NDArray:
 
 
 def get_suitable_a_b_n_for_fourier_integral(
-        integrand: FUNCTION_FLOAT_TO_CPLX,
-        k_max: float,
-        ft_ref: FUNCTION_FLOAT_TO_CPLX,
-        tol: float,
-        opt_b_only: bool,
-        diff_method: Callable[[NDArray, NDArray], NDArray],
-        ref_val_left: float = 0,
-        ref_val_right: float = 0,
-        max_num_iteration: int = 100,
-    ) -> tuple[float, float, int]:
+    integrand: FUNCTION_FLOAT_TO_CPLX,
+    k_max: float,
+    ft_ref: FUNCTION_FLOAT_TO_CPLX,
+    tol: float,
+    opt_b_only: bool,
+    diff_method: Callable[[NDArray, NDArray], NDArray],
+    ref_val_left: float = 0,
+    ref_val_right: float = 0,
+    max_num_iteration: int = 100,
+) -> tuple[float, float, int]:
     """
     Determine the integral boundaries 'a' and 'b', as well as the number of grid points 'n'
     of the numeric Fourier integral
@@ -561,9 +559,12 @@ def get_suitable_a_b_n_for_fourier_integral(
         I0 = quad(integrand, 0, np.inf)[0]
     else:
         I0 = quad(integrand, -np.inf, np.inf)[0]
+
     ft_ref_0 = ft_ref(0)
     rd = np.abs(ft_ref_0 - I0) / np.abs(ft_ref_0)
     log.debug(f"check Fourier integral at w=0 yields a relative difference of {rd:.3e}")
+    log.debug(f"I_0 = {I0}")
+    log.debug(f"ft_ref_0 = {ft_ref_0}")
     if rd > 1e-6:
         raise FTReferenceError(
             "It seems that 'ft_ref' is not the fourier transform of 'integrand'!"
@@ -596,24 +597,26 @@ def get_suitable_a_b_n_for_fourier_integral(
             else:
                 a = find_integral_boundary(
                     integrand=integrand,
-                    direction='left',
+                    direction="left",
                     tol=fx_min,
                     ref_val=ref_val_left,
-                    max_num_iteration=max_num_iteration
+                    max_num_iteration=max_num_iteration,
                 )
             b = find_integral_boundary(
                 integrand=integrand,
-                direction='right',
+                direction="right",
                 tol=fx_min,
                 ref_val=ref_val_right,
-                max_num_iteration=max_num_iteration
+                max_num_iteration=max_num_iteration,
             )
 
             k, ft_k = fourier_integral_midpoint_fft(integrand, a, b, n)
             idx = np.where(k <= k_max)
             ft_ref_k = ft_ref(k[idx])
             d = np.max(diff_method(ft_ref_k, ft_k[idx]))
-            log.debug(f"fx_min:{fx_min:.2e} yields: interval [{a:.2e},{b:.2e}] diff {d:.2e}")
+            log.debug(
+                f"fx_min:{fx_min:.2e} yields: interval [{a:.2e},{b:.2e}] diff {d:.2e}"
+            )
 
             if d_old is not None and d > d_old:
                 log.debug(
@@ -630,24 +633,34 @@ def get_suitable_a_b_n_for_fourier_integral(
 
 
 def get_dt_for_accurate_interpolation(
-        t_max: float,
-        tol: float,
-        ft_ref: FUNCTION_FLOAT_TO_CPLX,
-        diff_method: Callable[[NDArray, NDArray], NDArray] = _abs_diff
+    t_max: float,
+    tol: float,
+    ft_ref: FUNCTION_FLOAT_TO_CPLX,
+    diff_method: Callable[[NDArray, NDArray], NDArray] = _abs_diff,
 ):
-    """
-    Determine the discretization of a given interval in the Fourier transform domain which is necessary
-    to ensure a given tolerance threshold for qubic spline interpolation for that interval.
+    r"""
+    Determine the spacing of a uniform discretization of the given interval $[0, t_\mathrm{max}]$ which is
+    necessary to ensure a given tolerance threshold for qubic spline interpolation of a function over that interval.
+
+    For a given grid $t_i$ we estimate the interpolation error $\epsilon_i$ by the error
+    at the center of interval $[t_i, t_{i+1}]$, i.e., $x_i = (t_i + t_{i+1})/2$.
+    If the overall error is below `tol`
+
+    $$
+        \max_i \epsilon_i < \mathrm{tol}, \qquad \epsilon_i = \mathrm{diff}(f(x_i), f_\mathrm{interp}(x_i))
+    $$
+
+    the interval length $\mathrm{dt} = t_{i+1} - t_i$ is returned.
 
     Parameters:
-         t_max: specifies the interval of consideration [0, t_max]
-         tol: tolerance
-         ft_ref: the given Fourier transform as callable function
-         diff_method: a measure to quantify the difference between the reference value and
-         the interpolated value (predefined functions are '_abd_diff' and '_rel_diff')
+        t_max: specifies the interval of consideration [0, t_max]
+        tol: tolerance
+        ft_ref: the function (callable: float -> complex)
+        diff_method: a measure to quantify the difference between the reference value and
+            the interpolated value (predefined functions are `_abs_diff` and `_rel_diff`)
     Returns:
-         A step size 'dt' for which the interpolation between the resulting discretization fulfills
-         the condition max_t diff_method(interp_ft(t), ft_ref(t)) < tol.
+        A step size 'dt' for which the interpolation between the resulting discretization fulfills
+            the condition max_t diff_method(interp_ft(t), ft_ref(t)) < tol.
     """
     n = 16
 
@@ -663,37 +676,38 @@ def get_dt_for_accurate_interpolation(
 
         ft_ref_n[::2] = ft_ref_n_old
 
-        with Pool() as pool:
-            ft_ref_n_new = np.asarray(pool.map(ft_ref, tau[1::2]))
+        try:
+            with Pool() as pool:
+                ft_ref_n_new = np.asarray(pool.map(ft_ref, tau[1::2]))
+        except Exception as e:
+            log.warning(f"could not call 'ft_ref' in parallel (mp.pool.map) ({e})")
+            ft_ref_n_new = ft_ref(tau[1::2])
 
         ft_ref_n[1::2] = np.array(ft_ref_n_new)
 
         ft_intp = fcSpline.FCS(x_low=0, x_high=t_max, y=ft_ref_n_old)
-
-        with Pool() as pool:
-            ft_intp_n_new = np.asarray(pool.map(ft_intp, tau[1::2]))
+        ft_intp_n_new = ft_intp(tau[1::2])
 
         ft_ref_n_new /= ft_ref_0
         ft_intp_n_new /= ft_ref_0
 
         d = np.max(diff_method(ft_intp_n_new, ft_ref_n_new))
-        log.debug(
-            "interpolation with step size dt {:.2e} yields a difference of {:.2e}".format(2 * tau[1], d)
-        )
+        dt = 2 * tau[1]
+        log.debug(f"interpolation with step size dt {dt:.2e} estimates a difference of {d:.2e}")
         if d < tol:
-            return t_max / (n / 2)
+            return dt
 
         ft_ref_n_old = ft_ref_n
 
 
 def calc_ab_n_dx_dt(
-        integrand: FUNCTION_FLOAT_TO_CPLX,
-        intgr_tol: float,
-        intpl_tol: float,
-        t_max: float,
-        ft_ref: FUNCTION_FLOAT_TO_CPLX,
-        opt_b_only: bool,
-        diff_method: Callable[[NDArray, NDArray], NDArray] = _abs_diff
+    integrand: FUNCTION_FLOAT_TO_CPLX,
+    intgr_tol: float,
+    intpl_tol: float,
+    t_max: float,
+    ft_ref: FUNCTION_FLOAT_TO_CPLX,
+    opt_b_only: bool,
+    diff_method: Callable[[NDArray, NDArray], NDArray] = _abs_diff,
 ) -> tuple[float, float, int, float, float]:
     r"""
     Calculate the parameters for the FFT method such that the error tolerance is met.
@@ -749,7 +763,7 @@ def calc_ab_n_dx_dt(
     try:
         t_tol = find_integral_boundary(
             lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
-            direction='right',
+            direction="right",
             tol=intgr_tol,
         )
     except RuntimeError:
@@ -758,7 +772,9 @@ def calc_ab_n_dx_dt(
     dt_tol = get_dt_for_accurate_interpolation(
         t_max=t_max_for_dt, tol=intpl_tol, ft_ref=ft_ref, diff_method=diff_method
     )
-    log.debug(f"get_dt_for_accurate_interpolation returns the condition dt < {dt_tol:.3e}")
+    log.debug(
+        f"get_dt_for_accurate_interpolation returns the condition dt < {dt_tol:.3e}"
+    )
 
     log.debug("call get_suitable_a_b_n_for_fourier_integral (may take some time) ...")
     a, b, n = get_suitable_a_b_n_for_fourier_integral(
@@ -770,14 +786,18 @@ def calc_ab_n_dx_dt(
         diff_method=diff_method,
     )
     dx = (b - a) / n
-    log.debug(f"get_suitable_a_b_n_for_fourier_integral returns condition dx < {dx:.3e}")
+    log.debug(
+        f"get_suitable_a_b_n_for_fourier_integral returns condition dx < {dx:.3e}"
+    )
 
     dt = 2 * np.pi / dx / n
     log.debug(f"dx={dt:.3e} -> dt={dx:.3e}")
     # check if this dt obeys the above condition due to interpolation (get_dt_for_accurate_interpolation)
     if dt > dt_tol:
         log.debug(f"dt does not meet the interpolation condition, dt < {dt_tol:.3e}")
-        log.debug(" -> increase n (to powers of 2) such that dx and dt decrease simultaneously")
+        log.debug(
+            " -> increase n (to powers of 2) such that dx and dt decrease simultaneously"
+        )
         n_min = 2 * np.pi / dx / dt_tol
         n = 2 ** int(np.ceil(np.log2(n_min)))
         scale = np.sqrt(n_min / n)

@@ -15,7 +15,7 @@ import fcSpline
 
 sp.logging_setup(
     sh_level=logging.DEBUG,
-    sp_log_level=logging.DEBUG,
+    smpl_log_level=logging.DEBUG,
     kle_log_level=logging.DEBUG,
     ft_log_level=logging.DEBUG,
 )
@@ -83,9 +83,9 @@ def test_find_integral_boundary():
 
 def test_simpson_even_quad_and_midpoint():
     def f(x):
-        return np.cos(x)**2 * (x+1)**2
+        return np.cos(x) ** 2 * (x + 1) ** 2
 
-    i_analyt = np.pi/6 * (8*np.pi**2 + 12*np.pi + 9)
+    i_analyt = np.pi / 6 * (8 * np.pi**2 + 12 * np.pi + 9)
 
     for odd in [0, 1]:
         data_simpson = []
@@ -94,16 +94,16 @@ def test_simpson_even_quad_and_midpoint():
             n = 2**n + odd
 
             # simpson integration
-            x, dx = np.linspace(0, 2*np.pi, n, retstep=True)
+            x, dx = np.linspace(0, 2 * np.pi, n, retstep=True)
             f_x = f(x)
             w = method_ft.simpson_weights(n)
-            i = np.sum(f_x*w) * dx
+            i = np.sum(f_x * w) * dx
             d = abs(i - i_analyt)
             data_simpson.append([dx, d])
 
             # midpoint
             x, dx = np.linspace(0, 2 * np.pi, n, retstep=True, endpoint=False)
-            f_x = f(x+dx/2)
+            f_x = f(x + dx / 2)
             i = np.sum(f_x) * dx
             d = abs(i - i_analyt)
             data_mid.append([dx, d])
@@ -114,7 +114,7 @@ def test_simpson_even_quad_and_midpoint():
         is_odd = odd == 1
 
         plt.title(f"odd number of points {is_odd}")
-        
+
         # plt.plot(data_simpson[:, 0], data_simpson[:, 1], marker='o', label='simpson')
         # plt.plot(data_mid[:, 0], data_mid[:, 1], marker='o', label='midpoint')
         # plt.xscale('log')
@@ -151,7 +151,7 @@ def test_fourier_integral_finite_boundary():
         r = np.empty_like(k, dtype=np.complex128)
         idx_zero = np.where(k == 0)
         idx_not_zero = np.where(k != 0)
-        r[idx_zero] = 1/3*(b**3 - a**3)
+        r[idx_zero] = 1 / 3 * (b**3 - a**3)
         k_nz = k[idx_not_zero]
         r[idx_not_zero] = (
             np.exp(-1j * a * k_nz) * (2j - a * k_nz * (2 + 1j * a * k_nz))
@@ -191,7 +191,9 @@ def test_fourier_integral_finite_boundary():
     # plt.show()
     mrd_simps = np.max(rd)
     assert mrd_simps < 4e-3, f"mrd_simps = {mrd_simps}"
-    assert mrd_simps < mrd_midp, f"mrd_simps ({mrd_simps:.3e}) >= mrd_trapz ({mrd_midp:.3e})"
+    assert (
+        mrd_simps < mrd_midp
+    ), f"mrd_simps ({mrd_simps:.3e}) >= mrd_trapz ({mrd_midp:.3e})"
 
     # check tanh-sinh
     # --------------------------
@@ -305,11 +307,14 @@ def test_get_suitable_a_b_n_for_fourier_integral():
     assert abs(abs(intg(b)) - tol) < 1e-8
 
     a, b, n = sp.method_ft.get_suitable_a_b_n_for_fourier_integral(
-        intg, k_max=50, tol=tol, ft_ref=bcf_ref, opt_b_only=False, diff_method=method_ft._abs_diff
+        intg,
+        k_max=50,
+        tol=tol,
+        ft_ref=bcf_ref,
+        opt_b_only=False,
+        diff_method=method_ft._abs_diff,
     )
-    t_i, ft_i = method_ft.fourier_integral_midpoint_fft(
-        integrand=intg, a=a, b=b, n=n
-    )
+    t_i, ft_i = method_ft.fourier_integral_midpoint_fft(integrand=intg, a=a, b=b, n=n)
     assert np.all(np.abs(bcf_ref(t_i) - ft_i) < tol)
 
 
@@ -324,12 +329,15 @@ def test_get_suitable_a_b_n_for_fourier_integral_b_only():
     tol = 1e-5
     t_max = 15
     a, b, n = sp.method_ft.get_suitable_a_b_n_for_fourier_integral(
-        integrand=intg, k_max=t_max, tol=tol, ft_ref=bcf_ref, opt_b_only=True, diff_method=method_ft._abs_diff
+        integrand=intg,
+        k_max=t_max,
+        tol=tol,
+        ft_ref=bcf_ref,
+        opt_b_only=True,
+        diff_method=method_ft._abs_diff,
     )
     assert a == 0
-    t_i, ft_i = method_ft.fourier_integral_midpoint_fft(
-        integrand=intg, a=0, b=b, n=n
-    )
+    t_i, ft_i = method_ft.fourier_integral_midpoint_fft(integrand=intg, a=0, b=b, n=n)
     idx = np.where(t_i <= t_max)
     assert np.max(np.abs(bcf_ref(t_i[idx]) - ft_i[idx])) < tol
 
@@ -339,14 +347,13 @@ def test_get_dt_for_accurate_interpolation():
     wc = 4
     tol = 1e-4
     bcf_ref = partial(obcf, s=s, wc=wc)
-
     dt = sp.method_ft.get_dt_for_accurate_interpolation(
         t_max=40, tol=tol, ft_ref=bcf_ref
     )
     t = np.arange(0, 2, dt)
     bcf_t = bcf_ref(t)
     bcf_fcs = fcSpline.FCS(x_low=t[0], x_high=t[-1], y=bcf_t)
-    t_fine = np.linspace(0, 2, len(t*3)+7)
+    t_fine = np.linspace(0, 2, len(t * 3) + 7)
 
     assert np.max(np.abs(bcf_ref(t_fine) - bcf_fcs(t_fine))) < tol
 

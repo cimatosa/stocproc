@@ -1,22 +1,34 @@
+"""
+The `samplers` module implements the samplers [`KarhunenLoeve`][stocproc.samplers.KarhunenLoeve],
+[`FastFourier`][stocproc.samplers.FastFourier], [`TanhSinh`][stocproc.samplers.TanhSinh] and
+[`Cholesky`][stocproc.samplers.Cholesky].
+They all inherit from the abstract base class [`StocProc`][stocproc.samplers.StocProc]
+which takes care of sampling a new process, evaluating the process at any time by interpolation and possibly
+caching. Any new sampler should be a subclass of [`StocProc`][stocproc.samplers.StocProc].
+"""
+
+# python imports
 import abc
-from functools import partial
-from typing import Optional
-import numpy as np
-from numpy.typing import NDArray
 from collections.abc import Callable
+from functools import partial
+import logging
+from typing import Optional, Union
+
+# third party imports
+import fcSpline
+import numpy as np
+import numpy.random
+from numpy.typing import NDArray
+from numpy.random import default_rng
 import scipy.linalg
 import scipy.optimize
-import time
-import pickle
-import hashlib
-import pathlib
-import tempfile
 
+# module imports
 from . import method_kle
 from . import method_ft
-import fcSpline
 
-import logging
+
+ONE_OVER_SQRT_2 = 1 / np.sqrt(2)
 
 log = logging.getLogger(__name__)
 
@@ -25,26 +37,27 @@ sh.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
 
 
 def logging_setup(
-    sh_level=logging.INFO,
-    sp_log_level=logging.INFO,
-    kle_log_level=logging.INFO,
-    ft_log_level=logging.INFO,
-):
+    sh_level: int = logging.INFO,
+    smpl_log_level: int = logging.INFO,
+    kle_log_level: int = logging.INFO,
+    ft_log_level: int = logging.INFO,
+) -> None:
     """
-    controls the logging levels
+    Controls the logging levels
 
-    On loading the ``stocproc`` module this function is called with its default argument
-    which ammount to informative logging.
+    On loading the `stocproc` module this function is called with its default argument
+    which amount to informative logging.
 
-    :param sh_level: the logging level for the (output) StreamHandler
-    :param sp_log_level: the logging level of the stocproc module log
-    :param kle_log_level: the logging level of the KLE helper functions log (see :doc:`method_kle`)
-    :param ft_log_level: the logging level of the FT helper functions log (see :doc:`method_ft`)
+    Parameters:
+        sh_level: the logging level for the (output) StreamHandler
+        smpl_log_level: the logging level of the [`samplers`][stocproc.samplers] module log
+        kle_log_level: the logging level of the KLE helper functions log (see [`method_kle`][stocproc.method_kle])
+        ft_log_level: the logging level of the FT helper functions log (see [`method_ft`][stocproc.method_ft])
     """
     sh.setLevel(sh_level)
 
     log.addHandler(sh)
-    log.setLevel(sp_log_level)
+    log.setLevel(smpl_log_level)
 
     method_kle.log.addHandler(sh)
     method_kle.log.setLevel(kle_log_level)
@@ -60,142 +73,97 @@ class StocProc(abc.ABC):
     r"""
     Interface definition for stochastic process implementations
 
-    A new implementation for a stochastic process generator should subclass :py:class:`StocProc` and
-    overwrite :py:func:`calc_z` and :py:func:`get_num_y`, as well as :any:`__post_init__` for initialization.
-    If the class variable :any:`_use_cach` is set to :any:`True`, then the implementation will be cached.
-    For this to work, the :any:`__getstate__` and :any:`__setstate__` methods should be properly implemented.
+    A new implementation for a stochastic process sampler (generator)
+    should subclass `StocProc` and overwrite
+    [`calc_z`][stocproc.samplers.StocProc.calc_z], [`get_num_y`][stocproc.samplers.StocProc.calc_z]
+    and optionally [`calc_z_dot`][stocproc.samplers.StocProc.calc_z_dot].
 
-    Depending on the equally spaced times :math:`t_n = n \frac{t_{max}}{N-1}` with :math:`n = 0 \dots N-1`
-    (:math:`N` = number of grid points),
-    the function :py:func:`calc_z` should map :math:`M` independent complex valued and Gaussian
-    distributed random variables :math:`Y_m` (with :math:`\langle Y_m \rangle = 0 = \langle Y_m Y_{m'} \rangle` and
-    :math:`\langle Y_m Y^\ast_{m'} = \delta_{m m'}\rangle`) to the discrete time stochastic process :math:`z_n = z(t_n)`.
+    For the $N$ equally spaced times $t_n = n \frac{t_{max}}{N-1}$ with $n = 0 \dots N-1$,
+    the function [`calc_z`][stocproc.samplers.StocProc.calc_z] should map $M$ independent complex valued and Gaussian
+    distributed random variables $Y_m$ with $\langle Y_m \rangle = 0 = \langle Y_m Y_{m'} \rangle$ and
+    $\langle Y_m Y^\ast_{m'} = \delta_{m m'}\rangle$) to the discrete time stochastic process $z_n = z(t_n)$.
+    The method [`get_num_y`][stocproc.samplers.StocProc.calc_z] needs to return the number $M$ of random variables
+    $Y_m$ required as input for [`calc_z`][stocproc.samplers.StocProc.calc_z].
 
-    :py:func:`get_num_y` needs to return the number :math:`M` of random variables :math:`Y_m` required as
-    input for :py:func:`calc_z`.
+    Just like [`calc_z`][stocproc.samplers.StocProc.calc_z], the method
+    [`calc_z_dot`][stocproc.samplers.StocProc.calc_z_dot] needs to be implemented.
+    It needs to map $M$ independent complex valued and Gaussian distributed random variables $Y_m$ with
+    $\langle Y_m \rangle = 0 = \langle Y_m Y_{m'} \rangle$ and
+    $\langle Y_m Y^\ast_{m'} = \delta_{m m'}\rangle$) to the derivative os the stochastic process
+    at discrete times, i.e., $\dot z_n = \dot z(t_n)$.
 
-    Having implemented :py:func:`calc_z` and :py:func:`get_num_y` the :py:class:`StocProc` provides
+    Having implemented these methods, the [`StocProc`][stocproc.samplers.StocProc] class provides
     convenient functions such as:
 
-        - :py:func:`__call__`: evaluate the stochastic process for any time within the interval
-          :math:`[0, t_{max}]` using cubic spline interpolation
-        - :py:func:`get_time`: returns the times :math:`t_n`
-        - :py:func:`get_z`: returns the discrete stochastic process :math:`z_n`
-        - :py:func:`new_process`: draw new samples :math:`Y_m` and update :math:`z_n` as well as the
-          cubic spline interpolator
-        - :py:func:`set_scale`: set a scalar pre factor for the auto correlation function
-          which scales the stochastic process such that :math:`\langle z(t) z^\ast(s)\rangle = \text{scale} \; \alpha(t-s)`.
+    - [`__call__`][stocproc.samplers.StocProc.__call__] evaluate the stochastic process for any time within the
+      interval $[0, t_\mathrm{max}]$ using [cubic spline interpolation](https://github.com/cimatosa/fcSpline)
+    - [`get_time`][stocproc.samplers.StocProc.get_time] returns the times $t_n$
+    - [`get_z`][stocproc.samplers.StocProc.get_z] returns the discrete stochastic process $z_n$
+    - [`new_process`][stocproc.samplers.StocProc.new_process] draws new samples $Y_m$ and updates $z_n$ as well as the
+      cubic spline interpolator
+    - [`set_scale`][stocproc.samplers.StocProc.set_scale] set the scalar pre factor $\eta$ of the auto-correlation
+      function which scales the stochastic process such that $\langle z(t) z^\ast(s)\rangle = \eta \alpha(t-s)$.
 
-    :param t_max: specifies the upper bound of the time interval
-    :param num_grid_points: number of grid points :math:`N`
-    :param seed: if not ``None`` seed the random number generator with ``seed``
-    :param t_axis: an explicit definition of times t_k (may be non equidistant)
-    :param scale: passes ``scale`` to :py:func:`set_scale`
-    :param calc_deriv: whether to calculate the derivative of the stochastic process
-    :param invalidate_cache: ignore whether the instance has been cached and overwrite the cache
+    Each instance of a stochastic process has its own random number generator instance.
+    Its default amounts to the Generator object returned by numpy.random.default_rng.
+    It is seeded with 0.
+    Calling [`init_rng`][stocproc.StocProc.init_rng] reinits the Generator class, possibly with a different seed.
 
-    Note: :py:func:`new_process` is **not** called on init. If you want to evaluate a particular
-    realization of the stocastic process, a new sample needs to be drawn by calling :py:func:`new_process`.
-    Otherwise a ``RuntimeError`` is raised.
+    Parameters:
+        t_max: specifies the upper bound of the time interval
+        num_grid_points: number of equidistant grid points $N$
 
+    !!! Note
+        [`new_process`][stocproc.samplers.StocProc.new_process] is **not** called on init.
+        If you want to obtain a particular realization of the stochastic process, a new sample needs to be drawn by
+        calling [`new_process`][stocproc.samplers.StocProc.new_process].
+        Otherwise, a `RuntimeError` is raised.
     """
     _use_cache = False
 
-    def __init__(self, *args, **kwargs):
-        if hasattr(self, "_from_cache"):
-            return
-
-        if "invalidate_cache" in kwargs:
-            del kwargs["invalidate_cache"]
-
-        self.__post_init__(*args, **kwargs)
-
-        if not hasattr(self, "_from_cache") and hasattr(self, "_cache_path"):
-            with open(self._cache_path, "wb") as f:
-                pickle.dump(self, f)
-
-    def setup(
-        self, t_max=None, num_grid_points=None, seed=None, scale=1, calc_deriv=False
-    ):
-        self._set_up = True
-        assert hasattr(self, "key")
+    def __init__(self, t_max=None, num_grid_points=None):
+        # time axes
         self.t_max = t_max
         self.num_grid_points = num_grid_points
         self.t = np.linspace(0, t_max, num_grid_points)
+
         self._z = None
+        self._z_dot = None
         self._interpolator = None
         self._interpolator_dot = None
-        self._seed = seed
-        self.calc_deriv = calc_deriv
-        if seed is not None:
-            np.random.seed(seed)
-        self._one_over_sqrt_2 = 1 / np.sqrt(2)
         self._proc_cnt = 0
-        self.scale = scale
-        assert not np.isnan(scale)
-        self.sqrt_scale = np.sqrt(self.scale)
-        log.debug(
-            "init StocProc with t_max {} and {} grid points".format(
-                t_max, num_grid_points
-            )
+
+        # these can be changed by the 'config_rng' method
+        self._rng_class = np.random.default_rng
+        self._seed = 0
+        self._rand_skip = 1000
+        self._rng = None
+        self.init_rng(
+            random_numer_gen=self._rng_class,
+            seed=self._seed,
+            rand_skip=self._rand_skip
         )
 
-    def __new__(cls, *args, **kwargs):
-        if cls._use_cache:
-            name = hashlib.sha256(pickle.dumps((args, kwargs))).hexdigest()
-            cache_path = (
-                pathlib.Path(tempfile.gettempdir())
-                / "stocproc"
-                / f"{cls.__name__}_{name}.pickle"
-            )
-            cache_path.parent.mkdir(exist_ok=True, parents=True)
+        log.debug(f"init StocProc with t_max {t_max} and {num_grid_points} grid points")
 
-            if (
-                cache_path.exists()
-                and not "unpickle" in args
-                and not "invalidate_cache" in kwargs
-            ):
-                with open(cache_path, "rb") as f:
-                    instance = pickle.load(f)
-                    log.info("Loaded instance from cache.")
+    def __call__(self, t: Optional[np.ndarray] = None) -> np.ndarray:
+        r"""Evaluates the stochastic process
 
-                instance._from_cache = True
-                return instance
+        If $t$ is not `None`, cubic spline interpolation is used to evaluate $z(t)$
+        based on the discrete realization of the process $z_n = z(t_n)$.
+        The time argument $t$ may be a single value or array like.
 
-            instance = super().__new__(cls)
-            instance._cache_path = cache_path
+        If $t$ is `None`, the discrete process $z_n$ is returned.
 
-            return instance
+        Parameters:
+            t: the time (or times as array) for which to evaluate the stochastic process
 
-        return super().__new__(cls)
-
-    def __getnewargs_ex__(self):
-        return ("unpickle",), {}
-
-    def __init_subclass__(cls):
-        if StocProc.__init__ is not cls.__init__:
-            raise Exception(
-                f"Do not override {cls}.__init__ but use {cls}.__post_init__."
-            )
-
-    @abc.abstractmethod
-    def __post_init__(self, *args, **kwargs):
-        """Like ``__init__`` but for setting up child classes.
-        Implementations should call :any:`setup`.
-        """
-        pass
-
-    def __call__(self, t=None):
-        r"""Evaluates the stochastic process.
-
-        If ``t`` is not ``None`` cubic spline interpolation is used to evaluate :math:`z(t)` based on the
-        discrete realization of the process :math:`z_n = z(t_n)`. ``t`` may be a single value or array like.
-
-        If ``t`` is ``None`` the discrete process :math:`z_n` is returned.
+        Returns:
+            the value of the stochastic process $z(t)$
         """
         if self._z is None:
             raise RuntimeError(
-                "StocProc has NO random data, call 'new_process' to generate a new random process"
+                "StocProc has NO random data yet, call 'new_process' to generate a new random process!"
             )
 
         if t is None:
@@ -206,11 +174,11 @@ class StocProc(abc.ABC):
     def dot(self, t: Optional[np.ndarray] = None) -> np.ndarray:
         r"""Returns the derivative of the stochastic process.
 
-        Works the same as :meth:`__call__` in all other regards.
+        Works the same as [`__call__`][stocproc.StocProc.__call__] in all other regards.
         """
         if self._z_dot is None:
             raise RuntimeError(
-                "StocProc has NO random data, call 'new_process' to generate a new random process"
+                "StocProc has NO random data yet, call 'new_process' to generate a new random process!"
             )
 
         if t is None:
@@ -219,180 +187,190 @@ class StocProc(abc.ABC):
             return self._interpolator_dot(t)
 
     @abc.abstractmethod
-    def calc_z(self, y):
+    def calc_z(self, y: np.ndarray) -> np.ndarray:
         r"""*abstract method*
 
-        An implementation needs to map :math:`M` independent complex valued and Gaussian
-        distributed random variables :math:`Y_m` (with :math:`\langle Y_m \rangle = 0 = \langle Y_m Y_{m'} \rangle` and
-        :math:`\langle Y_m Y^\ast_{m'} = \delta_{m m'}\rangle`) to the discrete time stochastic process :math:`z_n = z(t_n)`.
+        An implementation needs to map $M$ independent complex valued and Gaussian
+        distributed random variables $Y_m$ (with $\langle Y_m \rangle = 0 = \langle Y_m Y_{m'} \rangle$ and
+        $\langle Y_m Y^\ast_{m'} = \delta_{m m'}\rangle$) to the discrete time stochastic
+        process $z_n = z(t_n)$.
 
-        :return: the discrete time stochastic process :math:`z_n`, array of complex numbers
+        Parameters:
+            y: M independent complex valued and Gaussian distributed random numbers with zero mean and variance one.
+
+        Returns:
+            the discrete time stochastic process $z_n$ as a numpy array of complex numbers
         """
         pass
-
-    def calc_z_dot(self, y):
-        r"""*abstract method*
-
-        An implementation needs to map :math:`M` independent complex
-        valued and Gaussian distributed random variables :math:`Y_m`
-        (with :math:`\langle Y_m \rangle = 0 = \langle Y_m Y_{m'}\rangle` and :math:`\langle Y_m Y^\ast_{m'} = \delta_{mm'}\rangle`) to the discrete time derivative of stochastic
-        process :math:`z_n = z(t_n)`.
-
-        :return: the derivative of the discrete time stochastic process :math:`z_n`,
-                 array of complex numbers
-        """
-
-        raise NotImplementedError("Derivative not implemented for this method.")
-
-    def _calc_scaled_z(self, y):
-        r"""
-        scaled the discrete process z with sqrt(scale), such that <z_i
-        z^ast_j> = scale bcf(i,j)
-        """
-        return self.sqrt_scale * self.calc_z(y)
-
-    def _calc_scaled_z_dot(self, y):
-        r"""
-        scaled derivative of the discrete process z with sqrt(scale),
-        such that <z_i z^ast_j> = scale bcf(i,j)
-        """
-        return self.sqrt_scale * self.calc_z_dot(y)
 
     @abc.abstractmethod
     def get_num_y(self):
         r"""*abstract method*
 
-        An implementation needs to return the number :math:`M` of random variables :math:`Y_m` required as
-        input for :py:func:`calc_z`.
+        An implementation needs to return the number $M$ of random variables $Y_m$ required as
+        input for the method [`calc_z`][stocproc.StocProc.calc_z]
         """
         pass
 
-    def get_time(self):
-        r"""Returns the times :math:`t_n` for which the discrete time stochastic process may be evaluated."""
+    def calc_z_dot(self, y: np.ndarray) -> Union[np.ndarray, None]:
+        r"""*abstract method (optional)*
+
+        An implementation needs to map $M$ independent complex
+        valued and Gaussian distributed random variables $Y_m$
+        (with $\langle Y_m \rangle = 0 = \langle Y_m Y_{m'}\rangle$ and
+        $\langle Y_m Y^\ast_{m'} = \delta_{mm'}\rangle$) to the discrete time
+        derivative of stochastic process $z_n = z(t_n)$.
+
+        Parameters:
+            y: M independent complex valued and Gaussian distributed random numbers with zero mean and variance one.
+
+        Returns:
+            the derivative of the discrete time stochastic process $z_n$ as a numpy array of complex numbers
+        """
+        return None
+
+    def get_time(self) -> np.ndarray:
+        r"""
+        Returns:
+             the times $t_n$ for which the discrete time stochastic process is defined $z_n = z(t_n)$.
+        """
         return self.t
 
-    def get_z(self):
-        r"""Returns the discrete time stochastic process :math:`z_n = z(t_n)`."""
+    def get_z(self) -> np.ndarray:
+        r"""
+        Returns:
+             the discrete time stochastic process $z_n = z(t_n)$.
+        """
         return self._z
 
-    def new_process(self, y=None, seed=None, rand_skip=None):
+    def init_rng(
+        self,
+        random_numer_gen=None,
+        seed: float = None,
+        rand_skip: int = None
+    ):
+        """
+        Set instance wide parameters which control the random number generation.
+        If a parameter is `None` (default), it is ignored.
+
+        Parameters:
+            random_numer_gen: a random number generator class (numpy.random.Generator), default is to use
+                numpy.random.default_rng
+            seed: the seed passed to the instantiation of the generator class (is actually passed through SeedSequence
+                to map any integer to a suitable random number generator seed.
+            rand_skip: discard the first 'rand_skip' numbers
+        """
+        if random_numer_gen is not None:
+            self._rng_class = random_numer_gen
+        if seed is not None:
+            self._seed = seed
+        if rand_skip is not None:
+            self._rand_skip = rand_skip
+        self._rng = self._rng_class(self._seed)
+
+    def new_process(
+        self,
+        y: Optional[np.ndarray] = None,
+        scale: float = 1,
+        seed: int = None,
+        rand_skip: int = None
+    ) -> None:
         r"""Generate a new realization of the stochastic process.
 
-        If ``seed`` is not ``None`` seed the random number generator with ``seed`` before drawing new random numbers.
-        Discard the first ``rand_skip`` samples.
+        If `y` is not `None`, use `y` as input to generate the new realization by calling
+        [`calc_z`][stocproc.StocProc.calc_z].
 
-        If ``y`` is ``None`` draw new random numbers to generate the new realization. Otherwise use ``y`` as input to
-        generate the new realization.
+        If `y` is `None`, draw new random numbers to generate the new realization.
+
+        If `seed` is not `None`, reinit the random number generator with seed before drawing new random numbers.
+        Discard the first `rand_skip` samples.
+
+        Scale the process with square root of `scale`.
+
+        Parameters:
+            y: M independent complex valued and Gaussian distributed random numbers with zero mean and variance one.
+            scale: Scale the process with square root of `scale`.
+            seed: reinit the random number generator with seed
+            rand_skip: discard the first `rand_skip` samples.
         """
-        assert (
-            self._set_up
-        ), "The `setup` method has to be called from implementing classes."
-        t0 = time.time()
-
         # clean up old data
         del self._interpolator
         self._interpolator = None
         del self._z
         self._z = None
+        del self._z_dot
+        self._z_dot = None
 
         self._proc_cnt += 1
-        if seed != None:
-            log.info("use fixed seed ({}) for new process".format(seed))
-            np.random.seed(seed)
-            if rand_skip:
-                np.random.random(rand_skip)
+
+        # reinit random number generator
+        if seed is not None:
+            self.init_rng(
+                seed=seed,
+                rand_skip=rand_skip
+            )
+
         if y is None:
-            # random complex normal samples
-            y = np.random.normal(scale=self._one_over_sqrt_2, size=2 * self.get_num_y())
+            # draw new random numbers
+            y = self._rng.normal(scale=ONE_OVER_SQRT_2, size=2 * self.get_num_y())
             if y.dtype != np.float64:
                 raise RuntimeError(
                     f"Expect that numpy.random.normal returns with dtype float64, but it is {y.dtype}"
                 )
             y = y.view(np.complex128)
         else:
-            if len(y) != self.get_num_y():
-                raise RuntimeError(
-                    "the length of 'y' ({}) needs to be {}".format(
-                        len(y), self.get_num_y()
-                    )
-                )
+            len_y = len(y)
+            num_y = self.get_num_y()
+            if len_y != num_y:
+                raise RuntimeError(f"the length of 'y' ({len_y}) needs to be {num_y}")
 
-        self._z = self._calc_scaled_z(y)
-
-        if self.calc_deriv:
-            self._z_dot = self._calc_scaled_z_dot(y)
-
-        log.debug(
-            "proc_cnt:{} new process generated [{:.2e}s]".format(
-                self._proc_cnt, time.time() - t0
-            )
-        )
-        t0 = time.time()
+        # generate the new process (scaled version)
+        self._z = np.sqrt(scale) * self.calc_z(y)
         self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
 
-        if self.calc_deriv:
+        # .. and optionally its derivative
+        self._z_dot = self.calc_z_dot(y)
+        if self._z_dot is not None:
+            self._z_dot *= np.sqrt(scale)
             self._interpolator_dot = fcSpline.FCS(
                 x_low=0, x_high=self.t_max, y=self._z_dot
             )
 
-        log.debug("created interpolator [{:.2e}s]".format(time.time() - t0))
 
-    def set_scale(self, scale):
-        r"""
-        Set a scalar pre factor for the auto correlation function
-        which scales the stochastic process such that :math:`\langle z(t) z^\ast(s)\rangle = \text{scale} \; \alpha(t-s)`.
-        """
-        self.scale = scale
-        self.sqrt_scale = np.sqrt(scale)
-
-
-class StocProc_KLE(StocProc):
+class KarhunenLoeve(StocProc):
     r"""
     A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
+
     The idea is that any stochastic process can be expressed in terms of the KLE
 
-    .. math:: Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t)
+    $$ Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t) . $$
 
-    where :math:`Y_i` and independent complex valued Gaussian random variables with variance one
-    (:math:`\langle Y_i Y_j \rangle = \delta_{ij}`) and :math:`\lambda_i`, :math:`u_i(t)` are
+    Here $Y_i$ are independent complex valued Gaussian random variables with variance one, i.e.,
+    $\langle Y_i Y_j \rangle = \delta_{ij}$. $\lambda_i$, $u_i(t)$ are the
     eigenvalues / eigenfunctions of the following homogeneous Fredholm equation
 
-    .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t)
+    $$ \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t) . $$
 
-    for a given positive integral kernel :math:`R(\tau)`. It turns out that the auto correlation of the
-    stocastic processes :math:`\langle Z(t)Z^\ast(s) \rangle = R(t-s)` is given by that kernel.
+    The positive integral kernel $R(\tau)$ amount to the auto correlation of the
+    stochastic processes, i.e., $\langle Z(t)Z^\ast(s) \rangle = R(t-s)$.
 
-    For the numeric implementation the integral equation will be discretized
-    (see :py:func:`stocproc.method_kle.solve_hom_fredholm` for details) which leads to a regular matrix
-    eigenvalue problem.
-    The accuracy of the generated  process in terms of its auto correlation function depends on
-    the quality of the eigenvalues and eigenfunction and thus of the number of discritization points.
-    Further for a given threshold there is only a finite number of eigenvalues above that threshold,
-    provided that the number of discritization points is large enough.
+    For a numeric treatment, the integral equation needs to be discretized
+    (see [`method_kle.solve_hom_fredholm`][stocproc.method_kle.solve_hom_fredholm] for details)
+    which leads to a regular matrix eigenvalue problem.
+    The accuracy of the generated process, by means of the accuracy of its auto correlation function, depends on
+    to factors. First, the accuracy of the eigenvalues and eigenfunction which depends on the integral discritization.
+    Second, the truncation of the infinite sum of the KLE.
+    Both errors can in principle be made arbitrarily small.
 
-    Now the property of representing the integral kernel in terms of the eigenfunction
+    Note that the property of representing the integral kernel in terms of the eigenfunction, i.e,
 
-    .. math :: R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s)
+    $$ R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s) $$
 
-    is used to find the number of discritization points and the number of used eigenfunctions such that
-    the sum represents the kernel up to a given tolerance (see :py:func:`stocproc.method_kle.auto_ng`
-    for details).
-    """
+    is used to find a suitable discritization and the number of required eigenfunctions such that
+    the sum represents the actual kernel up to a given tolerance.
+    See [`method_kle.auto_ng`][stocproc.method_kle.auto_ng] for details.
 
-    def __post_init__(
-        self,
-        alpha,
-        t_max,
-        tol=1e-2,
-        ng_fac=4,
-        meth="fourpoint",
-        diff_method="full",
-        dm_random_samples=10**4,
-        seed=None,
-        align_eig_vec=False,
-        scale=1,
-    ):
-        r"""
+    Parameters:
         :param r_tau: the idesired auto correlation function of a single parameter tau
         :param t_max: specifies the time interval [0, t_max] for which the processes in generated
         :param tol: maximal deviation of the auto correlation function of the sampled processes from
@@ -419,53 +397,44 @@ class StocProc_KLE(StocProc):
 
            Details on the error estimation and further clarification of the parameters ng_fac, meth,
            diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
-        """
-        key = alpha, t_max, tol
 
+    """
+
+    def __init__(
+        self,
+        alpha,
+        t_max,
+        tol=1e-2,
+        ng_fac=4,
+        meth="fourpoint",
+        diff_method="full",
+        dm_random_samples=10**4,
+    ):
         sqrt_lambda_ui_fine, t = method_kle.auto_ng(
-            corr=alpha,
+            acf=alpha,
             t_max=t_max,
-            ngfac=ng_fac,
+            ng_fac=ng_fac,
             meth=meth,
             tol=tol,
             diff_method=diff_method,
             dm_random_samples=dm_random_samples,
         )
+        num_ev, ng = sqrt_lambda_ui_fine.shape
 
-        # inplace alignment such that re(ui(0)) >= 0 and im(ui(0)) = 0
-        if align_eig_vec:
-            method_kle.align_eig_vec(sqrt_lambda_ui_fine)
-
-        state = sqrt_lambda_ui_fine, t_max, len(t), seed, scale, key
-        self.__setstate__(state)
-
-    @staticmethod
-    def get_key(r_tau, t_max, tol=1e-2):
-        return "kle", r_tau, t_max, tol
-
-    # def get_key(self):
-    #     """Returns the tuple (r_tau, t_max, tol) which should suffice to identify the process in order to load/dump
-    #     the StocProc class.
-    #     """
-    #     return self.key
+        super(KarhunenLoeve, self).__init__(t_max=t_max, num_grid_points=ng)
+        self.num_ev = num_ev
+        self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
     def __getstate__(self):
         return (
             self.sqrt_lambda_ui_fine,
             self.t_max,
-            self.num_grid_points,
-            self._seed,
-            self.scale,
-            self.key,
         )
 
     def __setstate__(self, state):
-        sqrt_lambda_ui_fine, t_max, num_grid_points, seed, scale, self.key = state
-        self.key = ("kle", *self.key)
+        sqrt_lambda_ui_fine, t_max = state
         num_ev, ng = sqrt_lambda_ui_fine.shape
-        super().setup(
-            t_max=t_max, num_grid_points=num_grid_points, seed=seed, scale=scale
-        )
+        super(KarhunenLoeve, self).__init__(t_max=t_max, num_grid_points=ng)
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
@@ -480,7 +449,7 @@ class StocProc_KLE(StocProc):
         return self.num_ev
 
 
-class StocProc_FFT(StocProc):
+class FastFourier(StocProc):
     r"""Generate Stochastic Processes using the Fast Fourier Transform (FFT) method
 
     This method uses the relation of the auto correlation function ``alpha`` to the non negative real valued
@@ -553,10 +522,7 @@ class StocProc_FFT(StocProc):
        find a negative :math:`\omega_\mathrm{min}` appropriately just like :math:`\omega_\mathrm{max}`
 
     """
-
-    _use_cache = True
-
-    def __post_init__(
+    def __init__(
         self,
         spectral_density,
         t_max,
@@ -564,7 +530,7 @@ class StocProc_FFT(StocProc):
         intgr_tol=1e-2,
         intpl_tol=1e-2,
         seed=None,
-        negative_frequencies=False,
+        positive_frequencies_only=False,
         scale=1,
         calc_deriv: bool = False,
     ):
@@ -572,9 +538,9 @@ class StocProc_FFT(StocProc):
             alpha=alpha, t_max=t_max, intgr_tol=intgr_tol, intpl_tol=intpl_tol
         )
 
-        ft_ref = partial(alpha_times_pi, alpha=alpha)
+        ft_ref = alpha
 
-        if not negative_frequencies:
+        if positive_frequencies_only:
             log.info("non neg freq only")
             a, b, N, dx, dt = method_ft.calc_ab_n_dx_dt(
                 integrand=spectral_density,
@@ -704,7 +670,7 @@ class StocProc_FFT(StocProc):
         return len(self.yl)
 
 
-class StocProc_TanhSinh(StocProc):
+class TanhSinh(StocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
     _use_cache = True
 
@@ -716,23 +682,22 @@ class StocProc_TanhSinh(StocProc):
         intgr_tol=1e-2,
         intpl_tol=1e-2,
         seed=None,
-        negative_frequencies=False,
+        positive_frequencies_only=False,
         scale=1,
         calc_deriv=False,
     ):
         self.key = "ts", alpha, t_max, intgr_tol, intpl_tol
 
-        if not negative_frequencies:
+        ft_ref = alpha
+
+        if positive_frequencies_only:
             log.info("non neg freq only")
-            log.info("get_dt_for_accurate_interpolation, please wait ...")
             try:
-                ft_ref = partial(alpha_times_pi, alpha=alpha)
+                log.info("get_dt_for_accurate_interpolation, please wait ...")
                 c = method_ft.find_integral_boundary(
-                    lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
-                    intgr_tol,
-                    1,
-                    1e6,
-                    0.777,
+                    integrand=lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
+                    direction='right',
+                    tol= intgr_tol
                 )
             except RuntimeError:
                 c = t_max

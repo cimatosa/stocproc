@@ -1,0 +1,43 @@
+site_name: stocproc
+
+nav:
+    - Home: index.md
+    - Getting started:
+        - Introduction to stochastic processes: getting_started/intro.md
+        - How to sample stochastic processes: getting_started/how_to_sample.md
+        - Usage: getting_started/usage.md
+    - API reference:
+        - stocproc: api/stocproc.md
+        - stocproc.samplers: api/samplers.md
+        - stocproc.method_ft: api/method_ft.md
+        - stocproc.method_kle: api/method_kle.md
+        - stocproc.gquad: api/gquad.md
+    - Examples: examples.md
+
+theme:
+    name: material
+    features:
+        - navigation.tabs
+        - navigation.tabs.sticky
+#        - toc.integrate
+
+
+plugins:
+# somehow conflicts with material theme
+#    - search
+    - mkdocstrings
+
+markdown_extensions:
+    - pymdownx.arithmatex:
+          generic: true
+    - pymdownx.snippets:
+    - toc:
+        permalink: true
+    - admonition
+    - pymdownx.details
+    - pymdownx.superfences
+
+extra_javascript:
+    - javascripts/mathjax.js
+    - https://polyfill.io/v3/polyfill.min.js?features=es6
+    - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
