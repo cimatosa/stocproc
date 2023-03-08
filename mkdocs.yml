@@ -13,6 +13,8 @@ nav:
         - stocproc.method_kle: api/method_kle.md
         - stocproc.gquad: api/gquad.md
     - Examples: examples.md
+    - Insights:
+        - Compare quadrature schemes: insights/comp_quad_schemes/comp_quad_schemes.md
 
 theme:
     name: material

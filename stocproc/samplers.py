@@ -19,13 +19,13 @@ import fcSpline
 import numpy as np
 import numpy.random
 from numpy.typing import NDArray
-from numpy.random import default_rng
 import scipy.linalg
 import scipy.optimize
 
 # module imports
 from . import method_kle
 from . import method_ft
+from . import util
 
 
 ONE_OVER_SQRT_2 = 1 / np.sqrt(2)
@@ -402,13 +402,13 @@ class KarhunenLoeve(StocProc):
 
     def __init__(
         self,
-        alpha,
-        t_max,
-        tol=1e-2,
-        ng_fac=4,
-        meth="fourpoint",
-        diff_method="full",
-        dm_random_samples=10**4,
+        alpha: util.CplxFnc,
+        t_max: float,
+        tol: float = 1e-2,
+        ng_fac: int = 4,
+        meth: Union[str, Callable[[float, int], tuple[NDArray, NDArray, bool]]] = 'midpoint',
+        diff_method: str = "full",
+        dm_random_samples: float = 10**4,
     ):
         sqrt_lambda_ui_fine, t = method_kle.auto_ng(
             acf=alpha,

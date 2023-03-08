@@ -34,6 +34,8 @@ pytest = "^7.2.1"
 pytest-cov = "^4.0.0"
 matplotlib = "^3.6.3"
 mpmath = "^1.2.1"
+notebook = "^6.5.3"
+mppfc = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core>=1.4", "cython", "setuptools", "numpy"]

@@ -12,14 +12,12 @@ import fcSpline
 # module imports
 from . import stocproc_c
 from . import gquad
-from . import tools
+from . import util
 
 log = logging.getLogger(__name__)
 
-CplxFnc = Union[Callable[[float], complex], Callable[[NDArray], NDArray]]
 
-
-def solve_hom_fredholm(r: NDArray, w: NDArray) -> tuple[NDArray, NDArray]:
+def solve_hom_fredholm(r: NDArray, w: NDArray, small_weights_problem=False) -> tuple[NDArray, NDArray]:
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
 
     $$ \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t) $$
@@ -38,9 +36,17 @@ def solve_hom_fredholm(r: NDArray, w: NDArray) -> tuple[NDArray, NDArray]:
 
     where $\tilde R$ is hermitian and $u = D^{-1}\tilde u$.
 
+    Note that if the weights become very small (i.g., for the tanh-sinh scheme)
+    $u = D^{-1}\tilde u$ recovers the auto correlation matrix poorly.
+    In that case it is advantageous to use $u(t_i) = \frac{1}{\lambda} R(t_i-t_j) \sqrt{w_j} \tilde u(t_j)$.
+    If `small_weights_problem` is set to `True`, this expression will be used.
+
     Parameters:
         r: hermitian correlation matrix $R_{ij} = R(t_j-s_i)$
         w: integrations weights $w_i$ (they have to correspond to the discrete time $t_i$)
+        small_weights_problem: if `True`, use the alternative expression (numerically slower)
+            $u(t_i) = \frac{1}{\lambda} R(t_i-t_j) \sqrt{w_j} \tilde u(t_j)$ to
+            calculate the eigen functions.
 
     Returns:
         a tuple of eigenvalues and eigenvectos, decreasingly ordered with respec to the magnitude of the eigenvalues
@@ -70,12 +76,18 @@ def solve_hom_fredholm(r: NDArray, w: NDArray) -> tuple[NDArray, NDArray]:
     n = len(w)
     w_sqrt = np.sqrt(w)
     # weighted matrix r due to quadrature weights
+    if small_weights_problem:
+        acf_matrix = r.copy()
     r = w_sqrt.reshape(n, 1) * r * w_sqrt.reshape(1, n)
     eig_val, eig_vec = scipy_eigh(r, overwrite_a=True)  # eig_vals in ascending
 
     eig_val = eig_val[::-1]
     eig_vec = eig_vec[:, ::-1]
-    eig_vec = np.reshape(1 / w_sqrt, (n, 1)) * eig_vec
+    if small_weights_problem:
+        eig_vec = np.einsum('ij, j, k, jk -> ik', acf_matrix, w_sqrt, 1/eig_val, eig_vec)
+    else:
+        eig_vec = np.reshape(1 / w_sqrt, (n, 1)) * eig_vec
+
     dt = time.time() - t0
     log.debug(f"discrete fredholm equation of size {n} solved in {dt:.2e}s")
     return eig_val, eig_vec
@@ -95,7 +107,7 @@ def align_eig_vec(eig_vec: NDArray):
         eig_vec[:, i] /= phase
 
 
-def _calc_corr_matrix(s: NDArray, acf: CplxFnc, is_equi=None) -> NDArray:
+def _calc_corr_matrix(s: NDArray, acf: util.CplxFnc, is_equi=None) -> NDArray:
     r"""
     calculates the correlation matrix $\alpha_ij = \alpha(t_i-s_j)$
 
@@ -330,6 +342,34 @@ def get_nodes_weights_tanh_sinh(t_max: float, num_grid_points: int) -> tuple[NDA
     return t, w, False
 
 
+def interpolate_eigenfunction(
+        acf: util.CplxFnc,
+        t: NDArray,
+        w: NDArray,
+        eig_vec: NDArray,
+        eig_val: float,
+        t_fine: NDArray,
+):
+    r"""
+    interpolate the discrete eigenfunction of the Fredholm equation according to
+
+    $$
+        u(t) = \frac{1}{\lambda } \int_0^T \mathrm{d}s \alpha(t-s) u(s) = \sum_i w_i \alpha(t-s_i) u(s_i) .
+    $$
+
+    Parameters:
+        acf: the auto correlation function
+        t: the time axes $s_i$ of the discrete eigen function (integration nodes)
+        w: the integration weights
+        eig_vec: the discrete eigen function (vector) $u(s_i)$
+        eig_val: the eigenvalue $\lambda$
+        t_fine: the fine time axes for which the eigen function is evaluated using Fredholm interpolation
+    Returns:
+        the values of eigen function obtained by interpolation for the times given in `t_fine`
+    """
+    return np.asarray([np.sum(acf(ti - t) * w * eig_vec) for ti in t_fine]) / eig_val
+
+
 def subdivide_axis(t: NDArray, ng_fac: int) -> NDArray:
     r"""
         Subdivide the $t$ axes $[t_0, t_1, \dots t_{n-1}]$ to obtain a finder grid.
@@ -354,31 +394,11 @@ def subdivide_axis(t: NDArray, ng_fac: int) -> NDArray:
     return t_fine
 
 
-def interpolate_eigenfunction(acf: CplxFnc, t: NDArray, w: NDArray, eig_vec: NDArray, t_fine: NDArray):
-    r"""
-    interpolate the discrete eigenfunction of the Fredholm equation according to
-
-    $$
-        \lambda u(t) = \int_0^T \mathrm{d}s \alpha(t-s) u(s) = \sum_i w_i \alpha(t-s_i) u(s_i) .
-    $$
-
-    Parameters:
-        acf: the auto correlation function
-        t: the time axes $s_i$ of the discrete eigen function (integration nodes)
-        w: the integration weights
-        eig_vec: the discrete eigen function (vector) $u(s_i)$
-        t_fine: the fine time axes for which the eigen function is evaluated using Fredholm interpolation
-    Returns:
-        the values of eigen function obtained by interpolation for the times given in `t_fine`
-    """
-    return np.asarray([np.sum(acf(ti - t) * w * eig_vec) for ti in t_fine])
-
-
 def auto_ng(
-    acf: CplxFnc,
+    acf: util.CplxFnc,
     t_max: float,
     ng_fac: int = 2,
-    meth: Callable[[float, int], tuple[NDArray, NDArray, bool]] = get_nodes_weights_mid_point,
+    meth: Union[str, Callable[[float, int], tuple[NDArray, NDArray, bool]]] = get_nodes_weights_mid_point,
     tol: float = 1e-3,
     diff_method: str = "full",
     dm_random_samples: float = 10**4,
@@ -560,8 +580,14 @@ def auto_ng(
                 # when using sqrt_lambda instead of lambda we get sqrt_lamda time u
                 # which is the quantity needed for the stochastic process generation
                 if not is_equi:
-                    sqrt_lambda_ui_fine = \
-                        interpolate_eigenfunction(acf=acf, t=t, w=w, eig_vec=eig_vec, t_fine=t_fine) / sqrt_eval
+                    sqrt_lambda_ui_fine = interpolate_eigenfunction(
+                        acf=acf,
+                        t=t,
+                        w=w,
+                        eig_vec=eig_vec,
+                        eig_val=sqrt_eval,
+                        t_fine=t_fine
+                    )
                 else:
                     sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(
                         delta_t_fac=ng_fac,
@@ -580,9 +606,8 @@ def auto_ng(
 
             # setup cubic spline interpolator
             t0 = time.time()
-            # sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(tfine, sqrt_lambda_ui_fine, noWarning=True)
             if not is_equi:
-                sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(
+                sqrt_lambda_ui_spl = util.ComplexInterpolatedUnivariateSpline(
                     t_fine, sqrt_lambda_ui_fine, noWarning=True
                 )
             else:

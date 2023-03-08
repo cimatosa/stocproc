@@ -17,13 +17,12 @@ from numpy.typing import NDArray
 from scipy.integrate import quad
 from scipy.optimize import brentq
 
+# stocproc module imports
+from . import util
+
 # warnings.simplefilter('error')
 MAX_FLOAT = sys.float_info.max
 log = logging.getLogger(__name__)
-
-# a function which takes a float and returns a complex
-# the function may also handle hole numpy NDArrays as input
-FUNCTION_FLOAT_TO_CPLX = Callable[[Union[float, NDArray]], Union[complex, NDArray]]
 
 
 class FTReferenceError(Exception):
@@ -31,7 +30,7 @@ class FTReferenceError(Exception):
 
 
 def find_integral_boundary(
-    integrand: FUNCTION_FLOAT_TO_CPLX,
+    integrand: util.CplxFnc,
     direction: str,
     tol: float = 1e-10,
     ref_val: float = 0,
@@ -125,7 +124,7 @@ def find_integral_boundary(
 
 
 def find_integral_boundary_auto(
-    integrand: FUNCTION_FLOAT_TO_CPLX,
+    integrand: util.CplxFnc,
     tol: float = 1e-10,
     ref_val: float = 0,
     ref_val_left: Union[None, float] = None,
@@ -173,7 +172,7 @@ def find_integral_boundary_auto(
 
 
 def fourier_integral_midpoint_fft(
-    integrand: FUNCTION_FLOAT_TO_CPLX,
+    integrand: util.CplxFnc,
     a: float,
     b: float,
     n: int,
@@ -243,7 +242,7 @@ def simpson_weights(n: int) -> NDArray:
 
 
 def fourier_integral_simps_fft(
-    integrand: FUNCTION_FLOAT_TO_CPLX,
+    integrand: util.CplxFnc,
     a: float,
     b: float,
     n: int,
@@ -327,7 +326,7 @@ def tanhsinh_w_t(t: float) -> float:
 
 
 def tanhsinh_t_max_for_singularity(
-    f: FUNCTION_FLOAT_TO_CPLX,
+    f: util.CplxFnc,
     a: float,
     b: float,
     tol: float,
@@ -410,7 +409,7 @@ def tanhsinh_x_and_w(n: int, x_max: float, t_max: float) -> tuple[NDArray, NDArr
 
 
 def fourier_integral_tanhsinh_x0_0(
-    f: FUNCTION_FLOAT_TO_CPLX, x_max: float, n: int, tau_l: NDArray, t_max_ts: float
+    f: util.CplxFnc, x_max: float, n: int, tau_l: NDArray, t_max_ts: float
 ) -> NDArray:
     """
     Evaluate the Fourier integral of f(x) for a list of values tau_l,
@@ -451,7 +450,7 @@ def fourier_integral_tanhsinh_x0_0(
 
 
 def fourier_integral_tanhsinh(
-    integrand: FUNCTION_FLOAT_TO_CPLX, a: float, b: float, n: int, tau: NDArray
+    integrand: util.CplxFnc, a: float, b: float, n: int, tau: NDArray
 ) -> NDArray:
     """
     Approximates F(t_i) int_a^b dx integrand(x) exp(i x t_i) using the tanh-sinh integration
@@ -511,9 +510,9 @@ def _abs_diff(x_ref: NDArray, x: NDArray) -> NDArray:
 
 
 def get_suitable_a_b_n_for_fourier_integral(
-    integrand: FUNCTION_FLOAT_TO_CPLX,
+    integrand: util.CplxFnc,
     k_max: float,
-    ft_ref: FUNCTION_FLOAT_TO_CPLX,
+    ft_ref: util.CplxFnc,
     tol: float,
     opt_b_only: bool,
     diff_method: Callable[[NDArray, NDArray], NDArray],
@@ -635,7 +634,7 @@ def get_suitable_a_b_n_for_fourier_integral(
 def get_dt_for_accurate_interpolation(
     t_max: float,
     tol: float,
-    ft_ref: FUNCTION_FLOAT_TO_CPLX,
+    ft_ref: util.CplxFnc,
     diff_method: Callable[[NDArray, NDArray], NDArray] = _abs_diff,
 ):
     r"""
@@ -701,11 +700,11 @@ def get_dt_for_accurate_interpolation(
 
 
 def calc_ab_n_dx_dt(
-    integrand: FUNCTION_FLOAT_TO_CPLX,
+    integrand: util.CplxFnc,
     intgr_tol: float,
     intpl_tol: float,
     t_max: float,
-    ft_ref: FUNCTION_FLOAT_TO_CPLX,
+    ft_ref: util.CplxFnc,
     opt_b_only: bool,
     diff_method: Callable[[NDArray, NDArray], NDArray] = _abs_diff,
 ) -> tuple[float, float, int, float, float]:

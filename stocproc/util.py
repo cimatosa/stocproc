@@ -1,21 +1,22 @@
-from scipy.integrate import quad
-from scipy.optimize import bisect
-
+from collections import namedtuple
 from functools import partial
-
-# from .stocproc_c import auto_correlation as auto_correlation_c
-import sys
-import os
+from typing import Union, Callable
 from warnings import warn
 
-sys.path.append(os.path.dirname(__file__))
+
 import numpy as np
-from collections import namedtuple
+from numpy.typing import NDArray
+from scipy.optimize import bisect
+from scipy.integrate import quad
+
 
 stocproc_key_type = namedtuple(
     typename="stocproc_key_type",
     field_names=["bcf", "t_max", "ng", "tol", "cubatur_type", "sig_min", "ng_fac"],
 )
+
+
+CplxFnc = Union[Callable[[float], complex], Callable[[NDArray], NDArray]]
 
 
 class ComplexInterpolatedUnivariateSpline(object):
