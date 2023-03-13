@@ -339,36 +339,80 @@ class StocProc(abc.ABC):
 
 class KarhunenLoeve(StocProc):
     r"""
-    A class to simulate stochastic processes using Karhunen-Loève expansion (KLE) method.
+    A class to simulate stochastic processes using Karhunen-Loève expansion method
 
-    The idea is that any stochastic process can be expressed in terms of the KLE
+    ## Karhunen-Loève Expansion (KLE)
 
-    $$ Z(t) = \sum_i \sqrt{\lambda_i} Y_i u_i(t) . $$
+    Any stochastic process can be expressed in terms of the KLE
 
-    Here $Y_i$ are independent complex valued Gaussian random variables with variance one, i.e.,
-    $\langle Y_i Y_j \rangle = \delta_{ij}$. $\lambda_i$, $u_i(t)$ are the
+    $$ Z(t) = \sum_k \sqrt{\lambda_i} Y_k u_k(t) . $$
+
+    Here $Y_k$ are independent complex valued Gaussian random variables with variance one, i.e.,
+    $\langle Y_k Y_{k'} \rangle = \delta_{k k'}$. $\lambda_k$, $u_k(t)$ are the
     eigenvalues / eigenfunctions of the following homogeneous Fredholm equation
 
-    $$ \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_i(s) = \lambda_i u_i(t) . $$
+    $$ \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_k(s) = \lambda_k u_k(t) . $$
 
-    The positive integral kernel $R(\tau)$ amount to the auto correlation of the
+    Is is easily seen, that the positive integral kernel $R(\tau)$ amounts to the auto correlation of the
     stochastic processes, i.e., $\langle Z(t)Z^\ast(s) \rangle = R(t-s)$.
 
-    For a numeric treatment, the integral equation needs to be discretized
-    (see [`method_kle.solve_hom_fredholm`][stocproc.method_kle.solve_hom_fredholm] for details)
-    which leads to a regular matrix eigenvalue problem.
-    The accuracy of the generated process, by means of the accuracy of its auto correlation function, depends on
-    to factors. First, the accuracy of the eigenvalues and eigenfunction which depends on the integral discritization.
-    Second, the truncation of the infinite sum of the KLE.
-    Both errors can in principle be made arbitrarily small.
+    ## Numeric Treatment
 
-    Note that the property of representing the integral kernel in terms of the eigenfunction, i.e,
+    For a numerical treatment, the integral equation is discretized using a finite amount of
+    nodes $t_i$, $1 \leq i \leq m$ (see [stocproc.method_kle.solve_hom_fredholm][] for furhter details).
+    The resulting eigenvalue problem is solved using standard algorithms, which limits the number of nodes
+    $m$ to the order of 1000.
 
-    $$ R(t-s) = \sum_i \lambda_i u_i(t) u_i^\ast(s) $$
+    A numeric sample of the stochastic process then takes the form
 
-    is used to find a suitable discritization and the number of required eigenfunctions such that
-    the sum represents the actual kernel up to a given tolerance.
-    See [`method_kle.auto_ng`][stocproc.method_kle.auto_ng] for details.
+    $$
+        Z_i \equiv Z(t_i) = \sum_{k=1}^n \sqrt{\lambda_k} Y_k u_{k,i}
+    $$
+
+    where, of course, the number of expansion terms $n$ cannot exceed the number of nodes $m$.
+    Note that $u_{k,i}$ is the $i$-th component of the $k$ eigen vector and $\lambda_k$
+    the related eigen valued obtained from the discrete eigen value problem.
+    As of the discretization, they will, in general, deviate from the exact solution
+    of the integral equation. That deviation increases with the index $k$.
+    Examples and insights are discussed in
+    [Compare quadrature schemes](./insights/comp_quad_schemes/comp_quad_schemes/).
+
+    A truly time continuous stochastic process is numerically realized by interpolating the eigen vectors
+    $u_{k,i} \rightarrow u_k(t)$.
+    Its accuracy in terms of the auto correlation function can be deduced from the deviation of
+    the numeric KLE auto correlation function
+
+    $$
+        R_n(t, s) = \sum_{k=1}^n \lambda_k u_k(t) u^\ast_k(s)
+    $$
+
+    and the given reference $R(t-s)$,
+
+    $$
+        \epsilon = \max_{t, s} |R_n(t, s) - R(t,s)| \, .
+    $$
+
+    As of the interpolation in $t$, it makes sense to keep the number of expansion terms $n$ independent
+    of the number of nodes $m$.
+    Finding $n$ and $m$ such that a given tolerance is met is implemented in [stocproc.method_kle.auto_ng][].
+
+    !!! Note
+
+        The numeric quadrature of the integral can be realized in many fashions.
+        At first glance one might expect an enhancement of the accuracy of the eigen vectors approximating
+        the true eigen functions when employing (higher order quadrature schemes)[stocproc.method_kle.str_meth_to_meth].
+        However, the [comparison of different such schemes](./insights/comp_quad_schemes/comp_quad_schemes/)
+        shows that the most simple scheme with equal weights for each node, known ad mid-point quadrature,
+        is most suited for the purpose of sampling time continuous stochastic processes numerically.
+        For that reason, the constructor of the [stocproc.samplers.KarhunenLoeve][] class accepts
+        quadratures schemes with equally spaced nodes only.
+
+
+    !!! Note
+
+        To push the limits of applicability, a special eigen vector solver exploiting the Toeplitz
+        structure of the auto-correlation-matrix should be used.
+
 
     Parameters:
         :param r_tau: the idesired auto correlation function of a single parameter tau
@@ -386,18 +430,6 @@ class KarhunenLoeve(StocProc):
         :param dm_random_samples: the number of random times used for diff_method 'random'
         :param seed: if not None seed the random number generator on init of this class with seed
         :param align_eig_vec: assures that :math:`re(u_i(0)) \leq 0` and :math:`im(u_i(0)) = 0` for all i
-
-        .. note ::
-           To circumvent the time consuming initializing the StocProc class can be saved and loaded using
-           the standard python pickle module. The :py:func:`get_key` method may be used identify the
-           Process class by its parameters (r_tau, t_max, tol).
-
-        .. seealso ::
-           Details on how to solve the homogeneous Fredholm equation: :py:func:`stocproc.method_kle.solve_hom_fredholm`
-
-           Details on the error estimation and further clarification of the parameters ng_fac, meth,
-           diff_method, dm_random_samples can be found at :py:func:`stocproc.method_kle.auto_ng`.
-
     """
 
     def __init__(

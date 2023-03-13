@@ -8,12 +8,12 @@ $$
     \text{and} \quad \langle z(t)z^\ast(s) \rangle = \alpha(t-s) \, .
 $$
 
-The so far implemented methods (KLE, FFT, TanhSinh) to generate such processes provide an error control mechanism
-which ensures that the auto correlation function of the numerically generated stochastic processes does correspond
-to the preset auto correlation function $\alpha(\tau)$.
+Fo far, four (more or less) different methods have been implemented:
 
-* [Documentation](doc.md)
-* [API referecnce](api.md)
+* [`stocproc.samplers.KarhunenLoeve`][]
+* [`stocproc.samplers.FastFourier`][]
+* [`stocproc.samplers.TanhSinh`][]
+* [`stocproc.samplers.Cholesky`][]
 
 ## Simple Example
 For the impatient, here a simple example.
