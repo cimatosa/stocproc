@@ -1,3 +1,7 @@
+"""
+Tests related to the submodule stocproc.method_kle
+"""
+
 # python imports
 import logging
 import time
@@ -7,17 +11,19 @@ from typing import Callable, Union
 import numpy as np
 from numpy.typing import NDArray
 from scipy.linalg import eigh as scipy_eigh
-import fcSpline
+import fastcubicspline
 
 # module imports
-from . import stocproc_c
+from stocproc import stocproc_c
 from . import gquad
 from . import util
 
 log = logging.getLogger(__name__)
 
 
-def solve_hom_fredholm(r: NDArray, w: NDArray, small_weights_problem=False) -> tuple[NDArray, NDArray]:
+def solve_hom_fredholm(
+    r: NDArray, w: NDArray, small_weights_problem=False
+) -> tuple[NDArray, NDArray]:
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
 
     $$ \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t) $$
@@ -84,7 +90,9 @@ def solve_hom_fredholm(r: NDArray, w: NDArray, small_weights_problem=False) -> t
     eig_val = eig_val[::-1]
     eig_vec = eig_vec[:, ::-1]
     if small_weights_problem:
-        eig_vec = np.einsum('ij, j, k, jk -> ik', acf_matrix, w_sqrt, 1/eig_val, eig_vec)
+        eig_vec = np.einsum(
+            "ij, j, k, jk -> ik", acf_matrix, w_sqrt, 1 / eig_val, eig_vec
+        )
     else:
         eig_vec = np.reshape(1 / w_sqrt, (n, 1)) * eig_vec
 
@@ -141,13 +149,15 @@ def _calc_corr_matrix(s: NDArray, acf: util.CplxFnc, is_equi=None) -> NDArray:
         for i in range(size_s):
             idx = size_s - 1 - i
             # i-th column
-            r[:, i] = acf_ms_s[idx:idx + size_s]
+            r[:, i] = acf_ms_s[idx : idx + size_s]
     else:
         return acf(s.reshape(-1, 1) - s.reshape(1, -1))
     return r
 
 
-def get_nodes_weights_mid_point(t_max: float, num_grid_points: int) -> tuple[NDArray, NDArray, bool]:
+def get_nodes_weights_mid_point(
+    t_max: float, num_grid_points: int
+) -> tuple[NDArray, NDArray, bool]:
     r"""
     nodes and weights of the **mid-point rule** (equal integration weights)
 
@@ -169,7 +179,9 @@ def get_nodes_weights_mid_point(t_max: float, num_grid_points: int) -> tuple[NDA
     return t, w, True
 
 
-def get_nodes_weights_trapezoidal(t_max: float, num_grid_points: int) -> tuple[NDArray, NDArray, bool]:
+def get_nodes_weights_trapezoidal(
+    t_max: float, num_grid_points: int
+) -> tuple[NDArray, NDArray, bool]:
     r"""
     nodes and weights of the **trapezoidal rule**
 
@@ -190,7 +202,9 @@ def get_nodes_weights_trapezoidal(t_max: float, num_grid_points: int) -> tuple[N
     return t, w, True
 
 
-def get_nodes_weights_simpson(t_max: float, num_grid_points: int) -> tuple[NDArray, NDArray, bool]:
+def get_nodes_weights_simpson(
+    t_max: float, num_grid_points: int
+) -> tuple[NDArray, NDArray, bool]:
     r"""
     nodes and weights **simpson rule**
 
@@ -227,7 +241,9 @@ def get_nodes_weights_simpson(t_max: float, num_grid_points: int) -> tuple[NDArr
     return t, w, True
 
 
-def get_nodes_weights_four_point(t_max: float, num_grid_points: int) -> tuple[NDArray, NDArray, bool]:
+def get_nodes_weights_four_point(
+    t_max: float, num_grid_points: int
+) -> tuple[NDArray, NDArray, bool]:
     r"""
     nodes and weights **four-point Newton-Cotes rule**
 
@@ -267,7 +283,9 @@ def get_nodes_weights_four_point(t_max: float, num_grid_points: int) -> tuple[ND
     return t, w, True
 
 
-def get_nodes_weights_gauss_legendre(t_max: float, num_grid_points: int) -> tuple[NDArray, NDArray, bool]:
+def get_nodes_weights_gauss_legendre(
+    t_max: float, num_grid_points: int
+) -> tuple[NDArray, NDArray, bool]:
     r"""
     Calculate the nodes and weights for **Gauss integration**
     by expanding the function in terms of Legendre Polynomials, known as
@@ -282,11 +300,13 @@ def get_nodes_weights_gauss_legendre(t_max: float, num_grid_points: int) -> tupl
         location of the grid points, corresponding weights and
             `False` since the grid points are **not spaced equidistantly**
     """
-    t, w = gquad.gauss_nodes_weights_legendre(n=num_grid_points, low=0, high=t_max)
+    t, w = gquad.gauss_nodes_weights_legendre(n=num_grid_points, a=0, b=t_max)
     return t, w, False
 
 
-def get_nodes_weights_tanh_sinh(t_max: float, num_grid_points: int) -> tuple[NDArray, NDArray, bool]:
+def get_nodes_weights_tanh_sinh(
+    t_max: float, num_grid_points: int
+) -> tuple[NDArray, NDArray, bool]:
     r"""
     Calculate the nodes and weights for **Tanh-Sinh integration**.
 
@@ -343,12 +363,12 @@ def get_nodes_weights_tanh_sinh(t_max: float, num_grid_points: int) -> tuple[NDA
 
 
 def interpolate_eigenfunction(
-        acf: util.CplxFnc,
-        t: NDArray,
-        w: NDArray,
-        eig_vec: NDArray,
-        eig_val: float,
-        t_fine: NDArray,
+    acf: util.CplxFnc,
+    t: NDArray,
+    w: NDArray,
+    eig_vec: NDArray,
+    eig_val: float,
+    t_fine: NDArray,
 ):
     r"""
     interpolate the discrete eigenfunction of the Fredholm equation according to
@@ -372,17 +392,17 @@ def interpolate_eigenfunction(
 
 def subdivide_axis(t: NDArray, ng_fac: int) -> NDArray:
     r"""
-        Subdivide the $t$ axes $[t_0, t_1, \dots t_{n-1}]$ to obtain a finder grid.
+    Subdivide the $t$ axes $[t_0, t_1, \dots t_{n-1}]$ to obtain a finder grid.
 
-        Each interval $[t_i, t_{i+1}]$ is divided into `ng_fac` sub-intervals of equal width.
-        Therefore, the returned grid has `(n-1) ng_fac + 1` points.
-        Note that, $t$ does **not** need to be equally spaced.
+    Each interval $[t_i, t_{i+1}]$ is divided into `ng_fac` sub-intervals of equal width.
+    Therefore, the returned grid has `(n-1) ng_fac + 1` points.
+    Note that, $t$ does **not** need to be equally spaced.
 
-        Parameters:
-            t: the axis (grid) of which to create a finer sub-grid
-            ng_fac: the number of sub-intervals per interval $[t_i, t_{i+1}]$
-        Returns:
-             the finer grid
+    Parameters:
+        t: the axis (grid) of which to create a finer sub-grid
+        ng_fac: the number of sub-intervals per interval $[t_i, t_{i+1}]$
+    Returns:
+         the finer grid
     """
     n = len(t)
     if not isinstance(t, np.ndarray):
@@ -398,7 +418,9 @@ def auto_ng(
     acf: util.CplxFnc,
     t_max: float,
     ng_fac: int = 2,
-    meth: Union[str, Callable[[float, int], tuple[NDArray, NDArray, bool]]] = get_nodes_weights_mid_point,
+    quad_scheme: Union[
+        str, Callable[[float, int], tuple[NDArray, NDArray, bool]]
+    ] = get_nodes_weights_mid_point,
     tol: float = 1e-3,
     diff_method: str = "full",
     dm_random_samples: float = 10**4,
@@ -406,17 +428,17 @@ def auto_ng(
     relative_difference: bool = False,
 ):
     r"""
-    Exponentially increase the number of grid points of the discrete 
+    Exponentially increase the number of grid points of the discrete
     Fredholm equation until the desired accuracy is met.
     The accuracy is determined from the deviation of the approximated
-    auto correlation of the Karhunen-Loève expansion from the given 
+    auto correlation of the Karhunen-Loève expansion from the given
     reference auto correlation.
 
-    $$ 
+    $$
         \Delta(n) = \max_{t,s \in [0,t_\mathrm{max}]}
         \left( \Big | R(t-s) - \sum_{i=1}^{n} \lambda_i u_i(t) u_i^\ast(s) \Big | \right )
     $$
-    
+
     Parameters:
         acf:
             the reference auto correlation function $R$
@@ -424,10 +446,10 @@ def auto_ng(
             specifies the interval [0, t_max] of the stochastic process
         ng_fac:
             specifies the fine grid to use to check against spline interpolation.
-            A value of `n` means that the fine grid splits an interval of the rough grid into `n` sub-intervals. 
+            A value of `n` means that the fine grid splits an interval of the rough grid into `n` sub-intervals.
             The reference value of the eigenfunctions at the intermediate points (new points of thefine grid)
             are calculated using integral interpolation (see book Numerical Recipes - Fredholm Equation [1]).
-        meth:
+        quad_scheme:
             the method used to calculate the integration weights and times,
             a callable or one of the following strings:
             `midpoint` (`midp`), `trapezoidal` (`trapz`), `simpson` (`simp`), `fourpoint` (`fp`),
@@ -436,7 +458,7 @@ def auto_ng(
             defines the success criterion max(abs(corr_exact - corr_reconstr)) < tol
         diff_method:
             either `full` or `random`, determines the points where the above success criterion is evaluated,
-            `full`: full grid in between the fine grid, such that 
+            `full`: full grid in between the fine grid, such that
             the spline interpolation error is expected to be maximal
             `random`: pick a fixed number of random times t and s within the interval [0, t_max]
         dm_random_samples:
@@ -480,11 +502,11 @@ def auto_ng(
             the indices of the fine grid. It is expected that the interpolation error is maximal
             when being in between the reference points.
 
-        
+
         4) **increase the number of eigenfunctions**
-        
-        Calculate the deviation $\Delta(n)$ for increasing value of $n$ 
-        (error when using the first $n$ eigenfunctions). 
+
+        Calculate the deviation $\Delta(n)$ for increasing value of $n$
+        (error when using the first $n$ eigenfunctions).
         If there is no $n$ which fulfills the success criterion, double the number of grid points,
         $2 ng-1 \rightarrow ng$, and start over again.
 
@@ -525,15 +547,15 @@ def auto_ng(
     time_spline = 0
     time_calc_diff = 0
 
-    if isinstance(meth, str):
-        meth = str_meth_to_meth(meth)
+    if isinstance(quad_scheme, str):
+        quad_scheme = quad_scheme_name_to_function(quad_scheme)
 
     k = 4
     while True:
         k += 1
         ng = 2**k + 1
         log.info("check {} grid points".format(ng))
-        t, w, is_equi = meth(t_max, ng)
+        t, w, is_equi = quad_scheme(t_max, ng)
 
         # construct the auto correlation matrix
         t0 = time.time()
@@ -586,7 +608,7 @@ def auto_ng(
                         w=w,
                         eig_vec=eig_vec,
                         eig_val=sqrt_eval,
-                        t_fine=t_fine
+                        t_fine=t_fine,
                     )
                 else:
                     sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(
@@ -611,7 +633,7 @@ def auto_ng(
                     t_fine, sqrt_lambda_ui_fine, noWarning=True
                 )
             else:
-                sqrt_lambda_ui_spl = fcSpline.FCS(
+                sqrt_lambda_ui_spl = fastcubicspline.FCS(
                     x_low=0, x_high=t_max, y=sqrt_lambda_ui_fine
                 )
             time_spline += time.time() - t0
@@ -677,11 +699,13 @@ def is_axis_equidistant(ax: NDArray):
     return np.max(np.abs(d - d[0])) < 1e-15
 
 
-def str_meth_to_meth(meth:str) -> Callable[[float, int], tuple[NDArray, NDArray, bool]]:
+def quad_scheme_name_to_function(
+    quad_scheme_name: str,
+) -> Callable[[float, int], tuple[NDArray, NDArray, bool]]:
     """
     Convenient access by name to the generator functions for the integration nodes and weights.
 
-    The parameters `meth` (str) may be:
+    The parameters `quad_scheme_name` (str) may be:
 
     * `midpoint` or `midp`: [stocproc.method_kle.get_nodes_weights_mid_point][]
     * `trapezoidal` or `trapz`: [stocproc.method_kle.get_nodes_weights_trapezoidal][]
@@ -691,21 +715,23 @@ def str_meth_to_meth(meth:str) -> Callable[[float, int], tuple[NDArray, NDArray,
     * `tanh_sinh` or `ts`: [stocproc.method_kle.get_nodes_weights_tanh_sinh][]
 
     Parameters:
-        meth: a string naming the integration scheme
+        quad_scheme_name: a string naming the integration scheme
     Returns:
         the function that generated the nodes and weights for that integration scheme
     """
-    if (meth == "midpoint") or (meth == "midp"):
+    if (quad_scheme_name == "midpoint") or (quad_scheme_name == "midp"):
         return get_nodes_weights_mid_point
-    elif (meth == "trapezoidal") or (meth == "trapz"):
+    elif (quad_scheme_name == "trapezoidal") or (quad_scheme_name == "trapz"):
         return get_nodes_weights_trapezoidal
-    elif (meth == "simpson") or (meth == "simp"):
+    elif (quad_scheme_name == "simpson") or (quad_scheme_name == "simp"):
         return get_nodes_weights_simpson
-    elif (meth == "fourpoint") or (meth == "fp"):
+    elif (quad_scheme_name == "fourpoint") or (quad_scheme_name == "fp"):
         return get_nodes_weights_four_point
-    elif (meth == "gauss_legendre") or (meth == "gl"):
+    elif (quad_scheme_name == "gauss_legendre") or (quad_scheme_name == "gl"):
         return get_nodes_weights_gauss_legendre
-    elif (meth == "tanh_sinh") or (meth == "ts"):
+    elif (quad_scheme_name == "tanh_sinh") or (quad_scheme_name == "ts"):
         return get_nodes_weights_tanh_sinh
     else:
-        raise ValueError("unknown method to get integration weights '{}'".format(meth))
+        raise ValueError(
+            "unknown method to get integration weights '{}'".format(quad_scheme_name)
+        )

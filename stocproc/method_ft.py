@@ -10,7 +10,7 @@ from typing import Callable, Union
 import warnings
 
 # third party
-import fcSpline
+import fastcubicspline
 import numpy as np
 from numpy.fft import rfft as np_rfft
 from numpy.typing import NDArray
@@ -684,7 +684,7 @@ def get_dt_for_accurate_interpolation(
 
         ft_ref_n[1::2] = np.array(ft_ref_n_new)
 
-        ft_intp = fcSpline.FCS(x_low=0, x_high=t_max, y=ft_ref_n_old)
+        ft_intp = fastcubicspline.FCS(x_low=0, x_high=t_max, y=ft_ref_n_old)
         ft_intp_n_new = ft_intp(tau[1::2])
 
         ft_ref_n_new /= ft_ref_0
@@ -692,7 +692,9 @@ def get_dt_for_accurate_interpolation(
 
         d = np.max(diff_method(ft_intp_n_new, ft_ref_n_new))
         dt = 2 * tau[1]
-        log.debug(f"interpolation with step size dt {dt:.2e} estimates a difference of {d:.2e}")
+        log.debug(
+            f"interpolation with step size dt {dt:.2e} estimates a difference of {d:.2e}"
+        )
         if d < tol:
             return dt
 

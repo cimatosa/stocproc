@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import bisect
 from scipy.integrate import quad
+from . import stocproc_c
 
 
 stocproc_key_type = namedtuple(
@@ -22,7 +23,9 @@ CplxFnc = Union[Callable[[float], complex], Callable[[NDArray], NDArray]]
 class ComplexInterpolatedUnivariateSpline(object):
     def __init__(self, x, y, k=3, noWarning=False):
         if not noWarning:
-            raise DeprecationWarning("use fast cubic Spline (fcSpline) if x-values are equally spaced!")
+            raise DeprecationWarning(
+                "use fast cubic Spline (fastcubicspline) if x-values are equally spaced!"
+            )
         from scipy.interpolate import InterpolatedUnivariateSpline
 
         self.re_spline = InterpolatedUnivariateSpline(x, np.real(y), k=k)
@@ -82,7 +85,7 @@ def auto_correlation(x, verbose=1):
 
     if verbose > 0:
         print("calculate auto correlation function ...")
-    res = auto_correlation_c(x)
+    res = stocproc_c.auto_correlation(x)
     if verbose > 0:
         print("done!")
 

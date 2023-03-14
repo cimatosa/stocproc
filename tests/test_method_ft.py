@@ -1,16 +1,22 @@
+"""
+Tests related to the submodule stocproc.method_fft
+"""
+
+# python imports
 import logging
 from functools import partial
-import pytest
-import stocproc as sp
-from stocproc import method_ft
-from stocproc import tools as sp_tools
 
+# third party imports
+import fastcubicspline
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import scipy.integrate as sp_int
 from scipy.special import gamma as gamma_func
 
-import fcSpline
+# stocproc module imports
+import stocproc as sp
+from stocproc import method_ft
 
 
 sp.logging_setup(
@@ -352,7 +358,7 @@ def test_get_dt_for_accurate_interpolation():
     )
     t = np.arange(0, 2, dt)
     bcf_t = bcf_ref(t)
-    bcf_fcs = fcSpline.FCS(x_low=t[0], x_high=t[-1], y=bcf_t)
+    bcf_fcs = fastcubicspline.FCS(x_low=t[0], x_high=t[-1], y=bcf_t)
     t_fine = np.linspace(0, 2, len(t * 3) + 7)
 
     assert np.max(np.abs(bcf_ref(t_fine) - bcf_fcs(t_fine))) < tol
@@ -378,7 +384,7 @@ def test_calc_abn():
         rd = diff_method(ft_tau[idx], ft_ref_tau)
         assert np.max(rd) < tol
 
-        ft_intp = fcSpline.FCS(x_low=0, x_high=tau[idx][-1], y=ft_tau[idx])
+        ft_intp = fastcubicspline.FCS(x_low=0, x_high=tau[idx][-1], y=ft_tau[idx])
         tau_fine = np.linspace(0, tmax, 1500)
         ft_ref_n = bcf_ref(tau_fine)
         ft_intp_n = ft_intp(tau_fine)

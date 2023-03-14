@@ -15,7 +15,7 @@ import logging
 from typing import Optional, Union
 
 # third party imports
-import fcSpline
+import fastcubicspline
 import numpy as np
 import numpy.random
 from numpy.typing import NDArray
@@ -96,7 +96,7 @@ class StocProc(abc.ABC):
     convenient functions such as:
 
     - [`__call__`][stocproc.samplers.StocProc.__call__] evaluate the stochastic process for any time within the
-      interval $[0, t_\mathrm{max}]$ using [cubic spline interpolation](https://github.com/cimatosa/fcSpline)
+      interval $[0, t_\mathrm{max}]$ using [cubic spline interpolation](https://github.com/cimatosa/fastcubicspline)
     - [`get_time`][stocproc.samplers.StocProc.get_time] returns the times $t_n$
     - [`get_z`][stocproc.samplers.StocProc.get_z] returns the discrete stochastic process $z_n$
     - [`new_process`][stocproc.samplers.StocProc.new_process] draws new samples $Y_m$ and updates $z_n$ as well as the
@@ -139,9 +139,7 @@ class StocProc(abc.ABC):
         self._rand_skip = 1000
         self._rng = None
         self.init_rng(
-            random_numer_gen=self._rng_class,
-            seed=self._seed,
-            rand_skip=self._rand_skip
+            random_numer_gen=self._rng_class, seed=self._seed, rand_skip=self._rand_skip
         )
 
         log.debug(f"init StocProc with t_max {t_max} and {num_grid_points} grid points")
@@ -244,10 +242,7 @@ class StocProc(abc.ABC):
         return self._z
 
     def init_rng(
-        self,
-        random_numer_gen=None,
-        seed: float = None,
-        rand_skip: int = None
+        self, random_numer_gen=None, seed: float = None, rand_skip: int = None
     ):
         """
         Set instance wide parameters which control the random number generation.
@@ -273,7 +268,7 @@ class StocProc(abc.ABC):
         y: Optional[np.ndarray] = None,
         scale: float = 1,
         seed: int = None,
-        rand_skip: int = None
+        rand_skip: int = None,
     ) -> None:
         r"""Generate a new realization of the stochastic process.
 
@@ -305,10 +300,7 @@ class StocProc(abc.ABC):
 
         # reinit random number generator
         if seed is not None:
-            self.init_rng(
-                seed=seed,
-                rand_skip=rand_skip
-            )
+            self.init_rng(seed=seed, rand_skip=rand_skip)
 
         if y is None:
             # draw new random numbers
@@ -326,13 +318,13 @@ class StocProc(abc.ABC):
 
         # generate the new process (scaled version)
         self._z = np.sqrt(scale) * self.calc_z(y)
-        self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
+        self._interpolator = fastcubicspline.FCS(x_low=0, x_high=self.t_max, y=self._z)
 
         # .. and optionally its derivative
         self._z_dot = self.calc_z_dot(y)
         if self._z_dot is not None:
             self._z_dot *= np.sqrt(scale)
-            self._interpolator_dot = fcSpline.FCS(
+            self._interpolator_dot = fastcubicspline.FCS(
                 x_low=0, x_high=self.t_max, y=self._z_dot
             )
 
@@ -351,10 +343,10 @@ class KarhunenLoeve(StocProc):
     $\langle Y_k Y_{k'} \rangle = \delta_{k k'}$. $\lambda_k$, $u_k(t)$ are the
     eigenvalues / eigenfunctions of the following homogeneous Fredholm equation
 
-    $$ \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u_k(s) = \lambda_k u_k(t) . $$
+    $$ \int_0^{t_\mathrm{max}} \mathrm{d}s \alpha(t-s) u_k(s) = \lambda_k u_k(t) . $$
 
     Is is easily seen, that the positive integral kernel $R(\tau)$ amounts to the auto correlation of the
-    stochastic processes, i.e., $\langle Z(t)Z^\ast(s) \rangle = R(t-s)$.
+    stochastic processes, i.e., $\langle Z(t)Z^\ast(s) \rangle = \alpha(t-s)$.
 
     ## Numeric Treatment
 
@@ -389,7 +381,7 @@ class KarhunenLoeve(StocProc):
     and the given reference $R(t-s)$,
 
     $$
-        \epsilon = \max_{t, s} |R_n(t, s) - R(t,s)| \, .
+        \epsilon = \max_{t, s} |R_n(t, s) - \alpha(t-s)| \, .
     $$
 
     As of the interpolation in $t$, it makes sense to keep the number of expansion terms $n$ independent
@@ -400,7 +392,8 @@ class KarhunenLoeve(StocProc):
 
         The numeric quadrature of the integral can be realized in many fashions.
         At first glance one might expect an enhancement of the accuracy of the eigen vectors approximating
-        the true eigen functions when employing (higher order quadrature schemes)[stocproc.method_kle.str_meth_to_meth].
+        the true eigen functions when employing
+        (higher order quadrature schemes)[stocproc.method_kle.quad_scheme_name_to_function].
         However, the [comparison of different such schemes](./insights/comp_quad_schemes/comp_quad_schemes/)
         shows that the most simple scheme with equal weights for each node, known ad mid-point quadrature,
         is most suited for the purpose of sampling time continuous stochastic processes numerically.
@@ -415,38 +408,56 @@ class KarhunenLoeve(StocProc):
 
 
     Parameters:
-        :param r_tau: the idesired auto correlation function of a single parameter tau
-        :param t_max: specifies the time interval [0, t_max] for which the processes in generated
-        :param tol: maximal deviation of the auto correlation function of the sampled processes from
-            the given auto correlation r_tau.
-        :param ngfac: specifies the fine grid to use for the spline interpolation, the intermediate points are
-            calculated using integral interpolation
-        :param meth: the method for calculation integration weights and times, a callable or one of the following strings
-            'midpoint' ('midp'), 'trapezoidal' ('trapz'), 'simpson' ('simp'), 'fourpoint' ('fp'),
-            'gauss_legendre' ('gl'), 'tanh_sinh' ('ts')
-        :param diff_method: either 'full' or 'random', determines the points where the above success criterion is evaluated,
-            'full': full grid in between the fine grid, such that the spline interpolation error is expected to be maximal
-            'random': pick a fixed number of random times t and s within the interval [0, t_max]
-        :param dm_random_samples: the number of random times used for diff_method 'random'
-        :param seed: if not None seed the random number generator on init of this class with seed
-        :param align_eig_vec: assures that :math:`re(u_i(0)) \leq 0` and :math:`im(u_i(0)) = 0` for all i
+        acf:
+            The auto correlation function.
+        t_max:
+            Specifies the time interval $[0, t_\mathrm{max}]$ for which the process is generated.
+        tol:
+            Tolerance for the deviation of the numeric KLE auto correlation function from the
+            reference auto correlation (see above for details).
+        ng_fac:
+            Specifies the number of points of the fine grid for the interpolated proces as multiple of the
+            number of grid points of the rough grid, i.e., the dimension of the eigenvalue problem
+            (see also [`stocproc.method_kle.auto_ng`][]).
+        quad_scheme:
+            Name of the quadrature scheme. There should be no need to use anything but the 'midpoint' scheme.
+        diff_method:
+            Either 'full' or 'random'. Determines the points where the deviation of the auto correlation function
+            is evaluated.
+                'full': full grid in between the fine grid, such that the
+                    spline interpolation error is expected to be maximal
+                'random': pick a fixed number of random times t and s within the interval $[0, t_\mathrm{max}]$
+        dm_random_samples:
+            the number of points used for diff_method 'random'
     """
 
     def __init__(
         self,
-        alpha: util.CplxFnc,
+        acf: util.CplxFnc,
         t_max: float,
         tol: float = 1e-2,
         ng_fac: int = 4,
-        meth: Union[str, Callable[[float, int], tuple[NDArray, NDArray, bool]]] = 'midpoint',
+        quad_scheme: Union[
+            str, Callable[[float, int], tuple[NDArray, NDArray, bool]]
+        ] = "midpoint",
         diff_method: str = "full",
         dm_random_samples: float = 10**4,
     ):
+
+        # dummy call to check if the given quadrature scheme returns an equidistant axes
+        if isinstance(quad_scheme, str):
+            quad_scheme = method_kle.quad_scheme_name_to_function(quad_scheme)
+        _, _, is_equi = quad_scheme(t_max=1, num_grid_points=8)
+        if not is_equi:
+            raise NotImplementedError(
+                "so far only quadrature schemes with equally spaced nodes are supported"
+            )
+
         sqrt_lambda_ui_fine, t = method_kle.auto_ng(
-            acf=alpha,
+            acf=acf,
             t_max=t_max,
             ng_fac=ng_fac,
-            meth=meth,
+            quad_scheme=quad_scheme,
             tol=tol,
             diff_method=diff_method,
             dm_random_samples=dm_random_samples,
@@ -470,13 +481,25 @@ class KarhunenLoeve(StocProc):
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
-    def calc_z(self, y):
-        r"""evaluate :math:`z_k = \sum_i \lambda_i Y_i u_{ik}`"""
+    def calc_z(self, y: NDArray) -> NDArray:
+        r"""
+        Evaluate the discrete stochastic process $Z_i$ for a given set of values $\{Y_k\}$.
+
+        Following the Karhunen-Lóeve expansion the stochastic process reads
+
+        $$ Z_i = \sum_{k=1}^n \sqrt{\lambda_k} Y_k u_{k,i} $$
+
+        Parameters:
+            y: an $n$-dimensional $Y$-vector (complex valued Gaussian random variables)
+        Returns:
+            the discrete stochastic process $Z_1, Z_2, \dots Z_m$
+        """
         return np.tensordot(y, self.sqrt_lambda_ui_fine, axes=([0], [0])).flatten()
 
     def get_num_y(self):
-        """The number of independent random variables Y is given by the number of used eigenfunction
-        to approximate the auto correlation kernel.
+        """
+        Return the number of independent random variables $Y$, which amounts in the KLE approach
+        to the number of eigenfunction $n$ used for the expansion.
         """
         return self.num_ev
 
@@ -554,6 +577,7 @@ class FastFourier(StocProc):
        find a negative :math:`\omega_\mathrm{min}` appropriately just like :math:`\omega_\mathrm{max}`
 
     """
+
     def __init__(
         self,
         spectral_density,
@@ -728,8 +752,8 @@ class TanhSinh(StocProc):
                 log.info("get_dt_for_accurate_interpolation, please wait ...")
                 c = method_ft.find_integral_boundary(
                     integrand=lambda tau: np.abs(ft_ref(tau)) / np.abs(ft_ref(0)),
-                    direction='right',
-                    tol= intgr_tol
+                    direction="right",
+                    tol=intgr_tol,
                 )
             except RuntimeError:
                 c = t_max
