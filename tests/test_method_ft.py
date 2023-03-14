@@ -1,16 +1,22 @@
+"""
+Tests related to the submodule stocproc.method_fft
+"""
+
+# python imports
 import logging
 from functools import partial
-import pytest
-import stocproc as sp
-from stocproc import method_ft
-from stocproc import tools as sp_tools
 
+# third party imports
+import fcSpline
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import scipy.integrate as sp_int
 from scipy.special import gamma as gamma_func
 
-import fcSpline
+# stocproc module imports
+import stocproc as sp
+from stocproc import method_ft
 
 
 sp.logging_setup(

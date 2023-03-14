@@ -1,24 +1,13 @@
-import sys
-import os
-
+# third party imports
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy.linalg import eig, ishermitian
-
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    print("matplotlib not found -> any plotting will crash")
-
-
-import pathlib
-
-p = pathlib.PosixPath(os.path.abspath(__file__))
-sys.path.insert(0, str(p.parent.parent))
-
-from scipy.special import gamma
 from scipy.integrate import quad
+from scipy.linalg import eig, ishermitian
+from scipy.special import gamma
+
+# stocproc module imports
 import stocproc as sp
-from stocproc import tools
+from stocproc import util
 from stocproc import method_kle
 from stocproc import stocproc_c
 import logging
@@ -30,10 +19,11 @@ _WC_ = 2
 
 def oac(tau):
     """ohmic bath correlation function"""
-    return (1 + 1j * (tau)) ** (-(_S_ + 1)) * _GAMMA_S_PLUS_1 / np.pi
+    return (1 + 1j * tau) ** (-(_S_ + 1)) * _GAMMA_S_PLUS_1 / np.pi
 
 
 def osd(omega):
+    """ohmic spectral density"""
     return omega**_S_ * np.exp(-omega)
 
 
@@ -154,11 +144,13 @@ def test_analytic_lorentzian_eigenfunctions():
     w = 10.3
     num = 10
     corr = lambda x: np.exp(-gamma * np.abs(x) - 1j * w * x)
-    lef = tools.LorentzianEigenFunctions(tmax, gamma, w, num)
+    lef = util.LorentzianEigenFunctions(tmax, gamma, w, num)
     t = np.linspace(0, tmax, 15)
     for idx in range(num):
         u = lef.get_eigfunc(idx)
-        u_kernel = np.asarray([tools.complex_quad(lambda s: corr(ti-s) * u(s), 0, tmax) for ti in t])
+        u_kernel = np.asarray(
+            [util.complex_quad(lambda s: corr(ti - s) * u(s), 0, tmax) for ti in t]
+        )
         c = 1 / lef.get_eigval(idx)
         md = np.max(np.abs(u(t) - c * u_kernel))
         assert md < 1e-6
@@ -174,7 +166,6 @@ def test_calc_acf():
 
     assert ishermitian(ac_mat)
     assert np.allclose(ac_mat, ac_ref)
-
 
 
 def test_solve_fredholm():
@@ -307,12 +298,12 @@ def test_auto_ng():
         method_kle.get_nodes_weights_trapezoidal,
         method_kle.get_nodes_weights_simpson,
         method_kle.get_nodes_weights_four_point,
+        method_kle.get_nodes_weights_gauss_legendre,
+        method_kle.get_nodes_weights_tanh_sinh,
     ]
-    # method_kle.get_gauss_legendre_weights_times]
-    # method_kle.get_tanh_sinh_weights_times]
 
     for _meth in meth:
-        ui, t = method_kle.auto_ng(corr, t_max, ng_fac=ng_fac, meth=_meth)
+        ui, t = method_kle.auto_ng(corr, t_max, ng_fac=ng_fac, quad_scheme=_meth)
         print(_meth.__name__, ui.shape)
 
 

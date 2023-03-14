@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pathlib
 import shutil
 
+
 def lsd(w):
     # Lorenzian spectral density
     return 1 / (1 + (w - _WC_) ** 2)
@@ -23,10 +24,10 @@ stp = sp.StocProc_FFT(
     spectral_density=lsd,
     t_max=t_max,
     alpha=exp_ac,
-    intgr_tol=1e-2,            # integration error control parameter
-    intpl_tol=1e-2,            # interpolation error control parameter
-    negative_frequencies=True, # due to the Lorentzian spec. dens.
-    seed=1                     # fixed a particular process
+    intgr_tol=1e-2,  # integration error control parameter
+    intpl_tol=1e-2,  # interpolation error control parameter
+    negative_frequencies=True,  # due to the Lorentzian spec. dens.
+    seed=1,  # fixed a particular process
 )
 # generate a new process
 stp.new_process()
@@ -41,9 +42,6 @@ plt.legend(ncol=2, loc="upper right")
 plt.title("stochastic process with exponential autocorrelation function")
 plt.xlabel("time")
 plt.ylabel("process $z(t)$")
-plt.axhline(0, color='0.5', lw=1)
+plt.axhline(0, color="0.5", lw=1)
 plt.tight_layout()
-plt.savefig('example_simple_out.png')
-
-
-
+plt.savefig("example_simple_out.png")

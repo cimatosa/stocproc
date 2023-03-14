@@ -692,7 +692,9 @@ def get_dt_for_accurate_interpolation(
 
         d = np.max(diff_method(ft_intp_n_new, ft_ref_n_new))
         dt = 2 * tau[1]
-        log.debug(f"interpolation with step size dt {dt:.2e} estimates a difference of {d:.2e}")
+        log.debug(
+            f"interpolation with step size dt {dt:.2e} estimates a difference of {d:.2e}"
+        )
         if d < tol:
             return dt
 

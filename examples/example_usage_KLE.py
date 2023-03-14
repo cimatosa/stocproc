@@ -4,7 +4,7 @@ import stocproc as sp
 
 def alpha(t, wc):
     """Ohmic correlation function, wc: cutoff frequency"""
-    return (wc/(1+1j*wc*t))**2
+    return (wc / (1 + 1j * wc * t)) ** 2
 
 
 al = partial(alpha, wc=5)
