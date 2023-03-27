@@ -1,18 +1,3 @@
-__MAJOR__ = 1
-__MINOR__ = 1
-__PATCH__ = 0
-
-
-def version():
-    """semantic version string with format 'MAJOR.MINOR' (https://semver.org/)"""
-    return "{}.{}".format(__MAJOR__, __MINOR__)
-
-
-def version_full():
-    """semantic version string with format 'MAJOR.MINOR.PATCH' (https://semver.org/)"""
-    return "{}.{}.{}".format(__MAJOR__, __MINOR__, __PATCH__)
-
-
 import sys
 
 if sys.version_info.major < 3:

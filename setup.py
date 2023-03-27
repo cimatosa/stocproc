@@ -1,13 +1,11 @@
 from setuptools import setup
 from Cython.Build import cythonize
 import numpy as np
-from stocproc import version_full
 
 author = "Richard Hartmann"
 authors = [author]
 description = "Generate continuous time stationary stochastic processes from a given auto correlation function."
 name = "stocproc"
-version = version_full()
 
 if __name__ == "__main__":
     setup(
@@ -15,7 +13,7 @@ if __name__ == "__main__":
         author=author,
         author_email="richard.hartmann@tu-dresden.de",
         url="https://github.com/cimatosa/stocproc",
-        version=version,
+        version="1.1.1",
         packages=[name],
         package_dir={name: name},
         license="BSD (3 clause)",
