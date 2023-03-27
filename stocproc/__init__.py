@@ -1,23 +1,24 @@
 __MAJOR__ = 1
-__MINOR__ = 0
+__MINOR__ = 1
 __PATCH__ = 0
+
 
 def version():
     """semantic version string with format 'MAJOR.MINOR' (https://semver.org/)"""
     return "{}.{}".format(__MAJOR__, __MINOR__)
 
+
 def version_full():
     """semantic version string with format 'MAJOR.MINOR.PATCH' (https://semver.org/)"""
     return "{}.{}.{}".format(__MAJOR__, __MINOR__, __PATCH__)
 
+
 import sys
+
 if sys.version_info.major < 3:
     raise SystemError("no support for Python 2")
 
-try:
-    from .stocproc import loggin_setup
-    from .stocproc import StocProc_FFT
-    from .stocproc import StocProc_KLE
-    from .stocproc import StocProc_TanhSinh
-except ImportError:
-    print("WARNING: Import Error occurred, parts of the package may be not available")
+from .stocproc import loggin_setup
+from .stocproc import StocProc_FFT
+from .stocproc import StocProc_KLE
+from .stocproc import StocProc_TanhSinh

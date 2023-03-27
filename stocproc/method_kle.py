@@ -6,32 +6,34 @@ import time
 from . import stocproc_c
 from . import gquad
 from . import tools
-import fcSpline
+import fastcubicspline as fcSpline
 
 import logging
+
 log = logging.getLogger(__name__)
+
 
 def solve_hom_fredholm(r, w):
     r"""Solves the discrete homogeneous Fredholm equation of the second kind
-    
+
     .. math:: \int_0^{t_\mathrm{max}} \mathrm{d}s R(t-s) u(s) = \lambda u(t)
-    
+
     Quadrature approximation of the integral gives a discrete representation
     which leads to a regular eigenvalue problem.
-    
-    .. math:: \sum_i w_i R(t_j-s_i) u(s_i) = \lambda u(t_j) \equiv \mathrm{diag(w_i)} \cdot R \cdot u = \lambda u 
-    
-    Note: If :math:`t_i = s_i \forall i` the matrix :math:`R(t_j-s_i)` is 
-    a hermitian matrix. In order to preserve hermiticity for arbitrary :math:`w_i` 
-    one defines the diagonal matrix :math:`D = \mathrm{diag(\sqrt{w_i})}` 
+
+    .. math:: \sum_i w_i R(t_j-s_i) u(s_i) = \lambda u(t_j) \equiv \mathrm{diag(w_i)} \cdot R \cdot u = \lambda u
+
+    Note: If :math:`t_i = s_i \forall i` the matrix :math:`R(t_j-s_i)` is
+    a hermitian matrix. In order to preserve hermiticity for arbitrary :math:`w_i`
+    one defines the diagonal matrix :math:`D = \mathrm{diag(\sqrt{w_i})}`
     with leads to the equivalent expression:
-    
+
     .. math:: D \cdot R \cdot D \cdot D \cdot u = \lambda D \cdot u \equiv \tilde R \tilde u = \lambda \tilde u
-    
+
     where :math:`\tilde R` is hermitian and :math:`u = D^{-1}\tilde u`.
-    
+
     :param r: correlation matrix :math:`R(t_j-s_i)`
-    :param w: integrations weights :math:`w_i` 
+    :param w: integrations weights :math:`w_i`
         (they have to correspond to the discrete time :math:`t_i`)
 
     :return: eigenvalues, eigenvectos (eigenvectos are stored in the normal numpy fashion, ordered in decreasing order)
@@ -58,18 +60,23 @@ def solve_hom_fredholm(r, w):
     # weighted matrix r due to quadrature weights
     n = len(w)
     w_sqrt = np.sqrt(w)
-    r = w_sqrt.reshape(n,1) * r * w_sqrt.reshape(1,n)
-    eig_val, eig_vec = scipy_eigh(r, overwrite_a=True)   # eig_vals in ascending
+    r = w_sqrt.reshape(n, 1) * r * w_sqrt.reshape(1, n)
+    eig_val, eig_vec = scipy_eigh(r, overwrite_a=True)  # eig_vals in ascending
 
     eig_val = eig_val[::-1]
     eig_vec = eig_vec[:, ::-1]
-    eig_vec = np.reshape(1/w_sqrt, (n,1)) * eig_vec
-    log.debug("discrete fredholm equation of size {} solved [{:.2e}s]".format(n, time.time() - t0))
+    eig_vec = np.reshape(1 / w_sqrt, (n, 1)) * eig_vec
+    log.debug(
+        "discrete fredholm equation of size {} solved [{:.2e}s]".format(
+            n, time.time() - t0
+        )
+    )
     return eig_val, eig_vec
+
 
 def align_eig_vec(eig_vec):
     for i in range(eig_vec.shape[1]):
-        phase = np.exp(1j * np.arctan2(np.real(eig_vec[0,i]), np.imag(eig_vec[0,i])))
+        phase = np.exp(1j * np.arctan2(np.real(eig_vec[0, i]), np.imag(eig_vec[0, i])))
         eig_vec[:, i] /= phase
 
 
@@ -98,9 +105,9 @@ def _calc_corr_matrix(s, bcf, is_equi=None):
         r = np.empty(shape=(n_, n_), dtype=np.complex128)
         for i in range(n_):
             idx = n_ - 1 - i
-            r[:, i] = bcf_n[idx:idx + n_]
+            r[:, i] = bcf_n[idx : idx + n_]
     else:
-        return bcf(s.reshape(-1,1) - s.reshape(1,-1))
+        return bcf(s.reshape(-1, 1) - s.reshape(1, -1))
     return r
 
 
@@ -115,19 +122,20 @@ def get_mid_point_weights_times(t_max, num_grid_points):
     it stretches the homogeneous weights over the grid points starting from 0 up to t_max, so the
     term min_point is somewhat miss leading. This is possible because we want to simulate
     stationary stochastic processes which allows :math:`\alpha(t_i+\Delta/2 - (s_j+\Delta/2)) = \alpha(t_i-s_j)`.
-        
+
     The N grid points are located at
-    
+
     .. math:: t_i = i \frac{t_\mathrm{max}}{N-1} \qquad i = 0,1, ... N - 1
 
     and the corresponding weights are
-    
+
     .. math:: w_i = \Delta t = \frac{t_\mathrm{max}}{N} \qquad i = 0,1, ... N - 1
     """
     t = np.linspace(0, t_max, num_grid_points)
-    delta_t = t_max/num_grid_points
-    w = np.ones(num_grid_points)*delta_t
+    delta_t = t_max / num_grid_points
+    w = np.ones(num_grid_points) * delta_t
     return t, w
+
 
 def get_trapezoidal_weights_times(t_max, num_grid_points):
     r"""Returns the weights and grid points for numeric integration via **trapezoidal rule**.
@@ -145,11 +153,12 @@ def get_trapezoidal_weights_times(t_max, num_grid_points):
     .. math:: w_0 = w_{N-1} = \Delta t /2 \qquad w_i = \Delta t \quad  0 < i < N - 1
               \qquad \Delta t = \frac{t_\mathrm{max}}{N-1}
     """
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
-    w = np.ones(num_grid_points)*delta_t
+    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep=True)
+    w = np.ones(num_grid_points) * delta_t
     w[0] /= 2
     w[-1] /= 2
     return t, w
+
 
 def get_simpson_weights_times(t_max, num_grid_points):
     r"""Returns the weights and grid points for numeric integration via **simpson rule**.
@@ -168,14 +177,19 @@ def get_simpson_weights_times(t_max, num_grid_points):
     .. math:: \qquad w_{2i+1} = 4/3 \Delta t \quad  0 \leq i < (N - 1)/2 \qquad \Delta t = \frac{t_\mathrm{max}}{N-1}
     """
     if num_grid_points % 2 != 1:
-        raise RuntimeError("simpson weights needs grid points ng such that ng = 2*k+1, but git ng={}".format(num_grid_points))
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
+        raise RuntimeError(
+            "simpson weights needs grid points ng such that ng = 2*k+1, but git ng={}".format(
+                num_grid_points
+            )
+        )
+    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep=True)
     w = np.empty(num_grid_points, dtype=np.float64)
-    w[0::2] = 2/3*delta_t
-    w[1::2] = 4/3*delta_t
-    w[0]    = 1/3*delta_t
-    w[-1]   = 1/3*delta_t
+    w[0::2] = 2 / 3 * delta_t
+    w[1::2] = 4 / 3 * delta_t
+    w[0] = 1 / 3 * delta_t
+    w[-1] = 1 / 3 * delta_t
     return t, w
+
 
 def get_four_point_weights_times(t_max, num_grid_points):
     r"""Returns the weights and grid points for numeric integration via **four-point Newton-Cotes rule**.
@@ -197,16 +211,21 @@ def get_four_point_weights_times(t_max, num_grid_points):
     .. math:: \Delta t = \frac{t_\mathrm{max}}{N-1}
     """
     if num_grid_points % 4 != 1:
-        raise RuntimeError("four point weights needs grid points ng such that ng = 4*k+1, but git ng={}".format(num_grid_points))
-    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep = True)
+        raise RuntimeError(
+            "four point weights needs grid points ng such that ng = 4*k+1, but git ng={}".format(
+                num_grid_points
+            )
+        )
+    t, delta_t = np.linspace(0, t_max, num_grid_points, retstep=True)
     w = np.empty(num_grid_points, dtype=np.float64)
-    w[0::4] = 56  / 90 * delta_t
+    w[0::4] = 56 / 90 * delta_t
     w[1::4] = 128 / 90 * delta_t
-    w[2::4] = 48  / 90 * delta_t
+    w[2::4] = 48 / 90 * delta_t
     w[3::4] = 128 / 90 * delta_t
-    w[0]    = 28  / 90 * delta_t
-    w[-1]   = 28  / 90 * delta_t
+    w[0] = 28 / 90 * delta_t
+    w[-1] = 28 / 90 * delta_t
     return t, w
+
 
 def get_gauss_legendre_weights_times(t_max, num_grid_points):
     """Returns the weights and grid points for numeric integration via **Gauss integration**
@@ -216,7 +235,8 @@ def get_gauss_legendre_weights_times(t_max, num_grid_points):
     :param num_grid_points: number of grid points N
     :return: location of the grid points, corresponding weights
     """
-    return gquad.gauss_nodes_weights_legendre(n = num_grid_points, low=0, high=t_max)
+    return gquad.gauss_nodes_weights_legendre(n=num_grid_points, low=0, high=t_max)
+
 
 def get_tanh_sinh_weights_times(t_max, num_grid_points):
     r"""Returns the weights and grid points for numeric integration via **Tanh-Sinh integration**. The idea is to
@@ -246,9 +266,10 @@ def get_tanh_sinh_weights_times(t_max, num_grid_points):
     :math:`w_i` are calculated for :math:`-(N-1)/2 \leq i \leq (N-1)/2`. Afterwards the :math:`x_i` are linearly
     scaled such that :math:`x_{-(N-1)/2} = 0` and :math:`x_{(N-1)/2} = t_\mathrm{max}`.
     """
+
     def get_h_of_N(N):
         r"""returns the stepsize h for sinh tanh quad for a given number of points N
-            such that the smallest weights are about 1e-14
+        such that the smallest weights are about 1e-14
         """
         a = 16.12087683080651
         b = -2.393599730652087
@@ -256,20 +277,25 @@ def get_tanh_sinh_weights_times(t_max, num_grid_points):
         d = -1.012504470475915
         if N < 4:
             raise ValueError("only tested for N >= 4")
-        return a * N ** b + c * N ** d
+        return a * N**b + c * N**d
 
     h = get_h_of_N(num_grid_points)
     if num_grid_points % 2 != 1:
-        raise RuntimeError("sinh tanh weights needs grid points ng such that ng = 2*k+1, but git ng={}".format(num_grid_points))
+        raise RuntimeError(
+            "sinh tanh weights needs grid points ng such that ng = 2*k+1, but git ng={}".format(
+                num_grid_points
+            )
+        )
     kmax = (num_grid_points - 1) / 2
-    k = np.arange(0, kmax+1)
+    k = np.arange(0, kmax + 1)
     w = h * np.pi / 2 * np.cosh(k * h) / np.cosh(np.pi / 2 * np.sinh(k * h)) ** 2
-    w = np.hstack((w[-1:0:-1], w))*t_max/2
+    w = np.hstack((w[-1:0:-1], w)) * t_max / 2
 
-    tmp = np.pi/2*np.sinh(h*k)
-    y_plus = 1/ (np.exp(tmp) * np.cosh(tmp))
-    t = np.hstack((y_plus[-1:0:-1], (2-y_plus)))*t_max/2
+    tmp = np.pi / 2 * np.sinh(h * k)
+    y_plus = 1 / (np.exp(tmp) * np.cosh(tmp))
+    t = np.hstack((y_plus[-1:0:-1], (2 - y_plus))) * t_max / 2
     return t, w
+
 
 def get_rel_diff(corr, t_max, ng, weights_times, ng_fac):
     t, w = weights_times(t_max, ng)
@@ -280,12 +306,14 @@ def get_rel_diff(corr, t_max, ng, weights_times, ng_fac):
     bcf_n_plus = corr(tfine - tfine[0])
     alpha_k = np.hstack((np.conj(bcf_n_plus[-1:0:-1]), bcf_n_plus))
 
-    u_i_all_t = stocproc_c.eig_func_all_interp(delta_t_fac = ng_fac,
-                                               time_axis   = t,
-                                               alpha_k     = alpha_k,
-                                               weights     = w,
-                                               eigen_val   = _eig_val,
-                                               eigen_vec   = _eig_vec)
+    u_i_all_t = stocproc_c.eig_func_all_interp(
+        delta_t_fac=ng_fac,
+        time_axis=t,
+        alpha_k=alpha_k,
+        weights=w,
+        eigen_val=_eig_val,
+        eigen_vec=_eig_vec,
+    )
 
     u_i_all_ast_s = np.conj(u_i_all_t)  # (N_gp, N_ev)
     num_ev = len(_eig_val)
@@ -295,10 +323,11 @@ def get_rel_diff(corr, t_max, ng, weights_times, ng_fac):
     refc_bcf = np.empty(shape=(ng_fine, ng_fine), dtype=np.complex128)
     for i in range(ng_fine):
         idx = ng_fine - 1 - i
-        refc_bcf[:, i] = alpha_k[idx:idx + ng_fine]
+        refc_bcf[:, i] = alpha_k[idx : idx + ng_fine]
 
     rd = np.abs(recs_bcf - refc_bcf) / np.abs(refc_bcf)
     return tfine, rd
+
 
 def subdevide_axis(t, ngfac):
     ng = len(t)
@@ -310,8 +339,18 @@ def subdevide_axis(t, ngfac):
         tfine[l::ngfac] = (l * t[1:] + (ngfac - l) * t[:-1]) / ngfac
     return tfine
 
-def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, diff_method='full',
-            dm_random_samples=10**4, ret_eigvals=False, relative_difference=False):
+
+def auto_ng(
+    corr,
+    t_max,
+    ngfac=2,
+    meth=get_mid_point_weights_times,
+    tol=1e-3,
+    diff_method="full",
+    dm_random_samples=10**4,
+    ret_eigvals=False,
+    relative_difference=False,
+):
     r"""increase the number of gridpoints until the desired accuracy is met
 
     This function increases the number of grid points of the discrete Fredholm equation exponentially until
@@ -381,14 +420,16 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
     Auflage: 3. ed. Cambridge University Press, Cambridge, UK ; New York. (pp. 990)
     """
     time_start = time.time()
-    if diff_method == 'full':
+    if diff_method == "full":
         pass
-    elif diff_method == 'random':
+    elif diff_method == "random":
         t_rand = np.random.rand(dm_random_samples) * t_max
         s_rand = np.random.rand(dm_random_samples) * t_max
         alpha_ref = corr(t_rand - s_rand)
     else:
-        raise ValueError("unknown diff_method '{}', use 'full' or 'random'".format(diff_method))
+        raise ValueError(
+            "unknown diff_method '{}', use 'full' or 'random'".format(diff_method)
+        )
     alpha_0 = np.abs(corr(0))
     log.debug("diff_method: {}".format(diff_method))
 
@@ -404,34 +445,36 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
     k = 4
     while True:
         k += 1
-        ng = 2 ** k + 1
+        ng = 2**k + 1
         log.info("check {} grid points".format(ng))
         t, w = meth(t_max, ng)
         is_equi = is_axis_equidistant(t)
         log.debug("equidistant axis: {}".format(is_equi))
 
-        t0 = time.time()                                      # efficient way to construct the
-        r = _calc_corr_matrix(t, corr, is_equi)               # auto correlation matrix r
-        time_calc_ac += (time.time() - t0)
+        t0 = time.time()  # efficient way to construct the
+        r = _calc_corr_matrix(t, corr, is_equi)  # auto correlation matrix r
+        time_calc_ac += time.time() - t0
 
-        t0 = time.time()                                      # solve the dicrete fredholm equation
-        _eig_val, _eig_vec = solve_hom_fredholm(r, w)         # using integration weights w
-        time_fredholm += (time.time() - t0)
+        t0 = time.time()  # solve the dicrete fredholm equation
+        _eig_val, _eig_vec = solve_hom_fredholm(r, w)  # using integration weights w
+        time_fredholm += time.time() - t0
 
-        tfine = subdevide_axis(t, ngfac)                      # setup fine
-        tsfine = subdevide_axis(tfine, 2)                     # and super fine time grid
+        tfine = subdevide_axis(t, ngfac)  # setup fine
+        tsfine = subdevide_axis(tfine, 2)  # and super fine time grid
 
         if is_equi:
-            t0 = time.time()                                  # efficient way to calculate the auto correlation
-            alpha_k = _calc_corr_min_t_plus_t(tfine, corr)    # from -tmax untill tmax on the fine grid
-            time_calc_ac += (time.time() - t0)                # needed for integral interpolation
+            t0 = time.time()  # efficient way to calculate the auto correlation
+            alpha_k = _calc_corr_min_t_plus_t(
+                tfine, corr
+            )  # from -tmax untill tmax on the fine grid
+            time_calc_ac += time.time() - t0  # needed for integral interpolation
             alpha_k_is_real = np.isrealobj(alpha_k)
             if alpha_k_is_real:
                 print("alpha_k is real")
 
-        if diff_method == 'full':
+        if diff_method == "full":
             if not is_equi:
-                alpha_ref = corr(tsfine.reshape(-1,1) - tsfine.reshape(1,-1))
+                alpha_ref = corr(tsfine.reshape(-1, 1) - tsfine.reshape(1, -1))
             else:
                 alpha_ref = _calc_corr_matrix(tsfine, corr, is_equi=True)
 
@@ -453,81 +496,113 @@ def auto_ng(corr, t_max, ngfac=2, meth=get_mid_point_weights_times, tol=1e-3, di
                 # when using sqrt_lambda instead of lambda we get sqrt_lamda time u
                 # which is the quantity needed for the stochastic process generation
                 if not is_equi:
-                    sqrt_lambda_ui_fine = np.asarray([np.sum(corr(ti - t) * w * evec) / sqrt_eval for ti in tfine])
+                    sqrt_lambda_ui_fine = np.asarray(
+                        [np.sum(corr(ti - t) * w * evec) / sqrt_eval for ti in tfine]
+                    )
                 else:
-                    sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(delta_t_fac=ngfac,
-                                                                     time_axis=t,
-                                                                     alpha_k=np.asarray(alpha_k, dtype=np.complex128),
-                                                                     weights=w,
-                                                                     eigen_val=sqrt_eval,
-                                                                     eigen_vec=evec)
+                    sqrt_lambda_ui_fine = stocproc_c.eig_func_interp(
+                        delta_t_fac=ngfac,
+                        time_axis=t,
+                        alpha_k=np.asarray(alpha_k, dtype=np.complex128),
+                        weights=w,
+                        eigen_val=sqrt_eval,
+                        eigen_vec=evec,
+                    )
 
-                time_integr_intp += (time.time() - t0)
+                time_integr_intp += time.time() - t0
             else:
-                sqrt_lambda_ui_fine = evec*sqrt_eval
+                sqrt_lambda_ui_fine = evec * sqrt_eval
 
             sqrt_lambda_ui_fine_all.append(sqrt_lambda_ui_fine)
 
             # setup cubic spline interpolator
             t0 = time.time()
-            #sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(tfine, sqrt_lambda_ui_fine, noWarning=True)
+            # sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(tfine, sqrt_lambda_ui_fine, noWarning=True)
             if not is_equi:
-                sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(tfine, sqrt_lambda_ui_fine, noWarning=True)
+                sqrt_lambda_ui_spl = tools.ComplexInterpolatedUnivariateSpline(
+                    tfine, sqrt_lambda_ui_fine, noWarning=True
+                )
             else:
-                sqrt_lambda_ui_spl = fcSpline.FCS(x_low=0, x_high=t_max, y=sqrt_lambda_ui_fine, ord_bound_apprx=2)
-            time_spline += (time.time() - t0)
+                sqrt_lambda_ui_spl = fcSpline.FCS(
+                    x_low=0, x_high=t_max, y=sqrt_lambda_ui_fine, ypp_specs=2
+                )
+            time_spline += time.time() - t0
 
             # calculate the max deviation
             t0 = time.time()
-            if diff_method == 'random':
+            if diff_method == "random":
                 ui_t = sqrt_lambda_ui_spl(t_rand)
                 ui_s = sqrt_lambda_ui_spl(s_rand)
                 if alpha_k_is_real:
                     diff += np.real(ui_t * np.conj(ui_s))
                 else:
                     diff += ui_t * np.conj(ui_s)
-            elif diff_method == 'full':
+            elif diff_method == "full":
                 ui_super_fine = sqrt_lambda_ui_spl(tsfine)
-                diff += ui_super_fine.reshape(-1, 1) * np.conj(ui_super_fine.reshape(1, -1))
+                diff += ui_super_fine.reshape(-1, 1) * np.conj(
+                    ui_super_fine.reshape(1, -1)
+                )
             md = np.max(np.abs(diff) / abs_alpha_res)
-            time_calc_diff += (time.time() - t0)
+            time_calc_diff += time.time() - t0
 
-            log.debug("num evec {} -> max diff {:.3e}".format(i+1, md))
+            log.debug("num evec {} -> max diff {:.3e}".format(i + 1, md))
 
             if md < tol:
-                time_total = time_calc_diff + time_spline + time_integr_intp + time_calc_ac + time_fredholm
+                time_total = (
+                    time_calc_diff
+                    + time_spline
+                    + time_integr_intp
+                    + time_calc_ac
+                    + time_fredholm
+                )
                 time_overall = time.time() - time_start
                 time_rest = time_overall - time_total
 
-                log.info("calc_ac {:.3%}, fredholm {:.3%}, integr_intp {:.3%}, spline {:.3%}, calc_diff {:.3%}, rest {:.3%}".format(
-                          time_calc_ac/time_overall, time_fredholm/time_overall, time_integr_intp/time_overall,
-                          time_spline/time_overall, time_calc_diff/time_overall, time_rest/time_overall))
-                log.info("auto ng SUCCESSFUL max diff {:.3e} < tol {:.3e} ng {} num evec {}".format(md, tol, ng, i+1))
+                log.info(
+                    "calc_ac {:.3%}, fredholm {:.3%}, integr_intp {:.3%}, spline {:.3%}, calc_diff {:.3%}, rest {:.3%}".format(
+                        time_calc_ac / time_overall,
+                        time_fredholm / time_overall,
+                        time_integr_intp / time_overall,
+                        time_spline / time_overall,
+                        time_calc_diff / time_overall,
+                        time_rest / time_overall,
+                    )
+                )
+                log.info(
+                    "auto ng SUCCESSFUL max diff {:.3e} < tol {:.3e} ng {} num evec {}".format(
+                        md, tol, ng, i + 1
+                    )
+                )
                 if ret_eigvals:
-                    return np.asarray(sqrt_lambda_ui_fine_all), tfine, _eig_val[:len(sqrt_lambda_ui_fine_all)]
+                    return (
+                        np.asarray(sqrt_lambda_ui_fine_all),
+                        tfine,
+                        _eig_val[: len(sqrt_lambda_ui_fine_all)],
+                    )
                 else:
                     return np.asarray(sqrt_lambda_ui_fine_all), tfine
 
         log.info("ng {} yields md {:.3e}".format(ng, md))
 
+
 def is_axis_equidistant(ax):
     ax = np.asarray(ax)
-    d = ax[1:]-ax[:-1]
+    d = ax[1:] - ax[:-1]
     return np.max(np.abs(d - d[0])) < 1e-15
 
 
 def str_meth_to_meth(meth):
-    if (meth == 'midpoint') or (meth == 'midp'):
+    if (meth == "midpoint") or (meth == "midp"):
         return get_mid_point_weights_times
-    elif (meth == 'trapezoidal') or (meth == 'trapz'):
+    elif (meth == "trapezoidal") or (meth == "trapz"):
         return get_trapezoidal_weights_times
-    elif (meth == 'simpson') or (meth == 'simp'):
+    elif (meth == "simpson") or (meth == "simp"):
         return get_simpson_weights_times
-    elif (meth == 'fourpoint') or (meth == 'fp'):
+    elif (meth == "fourpoint") or (meth == "fp"):
         return get_four_point_weights_times
-    elif (meth == 'gauss_legendre') or (meth == 'gl'):
+    elif (meth == "gauss_legendre") or (meth == "gl"):
         return get_gauss_legendre_weights_times
-    elif (meth == 'tanh_sinh') or (meth == 'ts'):
+    elif (meth == "tanh_sinh") or (meth == "ts"):
         return get_tanh_sinh_weights_times
     else:
         raise ValueError("unknown method to get integration weights '{}'".format(meth))
