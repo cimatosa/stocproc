@@ -2,6 +2,7 @@ import abc
 from functools import partial
 import numpy as np
 import time
+from numba import njit, complex128, float64
 
 from . import method_kle
 from . import method_ft
@@ -539,6 +540,16 @@ class StocProc_FFT(_abcStocProc):
         return len(self.yl)
 
 
+@njit(complex128[:](complex128[:], float64[:], float64[:], float64[:]))
+def _calc_z_TanhSinh(y, fl, omega_k, t):
+    z = np.empty(shape=len(t), dtype=np.complex128)
+    tmp1 = fl * y
+    tmp2 = -1j * omega_k
+    for i, ti in enumerate(t):
+        z[i] = np.sum(tmp1 * np.exp(tmp2 * ti))
+
+    return z
+
 class StocProc_TanhSinh(_abcStocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
 
@@ -672,17 +683,28 @@ class StocProc_TanhSinh(_abcStocProc):
         .. math::
             Z(t_l) = sum_k \sqrt{\frac{w_k J(\omega_k)}{\pi}} Y_k e^{-\i \omega_k t_l}
         """
-        # z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
-        # for i, ti in enumerate(self.t):
-        #     z[i] = np.sum(self.fl*y*np.exp(-1j*self.omega_k*ti))
 
-        tmp1 = self.fl * y
-        tmp2 = -1j * self.omega_k
-        z = np.fromiter(
-            map(lambda ti: np.sum(tmp1 * np.exp(tmp2 * ti)), self.t),
-            dtype=np.complex128,
-        )
-        return z
+        return _calc_z_TanhSinh(y, self.fl, self.omega_k, self.t)
+
+        # z = np.empty(shape=self.num_grid_points, dtype=np.complex128)
+        # tmp1 = self.fl * y
+        # tmp2 = -1j * self.omega_k
+        #
+        # for i, ti in enumerate(self.t):
+        #     z[i] = np.sum(tmp1 * np.exp(tmp2*ti))
+
+        # this is slower
+        # tmp3 = np.exp(tmp2.reshape(1, -1) * self.t.reshape(-1, 1))
+        # z = np.einsum('i, ji -> j', tmp1, tmp3)
+
+        # this has the same speed as the very first approach
+        # tmp1 = self.fl * y
+        # tmp2 = -1j * self.omega_k
+        # z = np.fromiter(
+        #     map(lambda ti: np.sum(tmp1 * np.exp(tmp2 * ti)), self.t),
+        #     dtype=np.complex128,
+        # )
+        # return z
 
     def calc_z_map(self, y):
         r"""calculate

@@ -1,0 +1,36 @@
+[tool.poetry]
+description = "Generate continuous time stationary stochastic processes from a given auto correlation function."
+name = "stocproc"
+version = "1.1.2"
+authors = ["Richard Hartmann <richard.hartmann@tu-dresden.de>"]
+license = "BSD (3 clause)"
+classifiers = [
+"Operating System :: OS Independent",
+"License :: OSI Approved :: BSD License",
+"Topic :: Utilities",
+"Intended Audience :: Science/Research"
+]
+repository = "https://github.com/cimatosa/stocproc"
+build = 'build.py'
+
+[tool.poetry.dependencies]
+python = ">=3.9"
+scipy = "^1.7.3"
+fastcubicspline = "^1.1.1"
+numpy = "^1.24.1"
+
+
+[tool.poetry.dev-dependencies]
+setuptools = "^59.5.0"
+Cython = "^0.29.25"
+black = "^22.12.0"
+pytest = "^7.2.1"
+pytest-cov = "^4.0.0"
+matplotlib = "^3.6.3"
+mpmath = "^1.2.1"
+notebook = "^6.5.3"
+mppfc = "^1.1.1"
+
+[build-system]
+requires = ["poetry-core>=1.4", "cython", "setuptools", "numpy"]
+build-backend = "poetry.core.masonry.api"

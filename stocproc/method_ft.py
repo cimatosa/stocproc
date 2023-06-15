@@ -19,6 +19,7 @@ from scipy.optimize import basinhopping
 from scipy.optimize import minimize
 import sys
 import warnings
+import math
 
 # warnings.simplefilter('error')
 MAX_FLOAT = sys.float_info.max
@@ -209,7 +210,10 @@ def get_x_w_and_dt(n, x_max, t_max):
 
 
 def _fourier_sum(tau, x, w, f):
-    return np.sum(f(x) * np.exp(-1j * x * tau) * w)
+    tmp = f(x) * np.exp(-1j * x * tau) * w
+    real_part = math.fsum(tmp.real)
+    imag_part = math.fsum(tmp.imag)
+    return real_part + 1j*imag_part
 
 
 def fourier_integral_TanhSinh(f, x_max, n, tau_l, t_max_ts):
