@@ -11,7 +11,7 @@ from typing import Callable, Union
 import numpy as np
 from numpy.typing import NDArray
 from scipy.linalg import eigh as scipy_eigh
-import fcSpline
+import fastcubicspline
 
 # module imports
 from stocproc import stocproc_c
@@ -633,7 +633,7 @@ def auto_ng(
                     t_fine, sqrt_lambda_ui_fine, noWarning=True
                 )
             else:
-                sqrt_lambda_ui_spl = fcSpline.FCS(
+                sqrt_lambda_ui_spl = fastcubicspline.FCS(
                     x_low=0, x_high=t_max, y=sqrt_lambda_ui_fine
                 )
             time_spline += time.time() - t0

@@ -24,7 +24,7 @@ class ComplexInterpolatedUnivariateSpline(object):
     def __init__(self, x, y, k=3, noWarning=False):
         if not noWarning:
             raise DeprecationWarning(
-                "use fast cubic Spline (fcSpline) if x-values are equally spaced!"
+                "use fast cubic Spline (fastcubicspline) if x-values are equally spaced!"
             )
         from scipy.interpolate import InterpolatedUnivariateSpline
 

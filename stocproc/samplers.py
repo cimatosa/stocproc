@@ -15,7 +15,7 @@ import logging
 from typing import Optional, Union
 
 # third party imports
-import fcSpline
+import fastcubicspline
 import numpy as np
 import numpy.random
 from numpy.typing import NDArray
@@ -96,7 +96,7 @@ class StocProc(abc.ABC):
     convenient functions such as:
 
     - [`__call__`][stocproc.samplers.StocProc.__call__] evaluate the stochastic process for any time within the
-      interval $[0, t_\mathrm{max}]$ using [cubic spline interpolation](https://github.com/cimatosa/fcSpline)
+      interval $[0, t_\mathrm{max}]$ using [cubic spline interpolation](https://github.com/cimatosa/fastcubicspline)
     - [`get_time`][stocproc.samplers.StocProc.get_time] returns the times $t_n$
     - [`get_z`][stocproc.samplers.StocProc.get_z] returns the discrete stochastic process $z_n$
     - [`new_process`][stocproc.samplers.StocProc.new_process] draws new samples $Y_m$ and updates $z_n$ as well as the
@@ -318,13 +318,13 @@ class StocProc(abc.ABC):
 
         # generate the new process (scaled version)
         self._z = np.sqrt(scale) * self.calc_z(y)
-        self._interpolator = fcSpline.FCS(x_low=0, x_high=self.t_max, y=self._z)
+        self._interpolator = fastcubicspline.FCS(x_low=0, x_high=self.t_max, y=self._z)
 
         # .. and optionally its derivative
         self._z_dot = self.calc_z_dot(y)
         if self._z_dot is not None:
             self._z_dot *= np.sqrt(scale)
-            self._interpolator_dot = fcSpline.FCS(
+            self._interpolator_dot = fastcubicspline.FCS(
                 x_low=0, x_high=self.t_max, y=self._z_dot
             )
 
