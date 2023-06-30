@@ -14,7 +14,7 @@ repository = "https://github.com/cimatosa/stocproc"
 build = 'build.py'
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.11"
+python = ">=3.9"
 scipy = "^1.7.3"
 fastcubicspline = "^1.1.1"
 numpy = "^1.24.1"
