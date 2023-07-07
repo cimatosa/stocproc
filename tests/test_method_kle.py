@@ -17,23 +17,7 @@ _GAMMA_S_PLUS_1 = gamma(_S_ + 1)
 _WC_ = 2
 
 
-def oac(tau):
-    """ohmic bath correlation function"""
-    return (1 + 1j * tau) ** (-(_S_ + 1)) * _GAMMA_S_PLUS_1 / np.pi
 
-
-def osd(omega):
-    """ohmic spectral density"""
-    return omega**_S_ * np.exp(-omega)
-
-
-def lac(t):
-    """lorenzian bath correlation function"""
-    return np.exp(-np.abs(t) - 1j * _WC_ * t)
-
-
-def lsd(w):
-    return 1 / (1 + (w - _WC_) ** 2)
 
 
 def my_intp(ti, corr, w, t, u, lam):

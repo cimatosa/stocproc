@@ -35,7 +35,7 @@ def ohmic_sd(omega):
 
 
 def lorentzian_acf(t):
-    """Lorenzian auto correlation function"""
+    """Lorentzian auto correlation function"""
     return np.exp(-np.abs(t) - 1j * _WC_ * t)
 
 
@@ -442,7 +442,7 @@ def Lor_BCF(tau, eta, gamma, w0):
 
 def test_Lorentian():
     """
-    see if problems with weak coupling Lorenzians have been cured
+    see if problems with weak coupling Lorentzians have been cured
     """
 
     n, g, w0 = 0.01, 1, 5

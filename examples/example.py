@@ -11,12 +11,12 @@ _WC_ = 5
 
 
 def lsd(w):
-    """Lorenzian spectral density"""
+    """LorenTzian spectral density"""
     return 1 / (1 + (w - _WC_) ** 2)
 
 
 def lac(t):
-    """the corresponding Lorenzian correlation function
+    """the corresponding Lorentzian correlation function
 
     note there is a factor of one over pi in the deficition
     of the correlation function:

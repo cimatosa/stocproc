@@ -14,7 +14,7 @@ repository = "https://github.com/cimatosa/stocproc"
 build = 'build.py'
 
 [tool.poetry.dependencies]
-python = ">=3.9"
+python = "^3.9"
 scipy = "^1.7.3"
 fastcubicspline = "^1.1.1"
 numpy = "^1.24.1"
@@ -24,6 +24,7 @@ mkdocs = "^1.4.2"
 mkdocs-material = "^9.0.0"
 mkdocstrings = "^0.20.0"
 mkdocstrings-python = "^0.8.3"
+mppfc = "^1.1.2"
 
 
 [tool.poetry.dev-dependencies]
@@ -35,7 +36,7 @@ pytest-cov = "^4.0.0"
 matplotlib = "^3.6.3"
 mpmath = "^1.2.1"
 notebook = "^6.5.3"
-mppfc = "^1.1.1"
+
 
 [build-system]
 requires = ["poetry-core>=1.4", "cython", "setuptools", "numpy"]

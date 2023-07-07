@@ -6,7 +6,7 @@ import shutil
 
 
 def lsd(w):
-    # Lorenzian spectral density
+    # Lorentzian spectral density
     return 1 / (1 + (w - _WC_) ** 2)
 
 
