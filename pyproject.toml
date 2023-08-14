@@ -21,7 +21,7 @@ fcSpline = { git = "https://github.com/vale981/fcSpline" }
 numpy = "^1.22.2"
 
 [tool.poetry.dev-dependencies]
-setuptools = "^59.5.0"
+setuptools = "^65.5.1"
 Cython = "^0.29.25"
 black = "^21.12b0"
 
