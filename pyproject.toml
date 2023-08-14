@@ -14,17 +14,17 @@ repository = "https://github.com/cimatosa/stocproc"
 build = 'build.py'
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.11"
-scipy = "^1.10.0"
-mpmath = "^1.2.1"
-fcSpline = { git = "https://github.com/vale981/fcSpline" }
+python = "^3.11"
+scipy = "^1.9.0"
+mpmath = "^1.3.0"
+fastcubicspline = "^1.1.3"
 numpy = "^1.22.2"
 
 [tool.poetry.dev-dependencies]
-setuptools = "^59.5.0"
+setuptools = "^65.5.0"
 Cython = "^0.29.25"
-black = "^21.12b0"
+black = "^23.7.0"
 
 [build-system]
-requires = ["poetry>=0.12", "cython", "setuptools", "numpy"]
+requires = ["poetry>=1.5", "cython", "setuptools", "numpy"]
 build-backend = "poetry.core.masonry.api"
