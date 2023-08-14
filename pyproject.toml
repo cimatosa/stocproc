@@ -15,7 +15,7 @@ build = 'build.py'
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-scipy = "^1.7.3"
+scipy = "^1.10.0"
 mpmath = "^1.2.1"
 fcSpline = { git = "https://github.com/vale981/fcSpline" }
 numpy = "^1.22.2"
