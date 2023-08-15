@@ -1,5 +1,6 @@
 from Cython.Build import cythonize
 from distutils.command.build_ext import build_ext
+from setuptools import setup
 import numpy
 import os
 
@@ -25,3 +26,10 @@ def build(setup_kwargs):
             "cmdclass": {"build_ext": build_ext},
         }
     )
+
+
+# if __name__ == "__main__":
+#     setup_kwargs = {}
+#     build(setup_kwargs)
+#     print(setup_kwargs)
+#     setup(**setup_kwargs)

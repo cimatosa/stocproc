@@ -550,6 +550,7 @@ def _calc_z_TanhSinh(y, fl, omega_k, t):
 
     return z
 
+
 class StocProc_TanhSinh(_abcStocProc):
     r"""Simulate Stochastic Process using TanhSinh integration for the Fourier Integral"""
 

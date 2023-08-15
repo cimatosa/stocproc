@@ -120,7 +120,6 @@ def find_integral_boundary_auto(
     max_val_left=None,
     max_val_right=None,
 ):
-
     ref_val_left = ref_val if ref_val_left is None else ref_val_left
     ref_val_right = ref_val if ref_val_right is None else ref_val_right
     max_val_left = max_val if max_val_left is None else max_val_left
@@ -185,7 +184,6 @@ def get_t_max_for_singularity_ts(f, a, b, tol):
     t_max = 3
 
     while t_max < 6:
-
         s_tmax = np.sinh(t_max) * np.pi / 2
         g_tmax = 1 / (np.exp(s_tmax) * np.cosh(s_tmax))
         w_tmax = np.pi * np.cosh(t_max) / 2 / np.cosh(s_tmax) ** 2
@@ -213,7 +211,7 @@ def _fourier_sum(tau, x, w, f):
     tmp = f(x) * np.exp(-1j * x * tau) * w
     real_part = math.fsum(tmp.real)
     imag_part = math.fsum(tmp.imag)
-    return real_part + 1j*imag_part
+    return real_part + 1j * imag_part
 
 
 def fourier_integral_TanhSinh(f, x_max, n, tau_l, t_max_ts):
@@ -439,7 +437,6 @@ def opt_integral_boundaries_use_SLSQP_minimizer(
 
 
 def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_method):
-
     tol_0 = 2
     # N_0 = 10
     N_0 = 5
@@ -489,7 +486,6 @@ def opt_integral_boundaries(integrand, t_max, ft_ref, tol, opt_b_only, diff_meth
 def get_N_a_b_for_accurate_fourier_integral(
     integrand, t_max, tol, ft_ref, opt_b_only, diff_method=_absDiff
 ):
-
     """ """
 
     if opt_b_only:

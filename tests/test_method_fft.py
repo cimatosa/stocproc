@@ -14,7 +14,7 @@ try:
 except ImportError:
     print("matplotlib not found -> any plotting will crash")
 
-import LorentzianSD
+from . import LorentzianSD
 
 
 def test_find_integral_boundary():
@@ -533,22 +533,24 @@ def test_SP_TanhSinh_dump():
 
 
 def test_Lorentzian():
-    w_a = 1.
+    w_a = 1.0
     w_c = 25  # 1.12
     kappa = 7  # .75
     t_max = 10
     t_steps = 50000
     t_eval = np.linspace(0, t_max, t_steps)
-    g_c = np.sqrt(w_a * (w_c ** 2 + kappa ** 2) / w_c)
+    g_c = np.sqrt(w_a * (w_c**2 + kappa**2) / w_c)
     g = 1.5 * g_c
 
     sp.logging_setup(ft_log_level=logging.DEBUG)
 
     sp.StocProc_FFT(
-        spectral_density=LorentzianSD.LorSD(eta=g ** 2 / kappa, p=1, gamma=kappa, wc=w_c),
-        alpha=LorentzianSD.LorBCF(eta=g ** 2 / kappa, p=1,  gamma=kappa, wc=w_c),
+        spectral_density=LorentzianSD.LorSD(
+            eta=g**2 / kappa, p=1, gamma=kappa, wc=w_c
+        ),
+        alpha=LorentzianSD.LorBCF(eta=g**2 / kappa, p=1, gamma=kappa, wc=w_c),
         t_max=t_max,
-        negative_frequencies=True
+        negative_frequencies=True,
     )
 
 
