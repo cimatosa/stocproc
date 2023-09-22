@@ -404,7 +404,7 @@ class KarhunenLoeve(StocProc):
     !!! Note
 
         To push the limits of applicability, a special eigen vector solver exploiting the Toeplitz
-        structure of the auto-correlation-matrix should be used.
+        structure of the auto-correlation-matrix should be used/implemented.
 
 
     Parameters:
@@ -468,13 +468,26 @@ class KarhunenLoeve(StocProc):
         self.num_ev = num_ev
         self.sqrt_lambda_ui_fine = sqrt_lambda_ui_fine
 
-    def __getstate__(self):
+    def __getstate__(self) -> tuple[NDArray, float]:
+        """
+        Return the state of this instance which is fully specified by the finite set of discrete eigenfunction
+        and the time over which they are defined.
+
+        Returns:
+            the tuple (set of eigenfunctions, tmax)
+        """
         return (
             self.sqrt_lambda_ui_fine,
             self.t_max,
         )
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: tuple[NDArray, float]):
+        """
+        Set the state of the instance from the tuple (set of eigenfunctions, tmax) given by `state`.
+
+        Parameters:
+            state: a tuple (set of eigenfunctions, tmax)
+        """
         sqrt_lambda_ui_fine, t_max = state
         num_ev, ng = sqrt_lambda_ui_fine.shape
         super(KarhunenLoeve, self).__init__(t_max=t_max, num_grid_points=ng)
@@ -496,7 +509,7 @@ class KarhunenLoeve(StocProc):
         """
         return np.tensordot(y, self.sqrt_lambda_ui_fine, axes=([0], [0])).flatten()
 
-    def get_num_y(self):
+    def get_num_y(self) -> int:
         """
         Return the number of independent random variables $Y$, which amounts in the KLE approach
         to the number of eigenfunction $n$ used for the expansion.

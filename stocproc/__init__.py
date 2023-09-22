@@ -22,3 +22,4 @@ from .samplers import FastFourier
 from .samplers import KarhunenLoeve
 from .samplers import TanhSinh
 from .samplers import Cholesky
+from . import acf

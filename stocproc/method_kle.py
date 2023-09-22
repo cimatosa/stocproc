@@ -8,10 +8,12 @@ import time
 from typing import Callable, Union
 
 # third party imports
+from numba import njit
 import numpy as np
 from numpy.typing import NDArray
 from scipy.linalg import eigh as scipy_eigh
 import fastcubicspline
+
 
 # module imports
 from stocproc import stocproc_c
@@ -62,12 +64,12 @@ def solve_hom_fredholm(
         There are various convenient functions to calculate the integration weights and times
         to approximate the integral over the interval [0, t_max] using `ng` points.
 
-        - [`stocproc.method_kle.get_mid_point_weights_times`][]
-        - [`stocproc.method_kle.`get_trapezoidal_weights_times`][]
-        - [`stocproc.method_kle.`get_simpson_weights_times`][]
-        - [`stocproc.method_kle.`get_four_point_weights_times`][]
-        - [`stocproc.method_kle.`get_gauss_legendre_weights_times`][]
-        - [`stocproc.method_kle.`get_tanh_sinh_weights_times`][]
+        - [`stocproc.method_kle.get_nodes_weights_mid_point`][]
+        - [`stocproc.method_kle.get_nodes_weights_trapezoidal`][]
+        - [`stocproc.method_kle.get_nodes_weights_simpson`][]
+        - [`stocproc.method_kle.get_nodes_weights_four_point`][]
+        - [`stocproc.method_kle.get_nodes_weights_gauss_legendre`][]
+        - [`stocproc.method_kle.get_nodes_weights_tanh_sinh`][]
 
     !!! Note
 
@@ -532,6 +534,7 @@ def auto_ng(
     if diff_method == "full":
         alpha_ref = t_rand = s_rand = None
     elif diff_method == "random":
+        np.random.seed(0)
         t_rand = np.random.rand(dm_random_samples) * t_max
         s_rand = np.random.rand(dm_random_samples) * t_max
         alpha_ref = acf(t_rand - s_rand)
@@ -539,7 +542,7 @@ def auto_ng(
         raise ValueError(
             "unknown diff_method '{}', use 'full' or 'random'".format(diff_method)
         )
-    log.debug("diff_method: {}".format(diff_method))
+    log.info(f"start auto_ng (tol: {tol}, diff_method: {diff_method}, rel. diff.: {relative_difference}")
 
     time_fredholm = 0
     time_calc_ac = 0
@@ -551,10 +554,11 @@ def auto_ng(
         quad_scheme = quad_scheme_name_to_function(quad_scheme)
 
     k = 4
+    # double number of grid points for the discrete eigen value approximation
+    # of the Fredholm equation
     while True:
         k += 1
         ng = 2**k + 1
-        log.info("check {} grid points".format(ng))
         t, w, is_equi = quad_scheme(t_max, ng)
 
         # construct the auto correlation matrix
@@ -567,7 +571,7 @@ def auto_ng(
         _eig_val, _eig_vec = solve_hom_fredholm(r, w)
         time_fredholm += time.time() - t0
 
-        t_fine = subdivide_axis(t, ng_fac)  # setup fine
+        t_fine = subdivide_axis(t, ng_fac)   # setup fine
         ts_fine = subdivide_axis(t_fine, 2)  # and super fine time grid
 
         # this is needed for efficient integral interpolation
@@ -590,7 +594,10 @@ def auto_ng(
         else:
             abs_alpha_res = 1
 
+        # subsequently add interpolated (by the KLE-kernel) eigen functions
+        # to reconstruct the ACF
         sqrt_lambda_ui_fine_all = []
+        md = None
         for i in range(ng):
             eig_vec = _eig_vec[:, i]
             if _eig_val[i] < 0:
@@ -646,9 +653,7 @@ def auto_ng(
                 diff += ui_t * np.conj(ui_s)
             elif diff_method == "full":
                 ui_super_fine = sqrt_lambda_ui_spl(ts_fine)
-                diff += ui_super_fine.reshape(-1, 1) * np.conj(
-                    ui_super_fine.reshape(1, -1)
-                )
+                diff += np.outer(ui_super_fine, np.conj(ui_super_fine))
             md = np.max(np.abs(diff) / abs_alpha_res)
             time_calc_diff += time.time() - t0
 
@@ -676,8 +681,8 @@ def auto_ng(
                     )
                 )
                 log.info(
-                    "auto ng SUCCESSFUL max diff {:.3e} < tol {:.3e} ng {} num evec {}".format(
-                        md, tol, ng, i + 1
+                    "auto ng SUCCESSFUL with {} grid points -> max diff {:.3e} < tol {:.3e}, used eig. vec. {}".format(
+                        ng, md, tol, ng, i + 1
                     )
                 )
                 if ret_eig_vals:
@@ -689,6 +694,9 @@ def auto_ng(
                 else:
                     return np.asarray(sqrt_lambda_ui_fine_all), t_fine
 
+        # We have added all eigen function, but the error is still too large.
+        # This means that the discretization is not fine enough.
+        log.info(f"{ng} grid points -> final deviation of {md:.3e} > tol {tol:.3e}")
 
 def is_axis_equidistant(ax: NDArray):
     r"""

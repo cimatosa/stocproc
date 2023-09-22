@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import quad
 from scipy.linalg import eig, ishermitian
-from scipy.special import gamma
 
 # stocproc module imports
 import stocproc as sp
@@ -11,13 +10,6 @@ from stocproc import util
 from stocproc import method_kle
 from stocproc import stocproc_c
 import logging
-
-_S_ = 0.6
-_GAMMA_S_PLUS_1 = gamma(_S_ + 1)
-_WC_ = 2
-
-
-
 
 
 def my_intp(ti, corr, w, t, u, lam):
@@ -145,6 +137,7 @@ def test_analytic_lorentzian_eigenfunctions():
 
 def test_calc_acf():
     t = np.linspace(0, 1, 15)
+    lac = lambda tau: sp.acf.lorentzian_acf(tau, eta=1, gamma=1, w0=5)
     ac_mat = method_kle._calc_corr_matrix(t, lac)
     ac_ref = lac(t.reshape(-1, 1) - t.reshape(1, -1))
 
@@ -159,7 +152,7 @@ def test_solve_fredholm():
     with a straight forward non Hermitian eigenvalue solver
     """
     t_max = 15
-    corr = lac
+    corr = lambda tau: sp.acf.lorentzian_acf(tau, eta=1, gamma=1, w0=5)
     meth = [
         method_kle.get_nodes_weights_mid_point,
         method_kle.get_nodes_weights_simpson,
@@ -203,7 +196,7 @@ def test_solve_fredholm():
 def test_cython_interpolation():
     """ """
     t_max = 15
-    corr = oac
+    corr = lambda tau: sp.acf.ohmic_acf(tau, eta=1, s=0.6, wc=6)
 
     meth = method_kle.get_nodes_weights_four_point
 
@@ -246,10 +239,7 @@ def test_solve_fredholm_reconstr_ac():
 
     differences occur when checking validity of the interpolated time continuous Fredholm equation
     """
-    _WC_ = 2
-
-    def lac(t):
-        return np.exp(-np.abs(t) - 1j * _WC_ * t)
+    lac = lambda tau: sp.acf.lorentzian_acf(tau, eta=1, gamma=1, w0=5)
 
     t_max = 10
     tol = 2e-10
@@ -274,8 +264,8 @@ def test_solve_fredholm_reconstr_ac():
 
 
 def test_auto_ng():
-    corr = oac
-    t_max = 8
+    corr = lambda tau: sp.acf.ohmic_acf(tau, eta=1, s=0.6, wc=3)
+    t_max = 4
     ng_fac = 1
     meth = [
         method_kle.get_nodes_weights_mid_point,
@@ -287,12 +277,11 @@ def test_auto_ng():
     ]
 
     for _meth in meth:
-        ui, t = method_kle.auto_ng(corr, t_max, ng_fac=ng_fac, quad_scheme=_meth)
-        print(_meth.__name__, ui.shape)
+        for diff_method in ['full', 'random']:
+            ui, t = method_kle.auto_ng(corr, t_max, ng_fac=ng_fac, quad_scheme=_meth, diff_method=diff_method)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     test_weights(plot=False)
     test_is_axis_equidistant()
     test_subdivide_axis()

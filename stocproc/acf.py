@@ -1,4 +1,4 @@
-"""
+r"""
 A collection of auto (bath) correlation functions (ACF)
 
 In principle the ACF $\alpha(\tau)$ can be any kind of positive integral kernel.
@@ -25,7 +25,7 @@ cached_gamma_s_over_pi = cache(lambda s: gamma(s) / np.pi)
 
 
 def ohmic_acf(tau, eta, s, wc):
-    """
+    r"""
     Ohmic auto correlation function
 
     Related to the spectral density
@@ -45,7 +45,7 @@ def ohmic_acf(tau, eta, s, wc):
 
 
 def ohmic_sd(w, eta, s, wc):
-    """
+    r"""
     Ohmic spectral density
 
     defines as
@@ -58,7 +58,7 @@ def ohmic_sd(w, eta, s, wc):
 
 
 def lorentzian_acf(tau, eta, gamma, w0):
-    """
+    r"""
     Lorentzian auto correlation function
 
     Related to the spectral density
@@ -78,7 +78,7 @@ def lorentzian_acf(tau, eta, gamma, w0):
 
 
 def lorentzian_sd(w, eta, gamma, w0):
-    """
+    r"""
         Lorentzian spectral density
 
         defines as

@@ -146,3 +146,5 @@ $$
 ### Caching
 
 ### Examples
+
+### Logging
