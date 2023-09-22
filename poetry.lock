@@ -3092,17 +3092,16 @@ testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (
 
 [[package]]
 name = "setuptools-scm"
-version = "8.0.2"
+version = "8.0.3"
 description = "the blessed package to manage your versions by scm tags"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "setuptools-scm-8.0.2.tar.gz", hash = "sha256:e45c8c87719b753b6d47cf09907d1239540c7e150cd44f06f658b602f402b005"},
-    {file = "setuptools_scm-8.0.2-py3-none-any.whl", hash = "sha256:b737bb0f195ae024759188e7080fe15fe6d9353e1b3f6e40b41e4d298f76c147"},
+    {file = "setuptools-scm-8.0.3.tar.gz", hash = "sha256:0169fd70197efda2f8c4d0b2a7a3d614431b488116f37b79d031e9e7ec884d8c"},
+    {file = "setuptools_scm-8.0.3-py3-none-any.whl", hash = "sha256:813822234453438a13c78d05c8af29918fbc06f88efb33d38f065340bbb48c39"},
 ]
 
 [package.dependencies]
-importlib-metadata = {version = ">=4.6", markers = "python_version < \"3.10\""}
 packaging = ">=20"
 setuptools = "*"
 tomli = {version = ">=1", markers = "python_version < \"3.11\""}
@@ -3551,4 +3550,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "a6b8ca4f1002d1cbc3ce2fb87396de7d3580447545aee7833bf9c7e86309471b"
+content-hash = "d944d55262c40606c956ae8e193c69e350b060bda951cdfe36da79f72dd5b6b6"
