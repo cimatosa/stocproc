@@ -23,7 +23,7 @@ numpy = "^1.22.2"
 [tool.poetry.dev-dependencies]
 setuptools = "^65.5.0"
 Cython = "^0.29.25"
-black = "^23.7.0"
+black = "^24.3.0"
 
 [build-system]
 requires = ["poetry>=1.5", "cython", "setuptools", "numpy"]
